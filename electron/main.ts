@@ -42,6 +42,7 @@ async function createWindow() {
     minHeight: 760,
     title: 'GrainMark',
     backgroundColor: '#0E0E10',
+    show: false, // 等 ready-to-show 再显示，避免白屏闪
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     trafficLightPosition: { x: 16, y: 16 },
     webPreferences: {
@@ -54,6 +55,35 @@ async function createWindow() {
       experimentalFeatures: false,
       spellcheck: false,
     },
+  })
+
+  // ready-to-show → 显示并抢焦点（macOS 从终端启动时必要）
+  win.once('ready-to-show', () => {
+    win?.show()
+    win?.focus()
+    if (process.platform === 'darwin') {
+      app.focus({ steal: true })
+    }
+    logger.info('window.ready', { url: VITE_DEV_SERVER_URL ?? 'file://dist' })
+  })
+
+  // 兜底：5s 后仍未 ready-to-show 强制 show（防卡死）
+  setTimeout(() => {
+    if (win && !win.isVisible()) {
+      logger.warn('window.force-show')
+      win.show()
+      win.focus()
+    }
+  }, 5000)
+
+  // 加载失败诊断（不要静默失败）
+  win.webContents.on('did-fail-load', (_e, errCode, errDesc, url) => {
+    logger.error('window.load-failed', { errCode, errDesc, url })
+  })
+
+  // 渲染进程崩溃诊断
+  win.webContents.on('render-process-gone', (_e, details) => {
+    logger.error('renderer.gone', { reason: details.reason })
   })
 
   // 拦截所有新窗口 / 外链：一律用系统浏览器打开（不在 Electron 里加载外部 URL）

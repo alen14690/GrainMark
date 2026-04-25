@@ -4,6 +4,8 @@ import { defineConfig } from 'vite'
 import electron from 'vite-plugin-electron/simple'
 
 export default defineConfig({
+  // file:// 加载时必须使用相对路径
+  base: './',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
