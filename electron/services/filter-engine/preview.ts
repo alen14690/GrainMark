@@ -1,9 +1,13 @@
 /**
  * 预览渲染（M2 填入完整 pipeline）
  * 目前占位：如果没有滤镜则返回原图 base64，有滤镜则简单 tone 调整
+ *
+ * RAW 支持（Pass 2.8）：对 RAW 文件先走 resolvePreviewBuffer 抽取内嵌 JPEG，
+ * 再交由 sharp 处理。对 UI 完全透明。
  */
 import sharp from 'sharp'
 import type { FilterPipeline } from '../../../shared/types.js'
+import { resolvePreviewBuffer } from '../raw/index.js'
 import { getFilter } from '../storage/filterStore.js'
 
 const PREVIEW_MAX_DIM = 1600
@@ -19,7 +23,9 @@ export async function renderPreview(
     pipeline = preset?.pipeline
   }
 
-  let img = sharp(photoPath, { failOn: 'none' }).rotate().resize({
+  const { buffer } = await resolvePreviewBuffer(photoPath)
+
+  let img = sharp(buffer, { failOn: 'none' }).rotate().resize({
     width: PREVIEW_MAX_DIM,
     height: PREVIEW_MAX_DIM,
     fit: 'inside',
@@ -30,8 +36,8 @@ export async function renderPreview(
     img = applyPipelineSharp(img, pipeline)
   }
 
-  const buffer = await img.jpeg({ quality: 85 }).toBuffer()
-  return `data:image/jpeg;base64,${buffer.toString('base64')}`
+  const out = await img.jpeg({ quality: 85 }).toBuffer()
+  return `data:image/jpeg;base64,${out.toString('base64')}`
 }
 
 /** M2 会扩展此函数以覆盖完整 pipeline */

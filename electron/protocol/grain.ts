@@ -12,8 +12,14 @@ import { pathToFileURL } from 'node:url'
  *   grain://thumb/<id>        — 缩略图
  *   grain://preview/<id>?v=N  — 预览（带版本号缓存破坏）
  *   grain://lut/<filename>    — 用户 LUT 文件
+ *
+ * RAW 支持（Pass 2.8）：photo / preview kind 对 RAW 文件会透明地返回内嵌 JPEG，
+ * UI 层不需感知。对非 RAW 走 net.fetch(file://) 零开销透传。
  */
 import { net, protocol } from 'electron'
+import { logger } from '../services/logger/logger.js'
+import { isRawFormat, resolvePreviewBuffer } from '../services/raw/index.js'
+import { UnsupportedRawError } from '../services/raw/rawDecoder.js'
 import type { PathGuard } from '../services/security/pathGuard.js'
 import { getLUTDir, getThumbsDir } from '../services/storage/init.js'
 
@@ -78,10 +84,37 @@ export function registerGrainProtocol(pathGuard: PathGuard): void {
       const stat = fs.statSync(safe)
       if (stat.isDirectory()) return new Response('Forbidden', { status: 403 })
 
+      // RAW 分支：photo / preview kind 对 RAW 做透明 JPEG 预览替换
+      // thumb / lut 不经过 RAW 解码（thumb 已由 photoStore 预先走过 resolvePreviewBuffer 生成了 JPEG）
+      if ((kind === 'photo' || kind === 'preview') && isRawFormat(safe)) {
+        try {
+          const { buffer } = await resolvePreviewBuffer(safe)
+          // Node Buffer → Blob 以兼容 Web Response BodyInit 类型签名
+          // （Electron/Node 运行时可直接接受 Buffer，但 DOM lib 的 TS 类型只认标准 BodyInit）
+          const body = new Blob([new Uint8Array(buffer).buffer as ArrayBuffer], {
+            type: 'image/jpeg',
+          })
+          return new Response(body, {
+            status: 200,
+            headers: {
+              'Content-Type': 'image/jpeg',
+              'Content-Length': String(buffer.length),
+              'Cache-Control': 'private, max-age=3600',
+            },
+          })
+        } catch (err) {
+          if (err instanceof UnsupportedRawError) {
+            logger.warn('grain.raw.unsupported', { path: safe, reason: err.reason })
+            return new Response('Unsupported RAW (no embedded JPEG)', { status: 415 })
+          }
+          throw err
+        }
+      }
+
       // 通过 Electron net.fetch 流式返回（支持 range 请求）
       return net.fetch(pathToFileURL(safe).toString())
     } catch (err) {
-      console.error('[grain-protocol] error:', err)
+      logger.error('grain.protocol.error', { err: (err as Error).message })
       return new Response('Internal Error', { status: 500 })
     }
   })
