@@ -25,6 +25,11 @@ export interface PipelineStep {
   frag: string
   /** 附加 uniforms（不含主输入纹理 `u_image`，由 Pipeline 自动绑定） */
   uniforms?: PassConfig['uniforms']
+  /**
+   * 额外纹理输入（除了 u_image 之外的 sampler，如 LUT3D）。
+   * name 必须匹配 shader 里的 uniform 名；Pipeline 不会解释语义
+   */
+  extraInputs?: PassConfig['inputs']
 }
 
 export interface PipelineRunArgs {
@@ -111,7 +116,7 @@ export class Pipeline {
       runPass(this.ctx, this.registry, {
         vert: this.vert,
         frag: step.frag,
-        inputs: [{ name: 'u_image', texture: input }],
+        inputs: [{ name: 'u_image', texture: input }, ...(step.extraInputs ?? [])],
         uniforms: step.uniforms,
         output,
       })

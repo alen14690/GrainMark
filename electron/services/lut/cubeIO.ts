@@ -2,80 +2,42 @@
  * 3D LUT .cube 文件读写
  *
  * 安全加固：
- *   - LUT_3D_SIZE 限制 2..64
- *   - 文本行数上限（防 DoS）
+ *   - LUT_3D_SIZE 限制 2..64（由 shared/cubeParser 保证）
+ *   - 文本行数上限（防 DoS，由 shared/cubeParser 保证）
  *   - 必要字段完整性校验
+ *
+ * 本文件是主进程侧的"带 I/O + 安全错误包装"壳；纯解析逻辑在 shared/cubeParser.ts，
+ * 渲染进程（WebGL LUT 上传）共用同一份解析器。
  */
 import fs from 'node:fs'
 import path from 'node:path'
 import { nanoid } from 'nanoid'
+import type { Cube3D } from '../../../shared/cubeParser.js'
+import { CUBE_LIMITS, CubeParseError, parseCubeText as _parseCubeText } from '../../../shared/cubeParser.js'
 import type { FilterPreset } from '../../../shared/types.js'
 import { SecurityError } from '../security/pathGuard.js'
 import { saveFilter } from '../storage/filterStore.js'
 import { getLUTDir } from '../storage/init.js'
 
+export type { Cube3D } from '../../../shared/cubeParser.js'
+
 export const LUT_LIMITS = {
-  MIN_SIZE: 2,
-  MAX_SIZE: 64,
+  MIN_SIZE: CUBE_LIMITS.MIN_SIZE,
+  MAX_SIZE: CUBE_LIMITS.MAX_SIZE,
   MAX_FILE_BYTES: 20 * 1024 * 1024, // 20 MB
-  MAX_LINES: 64 * 64 * 64 + 32,
+  MAX_LINES: CUBE_LIMITS.MAX_LINES,
 }
 
-export interface Cube3D {
-  size: number
-  title?: string
-  data: Float32Array
-}
-
+/** 把 shared 层的 CubeParseError 包装成 SecurityError 以保留历史契约 */
 export function parseCubeText(text: string): Cube3D {
-  // 行数守卫
-  const lines = text.split(/\r?\n/)
-  if (lines.length > LUT_LIMITS.MAX_LINES) {
-    throw new SecurityError(`LUT has too many lines: ${lines.length}`, 'LUT_TOO_MANY_LINES')
-  }
-  let size = 0
-  let title: string | undefined
-  const rgb: number[] = []
-
-  for (const rawLine of lines) {
-    const line = rawLine.trim()
-    if (!line || line.startsWith('#')) continue
-    if (line.startsWith('TITLE')) {
-      title = line
-        .replace(/^TITLE\s+/, '')
-        .replace(/^"|"$/g, '')
-        .slice(0, 128)
-      continue
+  try {
+    return _parseCubeText(text)
+  } catch (err) {
+    if (err instanceof CubeParseError) {
+      throw new SecurityError(err.message, err.code)
     }
-    if (line.startsWith('LUT_3D_SIZE')) {
-      size = Number.parseInt(line.split(/\s+/)[1] ?? '0', 10)
-      if (!Number.isInteger(size) || size < LUT_LIMITS.MIN_SIZE || size > LUT_LIMITS.MAX_SIZE) {
-        throw new SecurityError(
-          `Invalid LUT_3D_SIZE=${size} (allowed ${LUT_LIMITS.MIN_SIZE}..${LUT_LIMITS.MAX_SIZE})`,
-          'LUT_BAD_SIZE',
-        )
-      }
-      continue
-    }
-    if (line.startsWith('DOMAIN_') || line.startsWith('LUT_1D')) continue
-
-    const parts = line.split(/\s+/).map(Number)
-    if (parts.length === 3 && parts.every((v) => Number.isFinite(v))) {
-      rgb.push(parts[0]!, parts[1]!, parts[2]!)
-    }
+    throw err
   }
-
-  if (size === 0) {
-    throw new SecurityError('Missing LUT_3D_SIZE directive', 'LUT_MISSING_SIZE')
-  }
-  const expected = size * size * size * 3
-  if (rgb.length !== expected) {
-    throw new SecurityError(
-      `LUT data size mismatch: got ${rgb.length}, expected ${expected}`,
-      'LUT_DATA_MISMATCH',
-    )
-  }
-  return { size, title, data: new Float32Array(rgb) }
 }
 
 export function writeCubeText(cube: Cube3D, title?: string): string {

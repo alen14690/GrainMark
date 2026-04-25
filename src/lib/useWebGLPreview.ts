@@ -6,20 +6,22 @@
  *   - 首次 mount 创建 GLContext + ShaderRegistry + Pipeline
  *   - sourceUrl 变化 → fetch → createImageBitmap → 上传 GPU
  *   - pipeline 变化 → setSteps + run (自动 abort 上一次 run)
- *   - 返回：{ canvasRef, status, stats, error, needsCpuFallback }
+ *   - LUT 异步加载：useLutTexture 管理，LUT ready 后自动重渲染
+ *   - 返回：{ canvasRef, status, error, lastDurationMs, needsCpuFallback }
  *
  * 降级：
  *   - WebGL 2 不可用（GLContext.ok=false）→ status='unsupported'
  *   - sourceUrl 载入失败 → status='error' + error.message
  *   - context lost → status='lost'，尝试自动重建
- *   - Pipeline 含 WebGL 未实现通道（Pass 3b-1 后仅剩 LUT）→ needsCpuFallback=true
+ *   - Pass 3b-2 之后：LUT 解析失败（含 SecurityError 级别）会设 needsCpuFallback=true
+ *     这样 Editor 会改走 IPC CPU 路径（虽然 CPU 端现在也没实现 LUT，但至少预览不会卡死）
  *
- * Pipeline 顺序（Lightroom 约定 + 摄影工作流直觉）：
- *   WhiteBalance → Tone → Curves → HSL → ColorGrading → Adjustments(clarity/sat/vib)
- *   → Halation → Grain → Vignette
+ * Pipeline 顺序（Lightroom 约定）：
+ *   WB → Tone → Curves → HSL → ColorGrading → Adjustments → LUT → Halation → Grain → Vignette
  *
- * 注：Halation/Grain 放在最后颜色处理之后、Vignette 前；Vignette 永远是最后一步
- * （否则颗粒/溢光被暗角遮住就看不见了）
+ * 为什么 LUT 在 ColorGrading 之后、Halation/Grain/Vignette 之前？
+ *   - LUT 属于"最终色彩查表"，通常是创作者调好色之后再套个 look
+ *   - 但颗粒/光晕/暗角是物理模拟（胶片感），必须最后叠加
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FilterPipeline } from '../../shared/types'
@@ -32,6 +34,7 @@ import {
   GRAIN_FRAG,
   HALATION_FRAG,
   HSL_FRAG,
+  LUT3D_FRAG,
   Pipeline,
   ShaderRegistry,
   TONE_FRAG,
@@ -49,12 +52,14 @@ import {
   normalizeGrainParams,
   normalizeHalationParams,
   normalizeHslParams,
+  normalizeLut3dParams,
   normalizeToneParams,
   normalizeVignetteParams,
   normalizeWhiteBalanceParams,
   textureFromBitmap,
 } from '../engine/webgl'
 import type { PipelineStep, Texture } from '../engine/webgl'
+import { useLutTexture } from './useLutTexture'
 
 export type WebGLPreviewStatus = 'idle' | 'loading' | 'ready' | 'unsupported' | 'lost' | 'error'
 
@@ -64,30 +69,35 @@ export interface WebGLPreviewResult {
   error?: string
   lastDurationMs?: number
   /**
-   * Pipeline 中含 GPU 未实现的通道。Pass 3b-1 后只剩 LUT 需要 CPU 兜底。
-   * Editor 接到此信号应调用带 filterId 的 IPC preview:render。
+   * 仅当 LUT 加载/解析失败时为 true（极少数情况，例如 .cube 文件被破坏）。
+   * 所有 pipeline 通道都已 GPU 化，正常情况下恒为 false。
    */
   needsCpuFallback: boolean
 }
 
-/** GPU 未实现的通道（Pass 3b-1 之后仅 LUT） */
-function hasGpuUnsupportedChannels(pipe: FilterPipeline | null): boolean {
-  if (!pipe) return false
-  if (pipe.lut) return true
-  return false
+/** 构造 pipeline step 时需要的 GPU 资源（LUT 纹理等） */
+interface BuildContext {
+  resolution: [number, number]
+  /** LUT 纹理；null 表示 pipeline 无 LUT 或 LUT 尚未 ready */
+  lutTexture: Texture | null
+  lutSize: number
 }
 
 /**
  * 把 FilterPipeline 翻译成 GPU 步骤。只有 "非恒等" 的通道才会产生 step，
  * 避免浪费一个 ping-pong（一条空调整的 HSL/curves 也不是恒等 fast-path）。
+ *
+ * LUT 特殊处理：仅当 pipeline.lut 存在且 lutTexture 已 ready 时才产生 LUT step。
+ * LUT 还在加载时，其余通道照常渲染，保证 UI 响应性。
  */
-export function pipelineToSteps(pipe: FilterPipeline | null, resolution: [number, number]): PipelineStep[] {
+export function pipelineToSteps(pipe: FilterPipeline | null, build: BuildContext): PipelineStep[] {
   if (!pipe) return []
+  const { resolution, lutTexture, lutSize } = build
   const [w, h] = resolution
   const aspect = w / Math.max(h, 1)
   const steps: PipelineStep[] = []
 
-  // 1. White Balance（最先应用，影响后续所有色彩）
+  // 1. White Balance
   if (pipe.whiteBalance && (pipe.whiteBalance.temp !== 0 || pipe.whiteBalance.tint !== 0)) {
     steps.push({
       id: 'wb',
@@ -96,7 +106,7 @@ export function pipelineToSteps(pipe: FilterPipeline | null, resolution: [number
     })
   }
 
-  // 2. Tone（曝光/对比/高光/阴影/白黑点）
+  // 2. Tone
   if (pipe.tone) {
     steps.push({
       id: 'tone',
@@ -105,7 +115,7 @@ export function pipelineToSteps(pipe: FilterPipeline | null, resolution: [number
     })
   }
 
-  // 3. Curves（RGB + R/G/B）
+  // 3. Curves
   if (pipe.curves && !isCurvesIdentity(pipe.curves)) {
     steps.push({
       id: 'curves',
@@ -114,7 +124,7 @@ export function pipelineToSteps(pipe: FilterPipeline | null, resolution: [number
     })
   }
 
-  // 4. HSL（8 通道）
+  // 4. HSL
   if (pipe.hsl && !isHslIdentity(pipe.hsl)) {
     steps.push({
       id: 'hsl',
@@ -123,7 +133,7 @@ export function pipelineToSteps(pipe: FilterPipeline | null, resolution: [number
     })
   }
 
-  // 5. Color Grading（三向色轮）
+  // 5. Color Grading
   if (pipe.colorGrading && !isColorGradingIdentity(pipe.colorGrading)) {
     steps.push({
       id: 'colorGrading',
@@ -132,7 +142,7 @@ export function pipelineToSteps(pipe: FilterPipeline | null, resolution: [number
     })
   }
 
-  // 6. Adjustments（clarity + saturation + vibrance 合并为一个 pass）
+  // 6. Adjustments
   if (!isAdjustmentsIdentity(pipe)) {
     steps.push({
       id: 'adjustments',
@@ -141,7 +151,19 @@ export function pipelineToSteps(pipe: FilterPipeline | null, resolution: [number
     })
   }
 
-  // 7. Halation（高光溢光，颜色处理的最后一步）
+  // 7. LUT 3D（只有当 lutTexture 已加载完成才产生 step）
+  if (pipe.lut && lutTexture && lutSize >= 2) {
+    steps.push({
+      id: 'lut',
+      frag: LUT3D_FRAG,
+      uniforms: {
+        ...normalizeLut3dParams({ lutSize, intensity: pipe.lutIntensity ?? 100 }),
+      },
+      extraInputs: [{ name: 'u_lut', texture: lutTexture }],
+    })
+  }
+
+  // 8. Halation
   if (pipe.halation && !isHalationIdentity(pipe.halation)) {
     steps.push({
       id: 'halation',
@@ -150,7 +172,7 @@ export function pipelineToSteps(pipe: FilterPipeline | null, resolution: [number
     })
   }
 
-  // 8. Grain（胶片颗粒）
+  // 9. Grain
   if (pipe.grain && !isGrainIdentity(pipe.grain)) {
     steps.push({
       id: 'grain',
@@ -159,7 +181,7 @@ export function pipelineToSteps(pipe: FilterPipeline | null, resolution: [number
     })
   }
 
-  // 9. Vignette（必须最后，否则会被后续操作覆盖）
+  // 10. Vignette
   if (pipe.vignette) {
     steps.push({
       id: 'vignette',
@@ -179,9 +201,9 @@ export function useWebGLPreview(
   const [status, setStatus] = useState<WebGLPreviewStatus>('idle')
   const [error, setError] = useState<string | undefined>(undefined)
   const [lastDurationMs, setLastDurationMs] = useState<number | undefined>(undefined)
+  const [gl, setGl] = useState<GLContext | null>(null)
 
   // 长期持有的 GL 对象（跨 render）
-  const glRef = useRef<GLContext | null>(null)
   const pipelineRef = useRef<Pipeline | null>(null)
   const sourceTexRef = useRef<Texture | null>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -191,18 +213,30 @@ export function useWebGLPreview(
     latestPipelineRef.current = pipeline
   }, [pipeline])
 
-  const needsCpuFallback = useMemo(() => hasGpuUnsupportedChannels(pipeline), [pipeline])
+  // LUT 纹理加载（异步）
+  const lut = useLutTexture(gl, pipeline?.lut ?? null)
+
+  // CPU 兜底：只有 LUT 解析失败时才触发（几乎不发生）
+  const needsCpuFallback = useMemo(() => {
+    if (pipeline?.lut && lut.status === 'error') return true
+    return false
+  }, [pipeline?.lut, lut.status])
 
   const renderNow = useCallback(async () => {
     const source = sourceTexRef.current
     const pipe = pipelineRef.current
-    const gl = glRef.current
     if (!source || !pipe || !gl) return
     abortRef.current?.abort()
     const ctrl = new AbortController()
     abortRef.current = ctrl
     const resolution: [number, number] = [source.width, source.height]
-    pipe.setSteps(pipelineToSteps(latestPipelineRef.current, resolution))
+    pipe.setSteps(
+      pipelineToSteps(latestPipelineRef.current, {
+        resolution,
+        lutTexture: lut.texture,
+        lutSize: lut.size,
+      }),
+    )
     try {
       const stats = await pipe.run({ source, signal: ctrl.signal })
       if (stats.aborted) return
@@ -212,7 +246,7 @@ export function useWebGLPreview(
       setStatus('error')
       setError((e as Error).message)
     }
-  }, [])
+  }, [gl, lut.texture, lut.size])
 
   // 初始化 GLContext —— 仅在 mount 时一次
   useEffect(() => {
@@ -225,8 +259,8 @@ export function useWebGLPreview(
     const registry = new ShaderRegistry(ctx)
     const pipelineObj = new Pipeline(ctx, registry, DEFAULT_VERT)
 
-    glRef.current = ctx
     pipelineRef.current = pipelineObj
+    setGl(ctx)
 
     const offLost = ctx.onLost(() => setStatus('lost'))
     const offRestored = ctx.onRestored(() => setStatus('idle'))
@@ -239,16 +273,15 @@ export function useWebGLPreview(
       pipelineObj.dispose()
       registry.dispose()
       ctx.dispose()
-      glRef.current = null
       pipelineRef.current = null
       sourceTexRef.current = null
+      setGl(null)
     }
   }, [])
 
   // 加载 sourceUrl → ImageBitmap → GPU texture
   useEffect(() => {
-    if (!sourceUrl || !glRef.current || !pipelineRef.current) return
-    if (!glRef.current.ok) return
+    if (!sourceUrl || !gl || !gl.ok || !pipelineRef.current) return
 
     let cancelled = false
     setStatus('loading')
@@ -271,7 +304,7 @@ export function useWebGLPreview(
         }
 
         sourceTexRef.current?.dispose()
-        sourceTexRef.current = textureFromBitmap(glRef.current!, bitmap, {
+        sourceTexRef.current = textureFromBitmap(gl, bitmap, {
           flipY: true,
           renderable: false,
         })
@@ -288,14 +321,14 @@ export function useWebGLPreview(
     return () => {
       cancelled = true
     }
-  }, [sourceUrl, renderNow])
+  }, [sourceUrl, gl, renderNow])
 
-  // pipeline 变化 → 重渲染（pipeline 是触发信号，实际值由 latestPipelineRef 同步给 renderNow）
-  // biome-ignore lint/correctness/useExhaustiveDependencies: pipeline here is intentional trigger
+  // pipeline 或 LUT 纹理变化 → 重渲染
+  // biome-ignore lint/correctness/useExhaustiveDependencies: pipeline/lut.texture are intentional triggers, values consumed via refs + renderNow closure
   useEffect(() => {
-    if (!glRef.current || !sourceTexRef.current || !pipelineRef.current) return
+    if (!gl || !sourceTexRef.current || !pipelineRef.current) return
     renderNow()
-  }, [pipeline, renderNow])
+  }, [pipeline, lut.texture, renderNow])
 
   return { canvasRef, status, error, lastDurationMs, needsCpuFallback }
 }

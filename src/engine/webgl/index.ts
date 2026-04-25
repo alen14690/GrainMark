@@ -6,8 +6,8 @@ export type { GLContextOptions, Precision } from './GLContext'
 
 export { ShaderRegistry, ShaderCompileError } from './ShaderRegistry'
 
-export { Texture, textureFromBitmap } from './Texture'
-export type { InternalFormat, TextureInit } from './Texture'
+export { Texture, textureFromBitmap, textureFromLut3D } from './Texture'
+export type { InternalFormat, TextureInit, TextureTarget } from './Texture'
 
 export { runPass, DEFAULT_VERT } from './Pass'
 export type { PassConfig, PassInput, UniformValue } from './Pass'
@@ -57,3 +57,6 @@ export {
   isAdjustmentsIdentity,
 } from './shaders/adjustments'
 export type { AdjustmentsUniforms } from './shaders/adjustments'
+
+export { LUT3D_FRAG, normalizeLut3dParams } from './shaders/lut3d'
+export type { Lut3dUniforms } from './shaders/lut3d'

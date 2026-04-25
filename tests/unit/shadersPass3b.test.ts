@@ -288,12 +288,13 @@ describe('isAdjustmentsIdentity', () => {
 // ========== pipelineToSteps 顺序 ==========
 describe('pipelineToSteps · 顺序契约', () => {
   const resolution: [number, number] = [1920, 1080]
+  const build = { resolution, lutTexture: null, lutSize: 0 } as const
 
   it('null pipeline → []', () => {
-    expect(pipelineToSteps(null, resolution)).toEqual([])
+    expect(pipelineToSteps(null, build)).toEqual([])
   })
 
-  it('完整 pipeline → 9 步按 Lightroom 顺序', () => {
+  it('完整 pipeline（无 LUT）→ 9 步按 Lightroom 顺序', () => {
     const steps = pipelineToSteps(
       {
         whiteBalance: { temp: 10, tint: 5 },
@@ -306,7 +307,7 @@ describe('pipelineToSteps · 顺序契约', () => {
         grain: { amount: 5, size: 1, roughness: 0.5 },
         vignette: { amount: -30, midpoint: 50, roundness: 0, feather: 50 },
       },
-      resolution,
+      build,
     )
     const ids = steps.map((s) => s.id)
     expect(ids).toEqual([
@@ -332,7 +333,7 @@ describe('pipelineToSteps · 顺序契约', () => {
         grain: { amount: 0 },
         halation: { amount: 0 },
       },
-      resolution,
+      build,
     )
     expect(steps.map((s) => s.id)).toEqual(['tone']) // tone 不检测恒等，总是产生
   })
@@ -343,19 +344,79 @@ describe('pipelineToSteps · 顺序契约', () => {
         {
           whiteBalance: { temp: 0, tint: 0 },
         },
-        resolution,
+        build,
       ),
     ).toEqual([])
   })
 
   it('只含 adjustments 的 pipeline（clarity 非零）→ 1 个 step', () => {
-    const steps = pipelineToSteps({ clarity: 20 }, resolution)
+    const steps = pipelineToSteps({ clarity: 20 }, build)
     expect(steps).toHaveLength(1)
     expect(steps[0]!.id).toBe('adjustments')
   })
+})
 
-  it('只含 LUT → []（GPU 不实现，交 CPU 兜底）', () => {
-    const steps = pipelineToSteps({ lut: 'some.cube', lutIntensity: 80 }, resolution)
+// ========== LUT3D 集成（Pass 3b-2）==========
+describe('pipelineToSteps · LUT3D 集成', () => {
+  const resolution: [number, number] = [1920, 1080]
+
+  // 用一个 plain 对象伪装 Texture（pipelineToSteps 不访问 Texture 方法，只传 ref）
+  const fakeLutTexture = { target: '3D', width: 33, height: 33, depth: 33 } as never
+
+  it('含 LUT + lutTexture ready → 产生 lut step，位于 Lightroom 顺序第 7 位', () => {
+    const steps = pipelineToSteps(
+      {
+        tone: { exposure: 0, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0 },
+        lut: 'fuji-chrome.cube',
+        lutIntensity: 80,
+        vignette: { amount: -10, midpoint: 50, roundness: 0, feather: 50 },
+      },
+      { resolution, lutTexture: fakeLutTexture, lutSize: 33 },
+    )
+    const ids = steps.map((s) => s.id)
+    expect(ids).toEqual(['tone', 'lut', 'vignette'])
+    const lutStep = steps[1]!
+    expect(lutStep.extraInputs).toHaveLength(1)
+    expect(lutStep.extraInputs![0]!.name).toBe('u_lut')
+    // uniform intensity 80/100 = 0.8
+    expect((lutStep.uniforms as Record<string, number>).u_intensity).toBeCloseTo(0.8)
+    expect((lutStep.uniforms as Record<string, number>).u_lutSize).toBe(33)
+  })
+
+  it('含 LUT 但 lutTexture=null（加载中）→ 跳过 LUT step，其余通道照常渲染', () => {
+    const steps = pipelineToSteps(
+      {
+        tone: { exposure: 0, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0 },
+        lut: 'fuji-chrome.cube',
+      },
+      { resolution, lutTexture: null, lutSize: 0 },
+    )
+    expect(steps.map((s) => s.id)).toEqual(['tone'])
+  })
+
+  it('lutSize < 2 → 跳过（防止不合法 LUT 误传）', () => {
+    const steps = pipelineToSteps(
+      {
+        lut: 'bad.cube',
+      },
+      { resolution, lutTexture: fakeLutTexture, lutSize: 1 },
+    )
     expect(steps).toEqual([])
+  })
+
+  it('pipe.lut 缺失但 lutTexture 存在 → 不产生 LUT step（避免误用）', () => {
+    const steps = pipelineToSteps(
+      {
+        tone: { exposure: 0, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0 },
+      },
+      { resolution, lutTexture: fakeLutTexture, lutSize: 33 },
+    )
+    expect(steps.map((s) => s.id)).toEqual(['tone'])
+  })
+
+  it('默认 intensity = 100 → u_intensity = 1.0', () => {
+    const steps = pipelineToSteps({ lut: 'x.cube' }, { resolution, lutTexture: fakeLutTexture, lutSize: 17 })
+    expect(steps).toHaveLength(1)
+    expect((steps[0]!.uniforms as Record<string, number>).u_intensity).toBe(1)
   })
 })

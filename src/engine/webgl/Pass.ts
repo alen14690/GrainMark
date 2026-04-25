@@ -67,7 +67,8 @@ export function runPass(ctx: GLContext, registry: ShaderRegistry, config: PassCo
   // 绑定输入纹理到 texture units 0..N
   config.inputs.forEach((input, i) => {
     gl.activeTexture(gl.TEXTURE0 + i)
-    gl.bindTexture(gl.TEXTURE_2D, input.texture.texture)
+    const glTarget = input.texture.target === '3D' ? gl.TEXTURE_3D : gl.TEXTURE_2D
+    gl.bindTexture(glTarget, input.texture.texture)
     const loc = gl.getUniformLocation(program, input.name)
     if (loc) gl.uniform1i(loc, i)
   })
