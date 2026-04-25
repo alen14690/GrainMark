@@ -299,5 +299,15 @@ async function repairMissingInBackground(photos: Photo[], limit: number): Promis
   }
   if (repaired > 0) {
     logger.info('photo.repair.batch.done', { repaired })
+    // 通知所有 BrowserWindow 重新拉 photo 列表，让老数据一次性在 UI 自愈
+    try {
+      // 动态 import 避免 photoStore 成为 electron 启动主链路的强依赖
+      const { BrowserWindow } = await import('electron')
+      for (const w of BrowserWindow.getAllWindows()) {
+        w.webContents.send('photo:repaired')
+      }
+    } catch (err) {
+      logger.warn('photo.repair.notify.failed', { err: (err as Error).message })
+    }
   }
 }

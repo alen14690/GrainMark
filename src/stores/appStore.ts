@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import type { AppSettings, FilterPreset, Photo } from '../../shared/types'
-import { hasGrain, ipc } from '../lib/ipc'
+import { hasGrain, ipc, ipcOn } from '../lib/ipc'
 
 interface AppState {
   settings: AppSettings | null
@@ -55,6 +55,11 @@ export const useAppStore = create<AppState>()(
           s.photos = photos
           s.loading = false
           s.error = null
+        })
+        // 订阅懒补完成通知：老记录 thumbPath / dimsVerified 被修复后
+        // 主进程 push 'photo:repaired'，UI 自动 refreshPhotos → 显示新 thumb
+        ipcOn('photo:repaired', () => {
+          void get().refreshPhotos()
         })
       } catch (e) {
         set((s) => {

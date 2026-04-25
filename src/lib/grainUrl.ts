@@ -4,11 +4,15 @@
  */
 import type { Photo } from '../../shared/types'
 
-/** 缩略图 URL — thumbPath 是绝对路径，取 basename 后经 grain://thumb/<file> 访问 */
+/** 缩略图 URL — thumbPath 是绝对路径，取 basename 后经 grain://thumb/<file> 访问。
+ *  附带 ?v=<dimsVerified 版本号> 做 cache bust：算法升级 → 版本号变 → 强制重新 fetch。
+ *  没有 dimsVerified 时用 thumbPath 的 basename 哈希做降级 cache-bust（不同 thumb 基名本就不同）。
+ */
 export function thumbSrc(photo: Photo): string {
   if (!photo.thumbPath) return ''
   const basename = photo.thumbPath.split(/[/\\]/).pop() ?? ''
-  return `grain://thumb/${encodeURIComponent(basename)}`
+  const v = typeof photo.dimsVerified === 'number' ? photo.dimsVerified : photo.dimsVerified === true ? 1 : 0
+  return `grain://thumb/${encodeURIComponent(basename)}?v=${v}`
 }
 
 /** 原始照片（通过 photo id 间接访问，main 进程做 id → path 解析） */

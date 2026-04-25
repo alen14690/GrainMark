@@ -23,14 +23,23 @@ const makePhoto = (overrides: Partial<Photo> = {}): Photo => ({
 })
 
 describe('grainUrl', () => {
-  it('thumbSrc uses grain://thumb/ with basename only', () => {
+  it('thumbSrc uses grain://thumb/ with basename only + cache-bust version', () => {
     const p = makePhoto({ thumbPath: '/some/deep/path/abc.jpg' })
-    expect(thumbSrc(p)).toBe('grain://thumb/abc.jpg')
+    expect(thumbSrc(p)).toBe('grain://thumb/abc.jpg?v=0')
   })
 
   it('thumbSrc encodes special chars', () => {
     const p = makePhoto({ thumbPath: '/x/weird name.jpg' })
-    expect(thumbSrc(p)).toBe('grain://thumb/weird%20name.jpg')
+    expect(thumbSrc(p)).toBe('grain://thumb/weird%20name.jpg?v=0')
+  })
+
+  it('thumbSrc propagates dimsVerified version（数值 / boolean 两种格式）', () => {
+    const p1 = makePhoto({ thumbPath: '/x/t.jpg', dimsVerified: 2 })
+    expect(thumbSrc(p1)).toBe('grain://thumb/t.jpg?v=2')
+    const p2 = makePhoto({ thumbPath: '/x/t.jpg', dimsVerified: true })
+    expect(thumbSrc(p2)).toBe('grain://thumb/t.jpg?v=1')
+    const p3 = makePhoto({ thumbPath: '/x/t.jpg', dimsVerified: undefined })
+    expect(thumbSrc(p3)).toBe('grain://thumb/t.jpg?v=0')
   })
 
   it('thumbSrc returns empty string when no thumb', () => {
