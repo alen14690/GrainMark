@@ -165,17 +165,32 @@ export async function repairPhotoRecord(photo: Photo): Promise<Photo> {
 /**
  * listPhotos 对调用方是"当前快照"；修复发生在后台，不阻塞 UI 首屏
  * （修复后下次 listPhotos 调用即可见新值）
+ *
+ * 串行化：最多同时跑一个 repair batch，避免用户快速切换路由时并发多个后台任务
+ * 造成 JsonTable 脏写、并发 makeThumbnail 写同一目标路径等 race。
  */
+let repairInFlight: Promise<void> | null = null
+
 export function listPhotos(): Photo[] {
   const all = getPhotosTable()
     .all()
     .sort((a, b) => b.importedAt - a.importedAt)
 
   // 后台异步懒补：每次 listPhotos 最多尝试修复前 N 张缺 thumb / 缺尺寸的记录
-  // 控制在 N=8 避免首次进入图库时一次性吞吐大量 RAW
-  void repairMissingInBackground(all, 8)
+  // 控制在 N=8 避免首次进入图库时一次性吞吐大量 RAW；
+  // 串行化保证任意时刻至多一个 batch 在运行
+  if (!repairInFlight) {
+    repairInFlight = repairMissingInBackground(all, 8).finally(() => {
+      repairInFlight = null
+    })
+  }
 
   return all
+}
+
+/** 测试用：等待后台 repair batch 完成（若有） */
+export function _waitRepairIdle(): Promise<void> {
+  return repairInFlight ?? Promise.resolve()
 }
 
 /** 过滤出需要修复的条目，异步触发（fire-and-forget） */

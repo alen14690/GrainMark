@@ -165,3 +165,56 @@ describe('repairPhotoRecord', () => {
     expect(after.height).toBe(0)
   })
 })
+
+describe('listPhotos · 后台 repair 串行化（避免 race）', () => {
+  // photoStore.listPhotos 依赖 getPhotosTable()，需先 initStorage
+  beforeEach(async () => {
+    const init = await import('../../electron/services/storage/init')
+    await init.initStorage()
+  })
+
+  it('并发 10 次 listPhotos → 只启动 1 个 repair batch', async () => {
+    // 准备一条需要修复的记录，让 repair batch 实际会启动
+    // makeThumbnail 人为慢一点（50ms）以模拟 IO 时间，便于并发抓住 repairInFlight
+    let callCount = 0
+    hoisted.makeThumbnail.mockImplementation(async (_p: string, _s: number) => {
+      callCount++
+      await new Promise((r) => setTimeout(r, 50))
+      return path.join(tmpRoot, `slow-${callCount}.jpg`)
+    })
+
+    // 通过 photoStore 内部的 table 直接 upsert 一条缺 thumb 的记录
+    const table = (await import('../../electron/services/storage/init')).getPhotosTable()
+    const srcPath = path.join(tmpRoot, 'src.jpg')
+    if (!fs.existsSync(srcPath)) fs.writeFileSync(srcPath, Buffer.from([0xff, 0xd8, 0xff]))
+    table.upsert({
+      id: 'race-test-1',
+      path: srcPath,
+      name: 'src.jpg',
+      format: 'jpg',
+      sizeBytes: 3,
+      width: 100,
+      height: 200,
+      thumbPath: undefined,
+      exif: { width: 100, height: 200 },
+      starred: false,
+      rating: 0,
+      tags: [],
+      importedAt: Date.now(),
+    })
+
+    // 并发 10 次 listPhotos
+    const snapshots = Array.from({ length: 10 }, () => mod.listPhotos())
+    expect(snapshots).toHaveLength(10)
+    // 等所有 repair 落盘
+    await mod._waitRepairIdle()
+
+    // 串行化保证 makeThumbnail 只被 batch 触发 1 次（对同一条缺 thumb 的记录）
+    expect(callCount).toBe(1)
+  })
+
+  it('_waitRepairIdle 在无 batch 时立刻 resolve', async () => {
+    // 前置：上一个 it 已经把 batch 跑完，这里应当 idle
+    await expect(mod._waitRepairIdle()).resolves.toBeUndefined()
+  })
+})

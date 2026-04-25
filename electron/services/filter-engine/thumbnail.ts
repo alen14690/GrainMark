@@ -40,9 +40,9 @@ export async function makeThumbnail(filePath: string, size: number): Promise<str
 
   let img = sharp(buffer, { failOn: 'none' })
   if (rotationDeg !== null) {
-    // 先把 buffer 的 EXIF 信息丢弃（withMetadata 不带 orientation），再显式 rotate(angle)
-    // 这样避免"sharp 看到嵌入 JPEG 的 EXIF orientation 错误地再转一次"的双旋转 bug
-    img = img.rotate(rotationDeg).withMetadata({ orientation: 1 })
+    // RAW：显式按原文件 EXIF orientation 旋转；sharp 默认输出不含 EXIF，
+    // 最终 JPEG 天然是"像素正向 + 无 orientation tag"状态，无需 .withMetadata
+    img = img.rotate(rotationDeg)
   } else {
     img = img.rotate() // 非 RAW：读 buffer EXIF 自动转正
   }

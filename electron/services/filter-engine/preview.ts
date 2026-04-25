@@ -34,9 +34,11 @@ export async function renderPreview(
 
   let img = sharp(buffer, { failOn: 'none' })
   if (rotationDeg !== null) {
-    img = img.rotate(rotationDeg).withMetadata({ orientation: 1 })
+    // RAW：用原文件 EXIF orientation 显式旋转；sharp 默认不写输出 EXIF，
+    // 所以最终 JPEG 的 orientation tag 自然是 1（无需 .withMetadata）
+    img = img.rotate(rotationDeg)
   } else {
-    img = img.rotate()
+    img = img.rotate() // 非 RAW：读 buffer 自带 EXIF 自动转正
   }
   img = img.resize({
     width: PREVIEW_MAX_DIM,

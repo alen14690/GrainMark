@@ -39,12 +39,14 @@ export default function Editor() {
   const needsCpuFallback = !showOriginal && webgl.needsCpuFallback
   const ipcFilterId = showOriginal ? null : needsCpuFallback ? activeFilterId : null
 
+  // photo.path 作为稳定标识；photos 数组 re-order 不会误触发 IPC 重取
+  const photoPath = photo?.path
   useEffect(() => {
-    if (!photo) return
+    if (!photoPath) return
     let alive = true
     setLoading(true)
     // ipcFilterId = null：取原图，交给 GPU 叠加；否则让 IPC CPU 带 filter 渲染
-    ipc('preview:render', photo.path, ipcFilterId, undefined)
+    ipc('preview:render', photoPath, ipcFilterId, undefined)
       .then((url) => {
         if (alive) setPreviewUrl(url)
       })
@@ -55,7 +57,7 @@ export default function Editor() {
     return () => {
       alive = false
     }
-  }, [photo, ipcFilterId])
+  }, [photoPath, ipcFilterId])
 
   if (!photo) {
     return (
@@ -66,7 +68,9 @@ export default function Editor() {
   // P4 会从 IPC 拉到真实直方图；P2 用空占位
   const histogramData: HistogramData | null = null
 
-  const useWebglCanvas = webgl.status === 'ready' || webgl.status === 'loading'
+  // CPU 兜底时 IPC 返回的就是最终图，canvas 不参与计算 —— 直接用 <img>，
+  // 避免 canvas "等上传纹理 → 重绘" 过程中的闪烁
+  const useWebglCanvas = !needsCpuFallback && (webgl.status === 'ready' || webgl.status === 'loading')
   const showImgFallback = !useWebglCanvas && previewUrl
   const canvasStyle = { maxWidth: '100%', maxHeight: 'calc(100vh - 240px)' } as const
 
