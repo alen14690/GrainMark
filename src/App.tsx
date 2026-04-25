@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
+import { GrainOverlay } from './design'
 import AIStudio from './routes/AIStudio'
 import Batch from './routes/Batch'
 import Editor from './routes/Editor'
@@ -9,6 +10,7 @@ import Extract from './routes/Extract'
 import Filters from './routes/Filters'
 import Library from './routes/Library'
 import Settings from './routes/Settings'
+import TasteLab from './routes/TasteLab'
 import Trending from './routes/Trending'
 import Watermark from './routes/Watermark'
 import { useAppStore } from './stores/appStore'
@@ -23,18 +25,23 @@ export default function App() {
   }, [init])
 
   return (
-    <div className="flex h-screen bg-ink-950 text-ink-50 overflow-hidden">
+    <div className="flex h-screen bg-bg-0 text-fg-1 overflow-hidden relative isolate">
+      {/* 全局颗粒层（可在设置中关闭 — 未来） */}
+      <GrainOverlay opacity={0.03} />
+
       <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 relative z-10">
         <TopBar />
         <main className="flex-1 overflow-auto relative">
           {loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-ink-950/60 backdrop-blur z-40">
-              <div className="text-ink-300 text-sm animate-pulse-soft">正在初始化...</div>
+            <div className="absolute inset-0 flex items-center justify-center bg-bg-0/60 backdrop-blur-sm z-40">
+              <div className="text-fg-2 text-sm font-mono animate-pulse">Loading…</div>
             </div>
           )}
           {error && (
-            <div className="m-6 card p-4 border-red-500/40 bg-red-500/10 text-red-300 text-sm">⚠ {error}</div>
+            <div className="m-6 card p-4 border-sem-error/40 bg-sem-error/10 text-sem-error text-sm">
+              ⚠ {error}
+            </div>
           )}
           <Routes>
             <Route path="/" element={<Navigate to="/library" replace />} />
@@ -43,9 +50,10 @@ export default function App() {
             <Route path="/batch" element={<Batch />} />
             <Route path="/filters" element={<Filters />} />
             <Route path="/extract" element={<Extract />} />
+            <Route path="/taste" element={<TasteLab />} />
             <Route path="/watermark" element={<Watermark />} />
-            <Route path="/trending" element={<Trending />} />
             <Route path="/ai" element={<AIStudio />} />
+            <Route path="/trending" element={<Trending />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
         </main>

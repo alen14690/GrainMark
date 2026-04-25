@@ -34,7 +34,7 @@ export default function Watermark() {
       <div className="grid grid-cols-5 gap-5">
         {/* 模板 */}
         <aside className="col-span-1 card p-3">
-          <div className="text-[11px] text-ink-400 uppercase tracking-wider font-mono px-2 mb-2">模板</div>
+          <div className="text-[11px] text-fg-2 uppercase tracking-wider font-mono px-2 mb-2">模板</div>
           <div className="space-y-1">
             {templates.map((tpl) => (
               <button
@@ -42,12 +42,12 @@ export default function Watermark() {
                 onClick={() => setActiveTplId(tpl.id)}
                 className={`w-full text-left px-3 py-2 rounded-lg text-[12.5px] transition-all ${
                   activeTplId === tpl.id
-                    ? 'bg-accent-500/15 text-accent-400 border border-accent-500/30'
-                    : 'text-ink-300 hover:bg-ink-900 border border-transparent'
+                    ? 'bg-brand-amber/15 text-brand-amber border border-brand-amber/30'
+                    : 'text-fg-2 hover:bg-bg-1 border border-transparent'
                 }`}
               >
                 <div className="font-medium">{tpl.name}</div>
-                <div className="text-[10.5px] text-ink-500 mt-0.5">{tpl.description}</div>
+                <div className="text-[10.5px] text-fg-3 mt-0.5">{tpl.description}</div>
               </button>
             ))}
           </div>
@@ -55,11 +55,11 @@ export default function Watermark() {
 
         {/* 预览 */}
         <div className="col-span-3 card p-5">
-          <div className="text-[11px] text-ink-400 uppercase tracking-wider font-mono mb-3 flex items-center gap-2">
+          <div className="text-[11px] text-fg-2 uppercase tracking-wider font-mono mb-3 flex items-center gap-2">
             <Stamp className="w-3.5 h-3.5" />
             预览
             {refPhoto?.exif.model && (
-              <span className="ml-auto text-ink-500 normal-case tracking-normal font-normal text-[11px]">
+              <span className="ml-auto text-fg-3 normal-case tracking-normal font-normal text-[11px]">
                 <Camera className="inline w-3 h-3 mr-1" />
                 EXIF 驱动：{refPhoto.exif.model}
               </span>
@@ -67,7 +67,7 @@ export default function Watermark() {
           </div>
 
           {refPhoto ? (
-            <div className="relative aspect-[4/3] bg-ink-950 rounded-lg overflow-hidden">
+            <div className="relative aspect-[4/3] bg-bg-0 rounded-lg overflow-hidden">
               {refPhoto.thumbPath && (
                 <img src={thumbSrc(refPhoto)} alt="" className="w-full h-full object-contain" />
               )}
@@ -75,13 +75,13 @@ export default function Watermark() {
               <WatermarkOverlay style={style} photo={refPhoto} />
             </div>
           ) : (
-            <div className="aspect-[4/3] bg-ink-900 rounded-lg flex items-center justify-center text-ink-500 text-sm">
+            <div className="aspect-[4/3] bg-bg-1 rounded-lg flex items-center justify-center text-fg-3 text-sm">
               先到图库导入照片
             </div>
           )}
 
           {refPhoto && (
-            <div className="mt-3 text-[11px] text-ink-500 font-mono grid grid-cols-3 gap-2">
+            <div className="mt-3 text-[11px] text-fg-3 font-mono grid grid-cols-3 gap-2">
               <div>{refPhoto.exif.model ?? '—'}</div>
               <div>{refPhoto.exif.lensModel ?? '—'}</div>
               <div>
@@ -95,19 +95,19 @@ export default function Watermark() {
         {/* 参数 */}
         <aside className="col-span-1 card p-4 space-y-4">
           <div>
-            <div className="text-[11px] text-ink-400 uppercase tracking-wider font-mono mb-1.5">显示字段</div>
+            <div className="text-[11px] text-fg-2 uppercase tracking-wider font-mono mb-1.5">显示字段</div>
             {style && (
               <div className="space-y-1 text-[12px]">
                 {(Object.keys(style.fields) as (keyof typeof style.fields)[]).map((k) => (
                   <label key={k} className="flex items-center justify-between gap-2 py-0.5 cursor-pointer">
-                    <span className="text-ink-300 capitalize">{fieldLabel(k)}</span>
+                    <span className="text-fg-2 capitalize">{fieldLabel(k)}</span>
                     <input
                       type="checkbox"
                       checked={style.fields[k]}
                       onChange={(e) =>
                         setStyle((s) => (s ? { ...s, fields: { ...s.fields, [k]: e.target.checked } } : s))
                       }
-                      className="accent-accent-500"
+                      className="accent-brand-amber"
                     />
                   </label>
                 ))}
@@ -116,7 +116,7 @@ export default function Watermark() {
           </div>
 
           <div>
-            <div className="text-[11px] text-ink-400 uppercase tracking-wider font-mono mb-1.5">摄影师</div>
+            <div className="text-[11px] text-fg-2 uppercase tracking-wider font-mono mb-1.5">摄影师</div>
             <input
               className="input text-[12px]"
               placeholder={settings?.watermark.artistName || '在设置中配置默认值'}
@@ -125,14 +125,12 @@ export default function Watermark() {
           </div>
 
           <div>
-            <div className="text-[11px] text-ink-400 uppercase tracking-wider font-mono mb-1.5">
-              Logo (PNG)
-            </div>
+            <div className="text-[11px] text-fg-2 uppercase tracking-wider font-mono mb-1.5">Logo (PNG)</div>
             <button className="btn-secondary w-full text-[11.5px]">
               <UploadIcon className="w-3.5 h-3.5" />
               上传 Logo
             </button>
-            <div className="text-[10.5px] text-ink-500 mt-1.5 leading-relaxed">
+            <div className="text-[10.5px] text-fg-3 mt-1.5 leading-relaxed">
               ⚠ 请上传你有权使用的 Logo。应用不内置任何受商标保护的品牌 Logo。
             </div>
           </div>

@@ -65,9 +65,7 @@ export default function Filters() {
             key={c.id}
             onClick={() => setCategory(c.id)}
             className={`px-3 py-1.5 rounded-full text-[12px] transition-colors ${
-              category === c.id
-                ? 'bg-accent-500 text-ink-950 font-medium'
-                : 'bg-ink-900 text-ink-400 hover:text-ink-100'
+              category === c.id ? 'bg-brand-amber text-bg-0 font-medium' : 'bg-bg-1 text-fg-2 hover:text-fg-1'
             }`}
           >
             {c.label}
@@ -82,9 +80,9 @@ export default function Filters() {
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {filtered.map((f) => (
-          <div key={f.id} className="card p-4 hover:border-ink-700 transition-colors group">
-            <div className="aspect-video rounded-lg bg-gradient-to-br from-ink-800 to-ink-900 mb-3 relative overflow-hidden">
-              <div className="absolute inset-0 flex items-center justify-center text-ink-700">
+          <div key={f.id} className="card p-4 hover:border-bg-3 transition-colors group">
+            <div className="aspect-video rounded-lg bg-gradient-to-br from-bg-2 to-bg-1 mb-3 relative overflow-hidden">
+              <div className="absolute inset-0 flex items-center justify-center text-bg-3">
                 <Film className="w-8 h-8" />
               </div>
               <span className="absolute inset-0 film-grain" />
@@ -99,17 +97,17 @@ export default function Filters() {
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
                 <div className="text-[13px] font-medium truncate">{f.name}</div>
-                <div className="text-[10.5px] text-ink-500 font-mono mt-0.5 flex items-center gap-1.5">
+                <div className="text-[10.5px] text-fg-3 font-mono mt-0.5 flex items-center gap-1.5">
                   <User className="w-2.5 h-2.5" />
                   {f.author}
-                  <span className="text-ink-700">·</span>♦ {f.popularity}
+                  <span className="text-bg-3">·</span>♦ {f.popularity}
                 </div>
               </div>
             </div>
             {f.tags && f.tags.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2">
                 {f.tags.slice(0, 3).map((t) => (
-                  <span key={t} className="text-[10px] text-ink-500 font-mono">
+                  <span key={t} className="text-[10px] text-fg-3 font-mono">
                     #{t}
                   </span>
                 ))}

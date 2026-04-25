@@ -71,21 +71,21 @@ export default function Batch() {
         {/* 已选照片 */}
         <div className="col-span-2 card p-4 flex flex-col">
           <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-            <FileImage className="w-4 h-4 text-accent-400" />
+            <FileImage className="w-4 h-4 text-brand-amber" />
             已选照片 <span className="pill">{selectedPhotos.length}</span>
           </h3>
           <div className="flex-1 overflow-y-auto space-y-1 max-h-[480px] pr-1">
             {selectedPhotos.length === 0 ? (
-              <div className="text-xs text-ink-500 py-10 text-center">到图库选中想批量处理的照片</div>
+              <div className="text-xs text-fg-3 py-10 text-center">到图库选中想批量处理的照片</div>
             ) : (
               selectedPhotos.map((p) => (
                 <div
                   key={p.id}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-ink-900 text-[12px]"
+                  className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-bg-1 text-[12px]"
                 >
                   {p.thumbPath && <img src={thumbSrc(p)} className="w-8 h-8 object-cover rounded" alt="" />}
                   <span className="flex-1 truncate">{p.name}</span>
-                  <span className="text-[10px] text-ink-500 font-mono">{p.format.toUpperCase()}</span>
+                  <span className="text-[10px] text-fg-3 font-mono">{p.format.toUpperCase()}</span>
                 </div>
               ))
             )}
@@ -162,7 +162,7 @@ export default function Batch() {
               className="input font-mono text-[12px]"
               placeholder="{name}_{filter}_{date}"
             />
-            <div className="text-[10.5px] text-ink-500 mt-1.5 font-mono">
+            <div className="text-[10.5px] text-fg-3 mt-1.5 font-mono">
               可用变量：{'{name} {filter} {date} {model} {iso}'}
             </div>
           </div>
@@ -196,9 +196,7 @@ export default function Batch() {
           </div>
 
           {status && (
-            <div className="text-[11.5px] text-ink-300 bg-ink-900 rounded-lg px-3 py-2 font-mono">
-              {status}
-            </div>
+            <div className="text-[11.5px] text-fg-2 bg-bg-1 rounded-lg px-3 py-2 font-mono">{status}</div>
           )}
         </div>
       </div>
@@ -207,7 +205,7 @@ export default function Batch() {
 }
 
 function Label({ children }: { children: React.ReactNode }) {
-  return <div className="text-[11px] text-ink-400 uppercase tracking-wider font-mono mb-1.5">{children}</div>
+  return <div className="text-[11px] text-fg-2 uppercase tracking-wider font-mono mb-1.5">{children}</div>
 }
 
 function Toggle({
@@ -216,12 +214,12 @@ function Toggle({
   onChange,
 }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <label className="flex items-center gap-2 cursor-pointer text-[12.5px] text-ink-200">
+    <label className="flex items-center gap-2 cursor-pointer text-[12.5px] text-fg-1">
       <span
         role="checkbox"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`w-8 h-[18px] rounded-full relative transition-colors ${checked ? 'bg-accent-500' : 'bg-ink-700'}`}
+        className={`w-8 h-[18px] rounded-full relative transition-colors ${checked ? 'bg-brand-amber' : 'bg-bg-3'}`}
       >
         <span
           className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white transition-all ${checked ? 'left-[18px]' : 'left-0.5'}`}

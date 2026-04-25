@@ -29,7 +29,7 @@ const CAPS: {
     title: '天空替换',
     desc: '一键替换为日落、星空等天空',
     icon: Cloud,
-    color: 'from-orange-400 to-pink-500',
+    color: 'from-orange-400 to-pfg-3',
   },
   {
     id: 'inpaint',
@@ -43,7 +43,7 @@ const CAPS: {
     title: '滤镜推荐',
     desc: 'CLIP 图像理解，推荐 TOP 3 滤镜',
     icon: Sparkles,
-    color: 'from-accent-500 to-amber-500',
+    color: 'from-brand-amber to-amber-500',
   },
 ]
 
@@ -56,12 +56,12 @@ export default function AIStudio() {
 
   return (
     <div className="p-6 animate-fade-in">
-      <div className="card p-5 mb-5 bg-gradient-to-br from-accent-500/10 to-transparent border-accent-500/20">
+      <div className="card p-5 mb-5 bg-gradient-to-br from-brand-amber/10 to-transparent border-brand-amber/20">
         <div className="flex items-center gap-3">
-          <Cpu className="w-5 h-5 text-accent-400" />
+          <Cpu className="w-5 h-5 text-brand-amber" />
           <div className="flex-1">
             <div className="text-[14px] font-semibold">本地 AI 推理</div>
-            <div className="text-[11.5px] text-ink-400 mt-0.5">
+            <div className="text-[11.5px] text-fg-2 mt-0.5">
               所有 AI 能力均在你的电脑本地运行（ONNX
               Runtime），照片不上传任何服务器；未来版本将增加可选云端加速。
             </div>
@@ -84,12 +84,12 @@ export default function AIStudio() {
                 <Icon className="w-5 h-5 text-white" />
               </div>
               <h3 className="mt-3 text-[14px] font-semibold">{cap.title}</h3>
-              <p className="text-[11.5px] text-ink-400 mt-1 leading-relaxed">{cap.desc}</p>
+              <p className="text-[11.5px] text-fg-2 mt-1 leading-relaxed">{cap.desc}</p>
               {model && (
-                <div className="mt-3 pt-3 border-t border-ink-900">
+                <div className="mt-3 pt-3 border-t border-bg-1">
                   <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-ink-400 font-mono truncate">{model.name}</span>
-                    <span className="text-ink-500 font-mono">
+                    <span className="text-fg-2 font-mono truncate">{model.name}</span>
+                    <span className="text-fg-3 font-mono">
                       {(model.sizeBytes / 1024 / 1024).toFixed(0)} MB
                     </span>
                   </div>
@@ -117,25 +117,25 @@ export default function AIStudio() {
 
       <div className="card p-5">
         <h3 className="text-[13px] font-semibold mb-3">开发路线</h3>
-        <ul className="space-y-1.5 text-[12px] text-ink-400 leading-relaxed">
+        <ul className="space-y-1.5 text-[12px] text-fg-2 leading-relaxed">
           <li>
-            • <b className="text-ink-200">M7</b> 接入 ONNX Runtime（Node + Web），支持 CPU / CUDA / CoreML /
+            • <b className="text-fg-1">M7</b> 接入 ONNX Runtime（Node + Web），支持 CPU / CUDA / CoreML /
             DirectML
           </li>
           <li>
-            • 降噪模型：<code className="text-accent-400 font-mono">NAFNet</code>
+            • 降噪模型：<code className="text-brand-amber font-mono">NAFNet</code>
           </li>
           <li>
-            • 超分模型：<code className="text-accent-400 font-mono">Real-ESRGAN</code>
+            • 超分模型：<code className="text-brand-amber font-mono">Real-ESRGAN</code>
           </li>
           <li>
-            • 分割模型：<code className="text-accent-400 font-mono">SAM (mobile)</code>
+            • 分割模型：<code className="text-brand-amber font-mono">SAM (mobile)</code>
           </li>
           <li>
-            • 消除模型：<code className="text-accent-400 font-mono">LaMa Inpainting</code>
+            • 消除模型：<code className="text-brand-amber font-mono">LaMa Inpainting</code>
           </li>
           <li>
-            • 推荐模型：<code className="text-accent-400 font-mono">CLIP ViT-B/32</code>{' '}
+            • 推荐模型：<code className="text-brand-amber font-mono">CLIP ViT-B/32</code>{' '}
             做图像与滤镜的向量匹配
           </li>
         </ul>

@@ -1,6 +1,16 @@
+/**
+ * Editor — 单图编辑器
+ *
+ * 卤化银风格：
+ *  - 顶部 ScoreBar（评分条，P4 接入真实数据）
+ *  - 左侧画布 + EXIF 金属条
+ *  - 右侧滤镜列表（带 popularity 标识）
+ */
 import { Download, Redo2, Save, SplitSquareHorizontal, Undo2, Wand2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { Histogram, ScoreBar, ValueBadge, cn } from '../design'
+import type { HistogramData } from '../design'
 import { ipc } from '../lib/ipc'
 import { useAppStore } from '../stores/appStore'
 
@@ -35,126 +45,181 @@ export default function Editor() {
   }, [photo, activeFilterId, showOriginal])
 
   if (!photo) {
-    return <div className="h-full flex items-center justify-center text-ink-500">请先到「图库」导入照片</div>
+    return (
+      <div className="h-full flex items-center justify-center text-fg-3 text-sm">请先到「图库」导入照片</div>
+    )
   }
 
   const activeFilter = filters.find((f) => f.id === activeFilterId)
+  // P4 会从 IPC 拉到真实直方图；P2 用空占位
+  const histogramData: HistogramData | null = null
 
   return (
     <div className="h-full flex animate-fade-in">
-      {/* Canvas */}
-      <section className="flex-1 flex flex-col min-w-0 bg-ink-950">
-        <div className="h-12 border-b border-ink-900 flex items-center px-4 gap-2">
-          <div className="text-[13px] font-medium truncate flex-1">{photo.name}</div>
-          <button className="btn-ghost py-1.5 px-2 text-[12px]" title="撤销">
+      {/* Canvas Column */}
+      <section className="flex-1 flex flex-col min-w-0 bg-bg-0">
+        {/* 顶部工具条 */}
+        <div className="h-12 border-b border-fg-4/50 flex items-center px-4 gap-2">
+          <div className="text-sm font-medium truncate flex-1 text-fg-1">{photo.name}</div>
+          <button type="button" className="btn-ghost btn-xs" title="撤销 (⌘Z)">
             <Undo2 className="w-3.5 h-3.5" />
           </button>
-          <button className="btn-ghost py-1.5 px-2 text-[12px]" title="重做">
+          <button type="button" className="btn-ghost btn-xs" title="重做">
             <Redo2 className="w-3.5 h-3.5" />
           </button>
           <button
+            type="button"
             onMouseDown={() => setShowOriginal(true)}
             onMouseUp={() => setShowOriginal(false)}
             onMouseLeave={() => setShowOriginal(false)}
-            className="btn-ghost py-1.5 px-2 text-[12px]"
-            title="按住查看原图 (\\)"
+            className="btn-ghost btn-xs"
+            title="按住查看原图"
           >
             <SplitSquareHorizontal className="w-3.5 h-3.5" />
           </button>
-          <div className="w-px h-5 bg-ink-800 mx-1" />
-          <button className="btn-secondary py-1.5 px-3 text-[12px]">
+          <div className="divider-metal-v mx-1" />
+          <button type="button" className="btn-secondary btn-xs">
             <Save className="w-3.5 h-3.5" />
             保存预设
           </button>
-          <button className="btn-primary py-1.5 px-3 text-[12px]">
+          <button type="button" className="btn-primary btn-xs">
             <Download className="w-3.5 h-3.5" />
             导出
           </button>
         </div>
 
-        <div className="flex-1 flex items-center justify-center p-8 overflow-hidden">
+        {/* ScoreBar 占位 */}
+        <div className="px-4 pt-3">
+          <ScoreBar score={null} onSwitchRubric={() => {}} />
+        </div>
+
+        {/* 画布 */}
+        <div className="flex-1 flex items-center justify-center p-6 overflow-hidden">
           <div className="relative max-w-full max-h-full">
             {previewUrl ? (
               <img
                 src={previewUrl}
                 alt="preview"
-                className="max-w-full max-h-[calc(100vh-200px)] object-contain rounded-lg shadow-2xl"
+                className="max-w-full max-h-[calc(100vh-240px)] object-contain rounded-md shadow-soft-lg"
               />
             ) : (
-              <div className="w-[600px] h-[400px] bg-ink-900 rounded-lg flex items-center justify-center text-ink-500 text-sm">
-                加载预览...
+              <div className="w-[600px] h-[400px] bg-bg-1 rounded-md flex items-center justify-center text-fg-3 text-sm font-mono">
+                rendering…
               </div>
             )}
             {loading && (
-              <div className="absolute top-3 right-3 px-2 py-1 rounded bg-black/60 text-[11px] text-ink-300 backdrop-blur">
-                渲染中...
+              <div className="absolute top-3 right-3">
+                <ValueBadge value="RENDERING" variant="muted" size="sm" />
               </div>
             )}
-            {showOriginal && <div className="absolute top-3 left-3 pill-accent">原图</div>}
+            {showOriginal && (
+              <div className="absolute top-3 left-3">
+                <ValueBadge value="ORIGINAL" variant="amber" size="sm" />
+              </div>
+            )}
           </div>
         </div>
 
-        {/* EXIF bar */}
-        <div className="h-10 border-t border-ink-900 px-4 flex items-center gap-4 text-[11px] text-ink-400 font-mono">
-          <span>{photo.exif.model ?? '—'}</span>
-          <span className="text-ink-700">|</span>
-          <span>{photo.exif.lensModel ?? '—'}</span>
-          <span className="text-ink-700">|</span>
-          <span>{photo.exif.focalLength ? `${photo.exif.focalLength}mm` : '—'}</span>
-          <span>{photo.exif.fNumber ? `f/${photo.exif.fNumber}` : '—'}</span>
-          <span>{photo.exif.exposureTime ?? '—'}</span>
-          <span>{photo.exif.iso ? `ISO ${photo.exif.iso}` : '—'}</span>
-          <span className="ml-auto">
+        {/* EXIF 金属条 */}
+        <div className="h-12 border-t border-fg-4/50 px-4 flex items-center gap-3 text-xs">
+          <ExifItem label="CAM" value={photo.exif.model ?? '—'} />
+          <span className="divider-metal-v h-4" />
+          <ExifItem label="LENS" value={photo.exif.lensModel ?? '—'} />
+          <span className="divider-metal-v h-4" />
+          <ExifItem label="F" value={photo.exif.fNumber ? `f/${photo.exif.fNumber}` : '—'} />
+          <ExifItem label="SS" value={photo.exif.exposureTime ?? '—'} />
+          <ExifItem label="ISO" value={photo.exif.iso ? String(photo.exif.iso) : '—'} />
+          <ExifItem label="FL" value={photo.exif.focalLength ? `${photo.exif.focalLength}mm` : '—'} />
+          <span className="ml-auto font-numeric text-fg-3">
             {photo.width}×{photo.height}
           </span>
         </div>
       </section>
 
-      {/* Right panel */}
-      <aside className="w-80 shrink-0 border-l border-ink-900 bg-ink-950/80 flex flex-col">
-        <div className="h-12 border-b border-ink-900 flex items-center px-4">
-          <Wand2 className="w-3.5 h-3.5 text-accent-400 mr-2" />
-          <span className="text-[13px] font-medium">滤镜</span>
+      {/* Right Panel */}
+      <aside className="w-80 shrink-0 border-l border-fg-4/60 bg-bg-0 flex flex-col">
+        <div className="h-12 border-b border-fg-4/50 flex items-center px-4">
+          <Wand2 className="w-3.5 h-3.5 text-brand-amber mr-2" strokeWidth={2} />
+          <span className="text-sm font-medium text-fg-1">滤镜</span>
           {activeFilter && (
-            <span className="ml-auto text-[11px] text-ink-500 font-mono">{activeFilter.name}</span>
+            <span className="ml-auto text-xxs text-fg-3 font-mono truncate max-w-[140px]">
+              {activeFilter.name}
+            </span>
           )}
         </div>
 
+        {/* 滤镜列表 */}
         <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
-          <button
-            onClick={() => setActiveFilter(null)}
-            className={`w-full text-left px-3 py-2 rounded-lg text-[12.5px] transition-all ${
-              !activeFilterId
-                ? 'bg-accent-500/15 text-accent-400 border border-accent-500/30'
-                : 'text-ink-400 hover:bg-ink-900'
-            }`}
-          >
-            原图
-          </button>
-          {filters.map((f) => {
-            const active = f.id === activeFilterId
-            return (
-              <button
-                key={f.id}
-                onClick={() => setActiveFilter(f.id)}
-                className={`w-full text-left px-3 py-2.5 rounded-lg transition-all ${
-                  active
-                    ? 'bg-accent-500/15 text-accent-400 border border-accent-500/30'
-                    : 'text-ink-300 hover:bg-ink-900 hover:text-ink-100 border border-transparent'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[13px] font-medium truncate">{f.name}</span>
-                  <span className="text-[10px] font-mono text-ink-500 shrink-0 ml-2">♦ {f.popularity}</span>
-                </div>
-                <div className="text-[10.5px] text-ink-500 mt-0.5 truncate">
-                  {f.tags?.slice(0, 3).join(' · ') || f.category}
-                </div>
-              </button>
-            )
-          })}
+          <FilterRow name="原图" active={!activeFilterId} onClick={() => setActiveFilter(null)} />
+          {filters.map((f) => (
+            <FilterRow
+              key={f.id}
+              name={f.name}
+              popularity={f.popularity}
+              tags={f.tags}
+              active={f.id === activeFilterId}
+              onClick={() => setActiveFilter(f.id)}
+            />
+          ))}
+        </div>
+
+        {/* Histogram */}
+        <div className="p-3 border-t border-fg-4/50">
+          <div className="text-xxs text-fg-3 uppercase tracking-wider font-mono mb-1.5">Histogram</div>
+          <Histogram data={histogramData} width={288} height={64} />
         </div>
       </aside>
     </div>
+  )
+}
+
+function ExifItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline gap-1">
+      <span className="text-xxs text-fg-3 font-mono">{label}</span>
+      <span className="font-numeric text-fg-1">{value}</span>
+    </div>
+  )
+}
+
+function FilterRow({
+  name,
+  popularity,
+  tags,
+  active,
+  onClick,
+}: {
+  name: string
+  popularity?: number
+  tags?: string[]
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'w-full text-left px-3 py-2.5 rounded-md transition-all duration-fast',
+        active
+          ? 'bg-brand-amber/10 text-brand-amber border border-brand-amber/30'
+          : 'text-fg-2 hover:text-fg-1 hover:bg-bg-1 border border-transparent',
+      )}
+    >
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium truncate">{name}</span>
+        {popularity !== undefined && (
+          <span className="text-xxs font-numeric text-fg-3 shrink-0 ml-2">♦ {popularity}</span>
+        )}
+      </div>
+      {tags && tags.length > 0 && (
+        <div className="text-xxs text-fg-3 font-mono mt-0.5 truncate">
+          {tags
+            .slice(0, 3)
+            .map((t) => `#${t}`)
+            .join('  ')}
+        </div>
+      )}
+    </button>
   )
 }

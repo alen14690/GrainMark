@@ -1,9 +1,22 @@
+/* ========== 字体加载（@import 必须放在其他规则之前） ========== */
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
   color-scheme: dark;
+  --bg-0: #0e0e10;
+  --bg-1: #16161a;
+  --bg-2: #1e1e24;
+  --bg-3: #2a2a32;
+  --fg-1: #f5f3ee;
+  --fg-2: #a8a39a;
+  --fg-3: #6c6860;
+  --fg-4: #3d3a35;
+  --brand-amber: #e8b961;
+  --brand-cyan: #4a8a9e;
 }
 
 html,
@@ -14,11 +27,16 @@ body,
 }
 
 body {
-  font-family: Inter, "SF Pro Text", system-ui, sans-serif;
+  font-family: "Inter", "SF Pro Text", system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--fg-1);
+  background: var(--bg-0);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   user-select: none;
   -webkit-user-select: none;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
 input,
@@ -36,7 +54,7 @@ textarea,
   -webkit-app-region: no-drag;
 }
 
-/* 滚动条 */
+/* ========== 滚动条（暗房风格） ========== */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -45,66 +63,197 @@ textarea,
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
   border-radius: 6px;
-  border: 2px solid transparent;
+  border: 3px solid transparent;
   background-clip: content-box;
+  transition: background 150ms;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.18);
   background-clip: content-box;
-  border: 2px solid transparent;
+  border: 3px solid transparent;
 }
 
-/* 通用组件 */
+/* ========== 选中高亮（暖金） ========== */
+::selection {
+  background: rgba(232, 185, 97, 0.35);
+  color: var(--fg-1);
+}
+
+/* ========== Focus visible 暖金光圈（键盘可达性） ========== */
+:focus-visible {
+  outline: 2px solid rgba(232, 185, 97, 0.55);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ========== 通用组件 Layer ========== */
 @layer components {
+  /* 卡片 — 暗房底 + 细描边 */
   .card {
-    @apply bg-ink-900/80 border border-ink-800 rounded-xl backdrop-blur-sm;
+    @apply bg-bg-1 border border-fg-4 rounded-md;
   }
+  .card-raised {
+    @apply card shadow-soft-sm;
+  }
+  .card-hover {
+    @apply transition-colors duration-fast hover:bg-bg-2 hover:border-fg-3;
+  }
+
+  /* 按钮基底 */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium text-sm
-           transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2
+           px-4 py-2 rounded-md font-medium text-sm
+           transition-all duration-fast ease-standard
+           disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-primary {
-    @apply btn bg-accent-500 hover:bg-accent-400 text-ink-950 shadow-lg shadow-accent-500/20;
+    @apply btn bg-brand-amber text-bg-0 hover:bg-brand-amber-soft
+           shadow-glow active:translate-y-px;
   }
   .btn-secondary {
-    @apply btn bg-ink-800 hover:bg-ink-700 text-ink-50 border border-ink-700;
+    @apply btn bg-bg-2 text-fg-1 border border-fg-4
+           hover:bg-bg-3 hover:border-fg-3 active:translate-y-px;
   }
   .btn-ghost {
-    @apply btn text-ink-300 hover:text-ink-50 hover:bg-ink-800;
+    @apply btn text-fg-2 hover:text-fg-1 hover:bg-bg-2 active:bg-bg-3;
   }
+  .btn-danger {
+    @apply btn bg-sem-error text-fg-1 hover:brightness-110 active:translate-y-px;
+  }
+
+  /* 尺寸变体 */
+  .btn-sm {
+    @apply text-xs px-2.5 py-1.5 gap-1.5;
+  }
+  .btn-xs {
+    @apply text-xxs px-2 py-1 gap-1;
+  }
+
+  /* 药丸 / 徽章 */
   .pill {
-    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium
-           bg-ink-800 text-ink-300 border border-ink-700;
+    @apply inline-flex items-center gap-1 px-2 py-0.5
+           rounded-full text-xxs font-mono
+           bg-bg-2 text-fg-2 border border-fg-4;
   }
-  .pill-accent {
-    @apply pill bg-accent-500/15 text-accent-400 border-accent-500/30;
+  .pill-amber {
+    @apply pill bg-brand-amber/15 text-brand-amber border-brand-amber/30;
   }
+  .pill-cyan {
+    @apply pill bg-brand-cyan/15 text-brand-cyan border-brand-cyan/30;
+  }
+  .pill-red {
+    @apply pill bg-brand-red/15 text-brand-red border-brand-red/30;
+  }
+
+  /* 输入框 */
   .input {
-    @apply w-full px-3 py-2 rounded-lg bg-ink-900 border border-ink-800
-           text-sm text-ink-50 placeholder-ink-500 focus:border-accent-500/60
-           focus:outline-none transition-colors;
+    @apply w-full px-3 py-2 rounded-md bg-bg-1 border border-fg-4
+           text-sm text-fg-1 placeholder-fg-3
+           focus:border-brand-amber/60 focus:bg-bg-0
+           focus:outline-none transition-colors duration-fast;
   }
+
+  /* 键盘快捷键 */
   .kbd {
-    @apply inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded
-           text-[11px] font-mono text-ink-300 bg-ink-800 border border-ink-700
+    @apply inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5
+           rounded text-xxs font-mono text-fg-2 bg-bg-1 border border-fg-4
            shadow-[0_1px_0_rgba(0,0,0,0.4)];
   }
+
+  /* 显示字体（衬线，用于标题/大字） */
+  .font-display-serif {
+    font-family: "Fraunces", "Source Serif 4", Georgia, serif;
+    font-optical-sizing: auto;
+  }
+
+  /* 数字仪表感（EXIF/评分等） */
+  .font-numeric {
+    font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+    font-feature-settings: "tnum", "zero";
+  }
+
+  /* 金属拉丝细分隔 */
+  .divider-metal {
+    @apply h-px w-full;
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.06) 20%,
+      rgba(255, 255, 255, 0.12) 50%,
+      rgba(255, 255, 255, 0.06) 80%,
+      transparent 100%
+    );
+  }
+  .divider-metal-v {
+    @apply w-px h-full;
+    background-image: linear-gradient(
+      180deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.06) 20%,
+      rgba(255, 255, 255, 0.12) 50%,
+      rgba(255, 255, 255, 0.06) 80%,
+      transparent 100%
+    );
+  }
+
+  /* 胶片齿孔装饰（画廊图片卡用） */
+  .film-sprocket-top::before,
+  .film-sprocket-bottom::after {
+    content: "";
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    height: 6px;
+    background-image: radial-gradient(
+      circle 3px at 3px center,
+      var(--bg-0) 0,
+      var(--bg-0) 2px,
+      transparent 3px
+    );
+    background-size: 14px 6px;
+    background-repeat: repeat-x;
+    pointer-events: none;
+  }
+  .film-sprocket-top::before {
+    top: 4px;
+  }
+  .film-sprocket-bottom::after {
+    bottom: 4px;
+  }
+
+  /* 局部颗粒层（用于卡片） */
+  .grain-local {
+    position: relative;
+    isolation: isolate;
+  }
+  .grain-local::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+    opacity: 0.08;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0.12 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+
+  /* 评分条底色（12 维度用） */
+  .score-track {
+    @apply h-1 rounded-full bg-fg-4 overflow-hidden;
+  }
+  .score-fill {
+    @apply h-full transition-all duration-base ease-decelerate rounded-full;
+  }
 }
 
-/* 胶片颗粒纹理 (装饰用) */
-.film-grain::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0.08 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-  opacity: 0.55;
-  mix-blend-mode: overlay;
-}
-
-/* 防闪烁动画 */
-.will-animate {
-  will-change: transform, opacity;
+/* ========== 动画辅助 ========== */
+@layer utilities {
+  .will-animate {
+    will-change: transform, opacity;
+  }
+  /* 防止深色背景下小图片的"黑边感" */
+  .img-contain-clean {
+    background: var(--bg-0);
+  }
 }

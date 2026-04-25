@@ -44,7 +44,7 @@ export default function Settings() {
   const update = useAppStore((s) => s.updateSettings)
   const [tab, setTab] = useState<TabId>('general')
 
-  if (!settings) return <div className="p-8 text-ink-500">加载中...</div>
+  if (!settings) return <div className="p-8 text-fg-3">加载中...</div>
 
   const pickDir = async (set: (path: string) => void) => {
     const dir = await ipc('dialog:selectDir')
@@ -54,7 +54,7 @@ export default function Settings() {
   return (
     <div className="flex h-full animate-fade-in">
       {/* 左侧 tab */}
-      <aside className="w-48 shrink-0 border-r border-ink-900 py-4 px-2 bg-ink-950/60">
+      <aside className="w-48 shrink-0 border-r border-bg-1 py-4 px-2 bg-bg-0/60">
         {TABS.map((t) => {
           const Icon = t.icon
           return (
@@ -62,9 +62,7 @@ export default function Settings() {
               key={t.id}
               onClick={() => setTab(t.id)}
               className={`w-full text-left flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12.5px] transition-all ${
-                tab === t.id
-                  ? 'bg-ink-800 text-ink-50 font-medium'
-                  : 'text-ink-400 hover:bg-ink-900 hover:text-ink-100'
+                tab === t.id ? 'bg-bg-2 text-fg-1 font-medium' : 'text-fg-2 hover:bg-bg-1 hover:text-fg-1'
               }`}
             >
               <Icon className="w-3.5 h-3.5" />
@@ -287,7 +285,7 @@ export default function Settings() {
                   onChange={(v) => update({ watermark: { ...settings.watermark, enabledByDefault: v } })}
                 />
               </Row>
-              <div className="text-[11px] text-ink-500 leading-relaxed mt-2 pt-3 border-t border-ink-900">
+              <div className="text-[11px] text-fg-3 leading-relaxed mt-2 pt-3 border-t border-bg-1">
                 ⚠ 合规提示：GrainMark 不内置任何受商标保护的品牌 Logo（如 Leica / Canon / Nikon 等）。
                 <br />
                 如需品牌 Logo 水印，请上传你自有或已获授权的 Logo 文件。
@@ -318,7 +316,7 @@ export default function Settings() {
                   ]}
                 />
               </Row>
-              <div className="text-[11px] text-ink-500 leading-relaxed pt-3 border-t border-ink-900">
+              <div className="text-[11px] text-fg-3 leading-relaxed pt-3 border-t border-bg-1">
                 🔒 首发版本 AI 能力全部本地运行，照片永不离开你的电脑。
                 <br />
                 未来版本将支持可选的云端加速（需用户自主配置 API Key）。
@@ -353,9 +351,9 @@ export default function Settings() {
                   ]}
                 />
               </Row>
-              <div className="text-[11.5px] text-ink-300 space-y-1.5 pt-3 border-t border-ink-900">
-                <div className="font-medium text-ink-100">支持的云服务：</div>
-                <div className="grid grid-cols-2 gap-2 text-[11px] text-ink-400">
+              <div className="text-[11.5px] text-fg-2 space-y-1.5 pt-3 border-t border-bg-1">
+                <div className="font-medium text-fg-1">支持的云服务：</div>
+                <div className="grid grid-cols-2 gap-2 text-[11px] text-fg-2">
                   <div>• iCloud Drive</div>
                   <div>• Microsoft OneDrive</div>
                   <div>• Google Drive</div>
@@ -365,7 +363,7 @@ export default function Settings() {
                   <div>• 腾讯云 COS</div>
                   <div>• WebDAV / S3 兼容</div>
                 </div>
-                <div className="text-[10.5px] text-ink-500 pt-2">M9 将实装完整账号绑定流程</div>
+                <div className="text-[10.5px] text-fg-3 pt-2">M9 将实装完整账号绑定流程</div>
               </div>
               <div className="pt-2">
                 <Row label="同步项">
@@ -403,9 +401,9 @@ export default function Settings() {
                 {Object.entries(settings.shortcuts).map(([key, combo]) => (
                   <div
                     key={key}
-                    className="flex items-center justify-between py-2 border-b border-ink-900/80 last:border-0"
+                    className="flex items-center justify-between py-2 border-b border-bg-1/80 last:border-0"
                   >
-                    <span className="text-[12.5px] text-ink-200">{shortcutLabel(key)}</span>
+                    <span className="text-[12.5px] text-fg-1">{shortcutLabel(key)}</span>
                     <span className="kbd">{combo}</span>
                   </div>
                 ))}
@@ -432,16 +430,16 @@ export default function Settings() {
 
           {tab === 'about' && (
             <Section title="关于 GrainMark">
-              <div className="card p-5 bg-gradient-to-br from-accent-500/10 to-transparent border-accent-500/20">
+              <div className="card p-5 bg-gradient-to-br from-brand-amber/10 to-transparent border-brand-amber/20">
                 <div className="text-[20px] font-display font-semibold">GrainMark AI 后期</div>
-                <div className="text-[12px] text-ink-400 mt-1 font-mono">v1.0.0 · M1 Foundation</div>
-                <p className="text-[12px] text-ink-300 mt-4 leading-relaxed">
+                <div className="text-[12px] text-fg-2 mt-1 font-mono">v1.0.0 · M1 Foundation</div>
+                <p className="text-[12px] text-fg-2 mt-4 leading-relaxed">
                   专业级胶片风格照片后期桌面应用。
                   <br />
                   参数化滤镜 · AI 修图 · 批量处理 · EXIF 驱动水印 · 云同步
                 </p>
               </div>
-              <div className="text-[11.5px] text-ink-400 space-y-1.5">
+              <div className="text-[11.5px] text-fg-2 space-y-1.5">
                 <div>• React 18 + TypeScript + Electron 32</div>
                 <div>• Sharp (libvips) · ONNX Runtime · exiftool-vendored</div>
                 <div>• Tailwind CSS · Zustand · React Router</div>
@@ -458,7 +456,7 @@ export default function Settings() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h2 className="text-[11px] text-ink-500 uppercase tracking-widest font-mono mb-3">{title}</h2>
+      <h2 className="text-[11px] text-fg-3 uppercase tracking-widest font-mono mb-3">{title}</h2>
       <div className="card p-5 space-y-4">{children}</div>
     </div>
   )
@@ -468,8 +466,8 @@ function Row({ label, desc, children }: { label: string; desc?: string; children
   return (
     <div className="flex items-start justify-between gap-4">
       <div className="flex-1 min-w-0">
-        <div className="text-[13px] text-ink-100">{label}</div>
-        {desc && <div className="text-[11px] text-ink-500 mt-0.5 leading-relaxed">{desc}</div>}
+        <div className="text-[13px] text-fg-1">{label}</div>
+        {desc && <div className="text-[11px] text-fg-3 mt-0.5 leading-relaxed">{desc}</div>}
       </div>
       <div className="shrink-0">{children}</div>
     </div>
@@ -500,7 +498,7 @@ function Switch({ checked, onChange }: { checked: boolean; onChange: (v: boolean
   return (
     <button
       onClick={() => onChange(!checked)}
-      className={`w-9 h-5 rounded-full relative transition-colors ${checked ? 'bg-accent-500' : 'bg-ink-700'}`}
+      className={`w-9 h-5 rounded-full relative transition-colors ${checked ? 'bg-brand-amber' : 'bg-bg-3'}`}
     >
       <span
         className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${checked ? 'left-[18px]' : 'left-0.5'}`}
@@ -516,7 +514,7 @@ function SubSwitch({
 }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <label className="flex items-center justify-between py-1 cursor-pointer">
-      <span className="text-[12px] text-ink-300">{label}</span>
+      <span className="text-[12px] text-fg-2">{label}</span>
       <Switch checked={checked} onChange={onChange} />
     </label>
   )

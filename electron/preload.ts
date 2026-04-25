@@ -16,7 +16,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 
 /** IPC 通道白名单（主进程也会做校验，此处只做快速失败） */
 const CHANNEL_PATTERN =
-  /^(filter|photo|preview|batch|extract|watermark|ai|trending|sync|settings|dialog):[a-zA-Z]+$/
+  /^(filter|photo|preview|batch|extract|watermark|ai|trending|sync|settings|dialog|taste|score|evolve):[a-zA-Z]+$/
 
 const api = {
   invoke: (channel: string, ...args: unknown[]) => {
