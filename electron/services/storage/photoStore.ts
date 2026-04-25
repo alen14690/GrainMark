@@ -8,6 +8,21 @@ import { logger } from '../logger/logger.js'
 import { validateImageDimensions, validateImageFile } from '../security/imageGuard.js'
 import { getPhotosTable } from './init.js'
 
+/**
+ * 尺寸校对算法当前版本号。
+ *   v1（隐式）—— 最初无校对
+ *   v2 —— 本次：引入 thumb 算法版本号 + 方向交换自动修复 + 统一对
+ *          dimsVerified=true 的老数据也强制重新校对一次
+ */
+const DIMS_ALGO_VERSION = 2
+
+/** 将 photo.dimsVerified 归一到数值版本号。boolean true 视作 v1 老标记 */
+function normalizeDimsVersion(v: Photo['dimsVerified']): number {
+  if (typeof v === 'number') return v
+  if (v === true) return 1
+  return 0
+}
+
 /** EXIF orientation 是否表示"传感器横拍 → 实际竖拍"（5..8 都需要交换宽高） */
 function isRotatedOrientation(o?: number): boolean {
   return typeof o === 'number' && o >= 5 && o <= 8
@@ -101,8 +116,8 @@ export async function importPhotos(paths: string[]): Promise<Photo[]> {
       rating: 0,
       tags: [],
       importedAt: Date.now(),
-      // 新导入照片：dims 是用 detectDisplayDimensions 现算的，天然已校对
-      dimsVerified: true,
+      // 新导入照片：dims 是用 detectDisplayDimensions 现算的，天然已校对到当前算法版本
+      dimsVerified: DIMS_ALGO_VERSION,
     }
 
     table.upsert(photo)
@@ -125,42 +140,64 @@ export async function repairPhotoRecord(photo: Photo): Promise<Photo> {
   let next: Photo = photo
   let changed = false
 
-  // 1. thumb 失效检测
+  // 1. thumb 失效 / 陈旧检测：
+  //    (a) thumbPath 丢失 or 文件不存在 → 重建
+  //    (b) makeThumbnail 的 cache key 含算法版本号 + 源 mtime/size，老 thumb 的
+  //        文件名与当前期望不一致时，重新调 makeThumbnail 就会拿到新路径。
+  //        把 photo.thumbPath 指向它即可（老 thumb 文件成为孤儿，由磁盘清理另算）
   const thumbMissing = !photo.thumbPath || (photo.thumbPath && !fs.existsSync(photo.thumbPath))
-  if (thumbMissing) {
+  if (thumbMissing && fs.existsSync(photo.path)) {
     try {
-      // 源文件还要在才谈得上重建
-      if (fs.existsSync(photo.path)) {
-        const thumbPath = await makeThumbnail(photo.path, 360)
-        next = { ...next, thumbPath }
-        changed = true
-        logger.info('photo.thumb.repaired', { path: photo.path })
-      }
+      const thumbPath = await makeThumbnail(photo.path, 360)
+      next = { ...next, thumbPath }
+      changed = true
+      logger.info('photo.thumb.repaired', { path: photo.path })
     } catch (err) {
       logger.warn('photo.thumb.repair.failed', { path: photo.path, err: (err as Error).message })
+    }
+  } else if (photo.thumbPath && fs.existsSync(photo.path)) {
+    // thumb 存在，但可能是旧算法产物 —— 让 makeThumbnail 用当前算法 key 检查：
+    //   若现有路径即为当前 key → 直接返回，无成本
+    //   若 key 变了 → 重新渲染一张新 thumb，返回新路径
+    try {
+      const expectedThumbPath = await makeThumbnail(photo.path, 360)
+      if (expectedThumbPath !== photo.thumbPath) {
+        next = { ...next, thumbPath: expectedThumbPath }
+        changed = true
+        logger.info('photo.thumb.algo.upgraded', {
+          path: photo.path,
+          from: photo.thumbPath,
+          to: expectedThumbPath,
+        })
+      }
+    } catch (err) {
+      logger.warn('photo.thumb.algo.check.failed', {
+        path: photo.path,
+        err: (err as Error).message,
+      })
     }
   }
 
   // 2. 尺寸缺失检测（width 或 height 为 0）
-  if ((!photo.width || !photo.height) && fs.existsSync(photo.path)) {
+  if ((!next.width || !next.height) && fs.existsSync(next.path)) {
     try {
       const dims = await resolveDisplayDimensions(
-        photo.path,
-        photo.exif.width,
-        photo.exif.height,
-        photo.exif.orientation,
+        next.path,
+        next.exif.width,
+        next.exif.height,
+        next.exif.orientation,
       )
       if (dims.width > 0 && dims.height > 0) {
         next = { ...next, width: dims.width, height: dims.height }
         changed = true
         logger.info('photo.dims.repaired', {
-          path: photo.path,
+          path: next.path,
           width: dims.width,
           height: dims.height,
         })
       }
     } catch (err) {
-      logger.warn('photo.dims.repair.failed', { path: photo.path, err: (err as Error).message })
+      logger.warn('photo.dims.repair.failed', { path: next.path, err: (err as Error).message })
     }
   }
 
@@ -239,8 +276,8 @@ async function repairMissingInBackground(photos: Photo[], limit: number): Promis
       !fs.existsSync(p.thumbPath ?? '') ||
       !p.width ||
       !p.height ||
-      // 方向可能错的老数据：必须同时有 thumb + 尺寸才能进行校对
-      (p.thumbPath && p.width && p.height && !p.dimsVerified),
+      // 方向可能错的老数据：thumb + 尺寸都在但未用当前算法校对 → 重新跑一次
+      (p.thumbPath && p.width && p.height && normalizeDimsVersion(p.dimsVerified) < DIMS_ALGO_VERSION),
   )
   if (targets.length === 0) return
   const table = getPhotosTable()
@@ -249,8 +286,9 @@ async function repairMissingInBackground(photos: Photo[], limit: number): Promis
     if (repaired >= limit) break
     try {
       const next = await repairPhotoRecord(photo)
-      // 校对过的标记一下，避免下次 listPhotos 再次 O(N) 扫描
-      const withFlag: Photo = next.dimsVerified ? next : { ...next, dimsVerified: true }
+      // 校对过的标记版本号，避免下次 listPhotos 再次 O(N) 扫描
+      const needsFlag = normalizeDimsVersion(next.dimsVerified) < DIMS_ALGO_VERSION
+      const withFlag: Photo = needsFlag ? { ...next, dimsVerified: DIMS_ALGO_VERSION } : next
       if (withFlag !== photo) {
         table.upsert(withFlag)
         if (next !== photo) repaired++

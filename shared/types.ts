@@ -156,12 +156,13 @@ export interface Photo {
   tags: string[]
   importedAt: number
   /**
-   * 尺寸方向已通过 thumb 做过一次校对（迁移字段）。
-   * 旧版本可能在 Pass 3b 前把 RAW 的未旋转传感器尺寸存进了 width/height，
-   * 卡片 aspectRatio 因此与 thumb 内容不一致。
-   * 一次校对成功后置为 true，避免重复扫描。
+   * 尺寸方向校对使用的算法版本号（迁移字段）。
+   * 每次 RAW 方向 / thumb 生成算法升级就 bump，老记录（字段值偏小 or 缺失）
+   * 会在 listPhotos 懒补阶段重新走一遍尺寸校对 + thumb 升级。
+   *
+   * 为保持向后兼容：boolean true 视作 v1（老版本的 dimsVerified=true 记录）。
    */
-  dimsVerified?: boolean
+  dimsVerified?: number | boolean
 }
 
 // ============ 批量任务 ============

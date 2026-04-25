@@ -7,6 +7,15 @@ import { orientationToRotationDegrees, resolvePreviewBuffer } from '../raw/index
 import { getThumbsDir } from '../storage/init.js'
 
 /**
+ * 缩略图生成版本号 —— 每次 RAW 方向处理 / resize 逻辑有语义变化就 bump。
+ * 版本号会进入 cache key 的 hash，老 thumb 自动失效让 listPhotos 后台懒补重建。
+ *
+ *   v1（隐式）—— Pass 2.8 前：RAW 无 sourceOrientation 修正，竖拍 thumb 是横的
+ *   v2 —— 本次：RAW 用 sourceOrientation 显式 rotate，且强制 source 文件 size 进 key
+ */
+const THUMB_ALGO_VERSION = 2
+
+/**
  * 生成缩略图，返回本地绝对路径。
  *
  * 流程：
@@ -16,10 +25,23 @@ import { getThumbsDir } from '../storage/init.js'
  *   3. resize fit:'inside' + withoutEnlargement 保持比例、不超原图
  *   4. 生成失败会 throw；上层 photoStore 的 catch 继续把 photo 记录下来
  *
- * 缓存：按 `filePath:size` 的 md5 命名；源文件路径或尺寸变化会产生新 hash
+ * 缓存：key = md5(filePath : size : mtime : algoVersion)。
+ * - algoVersion 保证改了 orientation 算法后老缓存失效
+ * - mtime 保证用户替换文件后缩略图跟着更新
  */
 export async function makeThumbnail(filePath: string, size: number): Promise<string> {
-  const hash = crypto.createHash('md5').update(`${filePath}:${size}`).digest('hex')
+  // mtime/size 让替换源文件后 thumb 自动重建；algoVersion 让算法升级强制 rebuild 全量老数据
+  let keySuffix = ''
+  try {
+    const st = fs.statSync(filePath)
+    keySuffix = `:${st.size}:${Math.floor(st.mtimeMs)}`
+  } catch {
+    // 源文件不存在就退化到只用 path，让失败在 resolvePreviewBuffer 阶段报更清楚的错
+  }
+  const hash = crypto
+    .createHash('md5')
+    .update(`${filePath}:${size}:v${THUMB_ALGO_VERSION}${keySuffix}`)
+    .digest('hex')
   const outPath = path.join(getThumbsDir(), `${hash}.jpg`)
   if (fs.existsSync(outPath)) {
     // 额外校验：文件不为空，避免上次写到一半崩溃的残留
@@ -39,12 +61,12 @@ export async function makeThumbnail(filePath: string, size: number): Promise<str
   const rotationDeg = sourceOrientation !== undefined ? orientationToRotationDegrees(sourceOrientation) : null
 
   let img = sharp(buffer, { failOn: 'none' })
-  if (rotationDeg !== null) {
+  if (rotationDeg !== null && rotationDeg !== 0) {
     // RAW：显式按原文件 EXIF orientation 旋转；sharp 默认输出不含 EXIF，
     // 最终 JPEG 天然是"像素正向 + 无 orientation tag"状态，无需 .withMetadata
     img = img.rotate(rotationDeg)
   } else {
-    img = img.rotate() // 非 RAW：读 buffer EXIF 自动转正
+    img = img.rotate() // 非 RAW / orientation=1：读 buffer EXIF 自动转正（orientation=1 时是 no-op）
   }
 
   await img

@@ -106,14 +106,41 @@ describe('repairPhotoRecord', () => {
     expect(hoisted.detectDisplayDimensions).toHaveBeenCalledWith(before.path)
   })
 
-  it('完整记录 → 返回原引用，不调任何服务', async () => {
+  it('完整记录 + thumb 已是当前算法 → 返回原引用，不触发数据改动', async () => {
     const thumbFile = path.join(tmpRoot, 'have-thumb.jpg')
     fs.writeFileSync(thumbFile, 'x')
     const before = makePhoto({ width: 6000, height: 4000, thumbPath: thumbFile })
+    // 模拟当前算法生成的 thumb 路径 == 现有 thumbPath → 算法版本一致，不升级
+    hoisted.makeThumbnail.mockResolvedValue(thumbFile)
+
     const after = await mod.repairPhotoRecord(before)
-    expect(after).toBe(before)
-    expect(hoisted.makeThumbnail).not.toHaveBeenCalled()
+
+    // makeThumbnail 会被调一次以"核对算法版本"
+    expect(hoisted.makeThumbnail).toHaveBeenCalledWith(before.path, 360)
+    // 但结果路径相同，所以 photo 记录不改
+    expect(after.width).toBe(6000)
+    expect(after.height).toBe(4000)
+    expect(after.thumbPath).toBe(thumbFile)
+    // detectDisplayDimensions 不应被调（尺寸没缺）
     expect(hoisted.detectDisplayDimensions).not.toHaveBeenCalled()
+    // 方向校对 step 3 会读实际 thumb 文件，但我们写入的是 "x" 不是有效图像 →
+    // 校对会 catch 并静默，最终 next === photo 时 changed=false，返回原引用
+    expect(after).toBe(before)
+  })
+
+  it('完整记录 + thumb 是旧算法产物 → 升级到新 thumb path', async () => {
+    const oldThumb = path.join(tmpRoot, 'old-thumb.jpg')
+    const newThumb = path.join(tmpRoot, 'new-algo-thumb.jpg')
+    fs.writeFileSync(oldThumb, 'x')
+    fs.writeFileSync(newThumb, 'x')
+    const before = makePhoto({ width: 6000, height: 4000, thumbPath: oldThumb })
+    // makeThumbnail 返回新路径 → repair 检测到差异 → 替换
+    hoisted.makeThumbnail.mockResolvedValue(newThumb)
+
+    const after = await mod.repairPhotoRecord(before)
+
+    expect(after).not.toBe(before)
+    expect(after.thumbPath).toBe(newThumb)
   })
 
   it('makeThumbnail 抛错 → 捕获并返回原引用（不影响主流程）', async () => {

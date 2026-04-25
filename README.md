@@ -133,7 +133,7 @@ WB → Tone → Curves → HSL → ColorGrading → Adjustments(clarity/sat/vib)
 
 | 指标 | 当前 | 红线 |
 |---|---|---|
-| 单元测试 | **405 / 405 通过**（31 文件，含 14 个像素级 snapshot） | ≥ 基线无回归 |
+| 单元测试 | **407 / 407 通过**（31 文件，含 14 个像素级 snapshot） | ≥ 基线无回归 |
 | 集成测试 | **6 / 6 通过**（Playwright + Electron · CPU 路径 5 + GPU 路径 1） | ≥ 基线无回归 |
 | tsc --noEmit | **0 错误** | 0 |
 | biome check | **0 警告**（150 文件） | 0 |
