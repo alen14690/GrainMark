@@ -47,40 +47,41 @@
 
 ### 6. Git 提交与推送
 - **每个任务完成必须立即 `git commit` + `git push`**
-- 提交 message 遵循 Conventional Commits：`<type>(<scope>): <subject>`
+- **提交 message 一律使用简体中文**（subject + body + 所有段落内容均为中文；仅 type/scope 关键字、文件路径、代码符号、错误码、版本号保持原样）
+  - 遵循 Conventional Commits：`<type>(<scope>): <中文主题>`
   - `type`: `feat` / `fix` / `refactor` / `perf` / `test` / `chore` / `docs` / `sec`
   - `scope`: `p1-security` / `p1-test` / `engine` / `ai` / `design` 等
-  - 示例：`feat(p1-security): add PathGuard with symlink-safe resolution`
-- **commit body 必须回答三个问题**：
-  1. **改了什么**（What）— 新增/修改/删除了哪些符号和文件
-  2. **为什么要这么改**（Why）— 解决的问题 / 对应的准则或 plan 条目
-  3. **是否有更好的修改方案**（Alternatives）— 考虑过的其他方案及未选原因；没有则写 "已评估为最优"
+  - 示例：`feat(p1-security): 新增路径守卫与符号链接安全解析`
+- **commit body 必须回答三个问题（中文表述）**：
+  1. **改了什么**（变更内容）— 新增/修改/删除了哪些符号和文件
+  2. **为什么要这么改**（变更动机）— 解决的问题 / 对应的准则或 plan 条目
+  3. **是否有更好的修改方案**（备选方案）— 考虑过的其他方案及未选原因；没有则写 "已评估为最优"
 - **不得跳过 hooks**（不使用 `--no-verify`）
 - **不得使用 `git commit --amend`**，除非用户明确要求
 - **不得 force push**，除非用户明确要求且不涉及 main 分支
 
-Commit body 模板：
+Commit body 模板（中文）：
 
 ```
-<type>(<scope>): <subject>
+<type>(<scope>): <中文主题>
 
-What:
+变更内容：
 - 新增/修改/删除了 xxx
 - 涉及文件：A, B, C
 
-Why:
+变更动机：
 - 对应 M1.5 P1 的 xxx 工作项
 - 解决了 xxx 问题（或对应 AGENTS.md 第 X 条准则）
 
-Alternatives:
+备选方案：
 - 方案 A：...（未选原因）
 - 方案 B：...（未选原因）
 - 最终选择：...（理由）
 
-Verification:
-- tsc: 0 errors
-- biome: 0 warnings
-- tests: N/N passed, coverage X%
+验证结果：
+- tsc: 0 错误
+- biome: 0 警告
+- 单测: N/N 通过，覆盖率 X%
 ```
 
 ---
@@ -97,7 +98,7 @@ Verification:
 - **静态检查零回归**：tsc --noEmit [0/N] 错误 · biome [0/N] 警告
 - **单元测试同步更新并全绿**：vitest [N/N] 通过 · 覆盖率 [X%]
 - **可运行自测**：[具体验证了什么流程]
-- **Git 提交与推送**：commit [hash] · message 含 What/Why/Alternatives · pushed to [branch]
+- **Git 提交与推送**：commit [hash] · message 含「变更内容/变更动机/备选方案」三段中文说明 · 已推送至 [branch]
 ```
 
 **若违反任一条准则**：
