@@ -1,19 +1,23 @@
 /**
  * Editor — 单图编辑器
  *
- * 卤化银风格：
- *  - 顶部 ScoreBar（评分条，P4 接入真实数据）
- *  - 左侧画布 + EXIF 金属条
- *  - 右侧滤镜列表（带 popularity 标识）
+ * 架构（M2）：
+ *   - previewUrl  : IPC 拉到的原图预览（1600 长边 JPEG）
+ *   - pipeline    : editStore.currentPipeline（切滤镜时从 preset 克隆，手动滑块叠加）
+ *   - WebGL 渲染 : useWebGLPreview，完整 10-shader GPU pipeline + 实时直方图
+ *   - 右栏 Tab   : 滤镜列表 | 参数调整（滑块）
  */
-import { Download, Redo2, Save, SplitSquareHorizontal, Undo2, Wand2 } from 'lucide-react'
+import { Download, Redo2, RotateCcw, Save, Sliders, SplitSquareHorizontal, Undo2, Wand2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { AdjustmentsPanel } from '../components/AdjustmentsPanel'
 import { Histogram, ScoreBar, ValueBadge, cn } from '../design'
-import type { HistogramData } from '../design'
 import { ipc } from '../lib/ipc'
 import { useWebGLPreview } from '../lib/useWebGLPreview'
 import { useAppStore } from '../stores/appStore'
+import { hasDirtyEdits, useEditStore } from '../stores/editStore'
+
+type RightPanelTab = 'filters' | 'adjust'
 
 export default function Editor() {
   const { photoId } = useParams()
@@ -27,25 +31,44 @@ export default function Editor() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [showOriginal, setShowOriginal] = useState(false)
+  const [rightTab, setRightTab] = useState<RightPanelTab>('filters')
 
   const activeFilter = filters.find((f) => f.id === activeFilterId)
-  const pipeline = showOriginal ? null : (activeFilter?.pipeline ?? null)
 
-  // WebGL 预览（Pass 3a：只启用 tone + vignette）
-  const webgl = useWebGLPreview(previewUrl, pipeline)
+  // ---- editStore 与 activeFilter 同步 ----
+  const currentPipeline = useEditStore((s) => s.currentPipeline)
+  const baselinePipeline = useEditStore((s) => s.baselinePipeline)
+  const loadFromPreset = useEditStore((s) => s.loadFromPreset)
+  const resetToBaseline = useEditStore((s) => s.resetToBaseline)
+  const clearEdits = useEditStore((s) => s.clear)
 
-  // 滤镜含 GPU 未实现通道（LUT/HSL/曲线/色彩分级/颗粒/光晕/WB/adjustments）→ 让 IPC 端用 CPU 渲染后再给 canvas
-  // 注意：showOriginal=true 时永远强制走"原图"（不让 CPU 兜底污染）
+  // 切换 filter → 重置编辑态
+  useEffect(() => {
+    loadFromPreset(activeFilter ?? null)
+  }, [activeFilter, loadFromPreset])
+
+  // 离开 Editor 清空编辑态
+  useEffect(() => {
+    return () => {
+      clearEdits()
+    }
+  }, [clearEdits])
+
+  const dirty = hasDirtyEdits(currentPipeline, baselinePipeline)
+
+  // ---- WebGL 预览：按 showOriginal 短路 pipeline ----
+  const renderPipeline = showOriginal ? null : currentPipeline
+  const webgl = useWebGLPreview(previewUrl, renderPipeline)
+
+  // CPU 兜底：正常 Pass 3b-2 后只剩 LUT 解析失败触发
   const needsCpuFallback = !showOriginal && webgl.needsCpuFallback
   const ipcFilterId = showOriginal ? null : needsCpuFallback ? activeFilterId : null
 
-  // photo.path 作为稳定标识；photos 数组 re-order 不会误触发 IPC 重取
   const photoPath = photo?.path
   useEffect(() => {
     if (!photoPath) return
     let alive = true
     setLoading(true)
-    // ipcFilterId = null：取原图，交给 GPU 叠加；否则让 IPC CPU 带 filter 渲染
     ipc('preview:render', photoPath, ipcFilterId, undefined)
       .then((url) => {
         if (alive) setPreviewUrl(url)
@@ -65,11 +88,6 @@ export default function Editor() {
     )
   }
 
-  // P4 会从 IPC 拉到真实直方图；P2 用空占位
-  const histogramData: HistogramData | null = null
-
-  // CPU 兜底时 IPC 返回的就是最终图，canvas 不参与计算 —— 直接用 <img>，
-  // 避免 canvas "等上传纹理 → 重绘" 过程中的闪烁
   const useWebglCanvas = !needsCpuFallback && (webgl.status === 'ready' || webgl.status === 'loading')
   const showImgFallback = !useWebglCanvas && previewUrl
   const canvasStyle = { maxWidth: '100%', maxHeight: 'calc(100vh - 240px)' } as const
@@ -81,6 +99,7 @@ export default function Editor() {
         {/* 顶部工具条 */}
         <div className="h-12 border-b border-fg-4/50 flex items-center px-4 gap-2">
           <div className="text-sm font-medium truncate flex-1 text-fg-1">{photo.name}</div>
+          {dirty && <ValueBadge value="EDITED" variant="amber" size="sm" className="!ml-0 shrink-0" />}
           <button type="button" className="btn-ghost btn-xs" title="撤销 (⌘Z)">
             <Undo2 className="w-3.5 h-3.5" />
           </button>
@@ -97,6 +116,16 @@ export default function Editor() {
           >
             <SplitSquareHorizontal className="w-3.5 h-3.5" />
           </button>
+          {dirty && (
+            <button
+              type="button"
+              onClick={resetToBaseline}
+              className="btn-ghost btn-xs"
+              title="重置到滤镜预设"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+          )}
           <div className="divider-metal-v mx-1" />
           <button type="button" className="btn-secondary btn-xs">
             <Save className="w-3.5 h-3.5" />
@@ -122,7 +151,7 @@ export default function Editor() {
               className={cn('rounded-md shadow-soft-lg object-contain', useWebglCanvas ? 'block' : 'hidden')}
               style={canvasStyle}
             />
-            {/* IPC base64 兜底（WebGL 初始化前 / 不可用时） */}
+            {/* IPC base64 兜底（WebGL 初始化前 / 不可用时 / CPU 路径） */}
             {showImgFallback && (
               <img
                 src={previewUrl!}
@@ -186,38 +215,90 @@ export default function Editor() {
 
       {/* Right Panel */}
       <aside className="w-80 shrink-0 border-l border-fg-4/60 bg-bg-0 flex flex-col">
-        <div className="h-12 border-b border-fg-4/50 flex items-center px-4">
-          <Wand2 className="w-3.5 h-3.5 text-brand-amber mr-2" strokeWidth={2} />
-          <span className="text-sm font-medium text-fg-1">滤镜</span>
-          {activeFilter && (
-            <span className="ml-auto text-xxs text-fg-3 font-mono truncate max-w-[140px]">
-              {activeFilter.name}
-            </span>
+        {/* Tab 切换 */}
+        <div className="h-12 border-b border-fg-4/50 flex items-stretch">
+          <TabButton
+            active={rightTab === 'filters'}
+            onClick={() => setRightTab('filters')}
+            icon={<Wand2 className="w-3.5 h-3.5" strokeWidth={2} />}
+            label="滤镜"
+            sub={activeFilter?.name}
+          />
+          <TabButton
+            active={rightTab === 'adjust'}
+            onClick={() => setRightTab('adjust')}
+            icon={<Sliders className="w-3.5 h-3.5" strokeWidth={2} />}
+            label="调整"
+            sub={dirty ? '已修改' : undefined}
+          />
+        </div>
+
+        {/* 内容 */}
+        <div className="flex-1 overflow-y-auto">
+          {rightTab === 'filters' ? (
+            <div className="p-3 space-y-1.5">
+              <FilterRow name="原图" active={!activeFilterId} onClick={() => setActiveFilter(null)} />
+              {filters.map((f) => (
+                <FilterRow
+                  key={f.id}
+                  name={f.name}
+                  popularity={f.popularity}
+                  tags={f.tags}
+                  active={f.id === activeFilterId}
+                  onClick={() => setActiveFilter(f.id)}
+                />
+              ))}
+            </div>
+          ) : (
+            <AdjustmentsPanel />
           )}
         </div>
 
-        {/* 滤镜列表 */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
-          <FilterRow name="原图" active={!activeFilterId} onClick={() => setActiveFilter(null)} />
-          {filters.map((f) => (
-            <FilterRow
-              key={f.id}
-              name={f.name}
-              popularity={f.popularity}
-              tags={f.tags}
-              active={f.id === activeFilterId}
-              onClick={() => setActiveFilter(f.id)}
-            />
-          ))}
-        </div>
-
-        {/* Histogram */}
+        {/* Histogram — 实时从 WebGL readPixels 采样 */}
         <div className="p-3 border-t border-fg-4/50">
-          <div className="text-xxs text-fg-3 uppercase tracking-wider font-mono mb-1.5">Histogram</div>
-          <Histogram data={histogramData} width={288} height={64} />
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="text-xxs text-fg-3 uppercase tracking-wider font-mono">Histogram</div>
+            {webgl.histogram && (
+              <div className="text-xxs text-fg-3 font-mono">{webgl.histogram.total.toLocaleString()} px</div>
+            )}
+          </div>
+          <Histogram data={webgl.histogram} width={288} height={64} />
         </div>
       </aside>
     </div>
+  )
+}
+
+function TabButton({
+  active,
+  onClick,
+  icon,
+  label,
+  sub,
+}: {
+  active: boolean
+  onClick: () => void
+  icon: React.ReactNode
+  label: string
+  sub?: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'flex-1 flex items-center justify-center gap-2 px-3 transition-all duration-fast border-b-2',
+        active
+          ? 'border-brand-violet text-fg-1 bg-white/[0.03]'
+          : 'border-transparent text-fg-3 hover:text-fg-2',
+      )}
+    >
+      <span className={active ? 'text-brand-violet' : 'text-fg-3'}>{icon}</span>
+      <div className="flex flex-col items-start leading-tight">
+        <span className="text-sm font-medium">{label}</span>
+        {sub && <span className="text-xxs font-mono text-fg-3 truncate max-w-[90px]">{sub}</span>}
+      </div>
+    </button>
   )
 }
 
@@ -250,7 +331,7 @@ function FilterRow({
       className={cn(
         'w-full text-left px-3 py-2.5 rounded-md transition-all duration-fast',
         active
-          ? 'bg-brand-amber/10 text-brand-amber border border-brand-amber/30'
+          ? 'bg-brand-violet/10 text-brand-violet border border-brand-violet/30'
           : 'text-fg-2 hover:text-fg-1 hover:bg-bg-1 border border-transparent',
       )}
     >

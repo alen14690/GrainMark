@@ -59,6 +59,7 @@ import {
   textureFromBitmap,
 } from '../engine/webgl'
 import type { PipelineStep, Texture } from '../engine/webgl'
+import { type HistogramBins, computeHistogramFromCanvas, emptyHistogram } from './histogram'
 import { useLutTexture } from './useLutTexture'
 
 export type WebGLPreviewStatus = 'idle' | 'loading' | 'ready' | 'unsupported' | 'lost' | 'error'
@@ -73,6 +74,8 @@ export interface WebGLPreviewResult {
    * 所有 pipeline 通道都已 GPU 化，正常情况下恒为 false。
    */
   needsCpuFallback: boolean
+  /** 最近一次渲染后的直方图（256 bins × 4 通道）；未就绪时为 null */
+  histogram: HistogramBins | null
 }
 
 /** 构造 pipeline step 时需要的 GPU 资源（LUT 纹理等） */
@@ -202,6 +205,9 @@ export function useWebGLPreview(
   const [error, setError] = useState<string | undefined>(undefined)
   const [lastDurationMs, setLastDurationMs] = useState<number | undefined>(undefined)
   const [gl, setGl] = useState<GLContext | null>(null)
+  const [histogram, setHistogram] = useState<HistogramBins | null>(null)
+  // 直方图节流：滑块高频拖动时跳过中间帧，只对稳定态采样
+  const histogramTimerRef = useRef<number | null>(null)
 
   // 长期持有的 GL 对象（跨 render）
   const pipelineRef = useRef<Pipeline | null>(null)
@@ -242,6 +248,23 @@ export function useWebGLPreview(
       if (stats.aborted) return
       setLastDurationMs(stats.durationMs)
       setStatus('ready')
+      // 渲染后节流采样直方图：大分辨率 canvas 的 readPixels 可达 5-15ms，
+      // 拖动滑块高频触发时会堆积。保留 120ms debounce，稳定态才真正 readPixels。
+      // preserveDrawingBuffer=true 保证跨帧仍可读 drawing buffer
+      const canvas = canvasRef.current
+      if (canvas) {
+        if (histogramTimerRef.current !== null) {
+          window.clearTimeout(histogramTimerRef.current)
+        }
+        histogramTimerRef.current = window.setTimeout(() => {
+          histogramTimerRef.current = null
+          try {
+            setHistogram(computeHistogramFromCanvas(canvas))
+          } catch {
+            setHistogram(emptyHistogram())
+          }
+        }, 120)
+      }
     } catch (e) {
       setStatus('error')
       setError((e as Error).message)
@@ -251,7 +274,7 @@ export function useWebGLPreview(
   // 初始化 GLContext —— 仅在 mount 时一次
   useEffect(() => {
     if (!canvasRef.current) return
-    const ctx = new GLContext(canvasRef.current, { preserveDrawingBuffer: false })
+    const ctx = new GLContext(canvasRef.current, { preserveDrawingBuffer: true })
     if (!ctx.ok) {
       setStatus('unsupported')
       return
@@ -269,6 +292,10 @@ export function useWebGLPreview(
       offLost()
       offRestored()
       abortRef.current?.abort()
+      if (histogramTimerRef.current !== null) {
+        window.clearTimeout(histogramTimerRef.current)
+        histogramTimerRef.current = null
+      }
       sourceTexRef.current?.dispose()
       pipelineObj.dispose()
       registry.dispose()
@@ -330,5 +357,5 @@ export function useWebGLPreview(
     renderNow()
   }, [pipeline, lut.texture, renderNow])
 
-  return { canvasRef, status, error, lastDurationMs, needsCpuFallback }
+  return { canvasRef, status, error, lastDurationMs, needsCpuFallback, histogram }
 }

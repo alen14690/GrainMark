@@ -94,7 +94,7 @@ GrainMark/
 | **M1.5 P3a** | ✅ 完成 | **WebGL 2 引擎骨架**（5 件套 + ping-pong + AbortController） |
 | **M1.5 P3b-1** | ✅ 完成 | **7 个 GPU filter shader**（WB/HSL/Curves/ColorGrading/Adjustments/Grain/Halation） |
 | **M1.5 P3b-2** | ✅ 完成 | **LUT3D shader**（WebGL 2 TEXTURE_3D + 半像素校正 + LRU 纹理缓存） |
-| **M2** | 🟡 进行中 | 完整 Pipeline 执行器 + 实时预览（已基本就绪，剩下直方图/实时滑块） |
+| **M2** | ✅ 完成 | **完整 Pipeline 执行器 + 实时预览 + editStore + 手动调整面板 + 实时 GPU 直方图** |
 | **M3** | 待办 | Worker Pool 批处理 + 命名模板 + EXIF 保留 |
 | **M4** | 待办 | 编辑器 UI（历史栈 / 撤销重做 / 前后对比） |
 | **M5** | 待办 | 参考图 L2 提取 + .cube 烘焙 |
@@ -132,11 +132,12 @@ WB → Tone → Curves → HSL → ColorGrading → Adjustments(clarity/sat/vib)
 
 | 指标 | 当前 | 红线 |
 |---|---|---|
-| 单元测试 | **306 / 306 通过**（24 文件） | ≥ 基线无回归 |
+| 单元测试 | **333 / 333 通过**（26 文件） | ≥ 基线无回归 |
 | tsc --noEmit | **0 错误** | 0 |
-| biome check | **0 警告**（133 文件） | 0 |
-| 打包体积 | renderer 295KB · main 144KB · preload 0.55KB | dmg/exe ≤ 300MB |
+| biome check | **0 警告**（138 文件） | 0 |
+| 打包体积 | renderer 308KB · main 144KB · preload 0.55KB | dmg/exe ≤ 300MB |
 | WebGL 预览性能 | M-series Mac 24MP Nms（UI 实时显示） | ≤ 8ms/frame |
+| 实时直方图 | readPixels + 120ms debounce，不阻塞滑块 | 滑块 ≥ 60fps |
 
 ## ⚖️ 版权与合规
 
