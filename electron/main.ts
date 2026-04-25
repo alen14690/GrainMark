@@ -4,6 +4,7 @@ import { BrowserWindow, app, dialog, ipcMain, session, shell } from 'electron'
 import { z } from 'zod'
 import { DialogSelectFilesSchema } from '../shared/ipc-schemas.js'
 import { registerAllIpcHandlers } from './ipc/register.js'
+import { buildAppMenu } from './menu.js'
 import { registerGrainPrivileges, registerGrainProtocol, setPhotoPathResolver } from './protocol/grain.js'
 import { shutdownExiftool } from './services/exif/reader.js'
 import { logger } from './services/logger/logger.js'
@@ -244,6 +245,9 @@ app.whenReady().then(async () => {
   registerAllIpcHandlers()
 
   await createWindow()
+
+  // 应用菜单：必须在窗口创建后挂，确保点击时能拿到窗口引用
+  buildAppMenu({ getMainWindow: () => win })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

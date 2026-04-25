@@ -3,6 +3,8 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
 import { GrainOverlay } from './design'
+import { useAppNavigation } from './lib/useAppNavigation'
+import { useGlobalHotkeys } from './lib/useGlobalHotkeys'
 import AIStudio from './routes/AIStudio'
 import Batch from './routes/Batch'
 import Editor from './routes/Editor'
@@ -23,6 +25,11 @@ export default function App() {
   useEffect(() => {
     init()
   }, [init])
+
+  // 菜单点击 / 原生 accelerator 的路由桥接
+  useAppNavigation()
+  // 渲染端兜底快捷键（⌘, 等）
+  useGlobalHotkeys()
 
   return (
     <div className="flex h-screen bg-bg-0 text-fg-1 overflow-hidden relative isolate">

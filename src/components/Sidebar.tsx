@@ -79,9 +79,13 @@ export default function Sidebar() {
               isActive ? 'bg-bg-2 text-fg-1' : 'text-fg-2 hover:text-fg-1 hover:bg-bg-2',
             )
           }
+          title="设置（⌘,）"
         >
           <SettingsIcon className="w-4 h-4" strokeWidth={1.8} />
-          <span>设置</span>
+          <span className="flex-1">设置</span>
+          <span className="kbd" aria-hidden>
+            ⌘,
+          </span>
         </NavLink>
       </div>
     </aside>
