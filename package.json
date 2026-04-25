@@ -1,0 +1,94 @@
+{
+  "name": "grainmark",
+  "version": "1.0.0",
+  "description": "GrainMark AI 后期 — 专业胶片风格照片编辑桌面应用",
+  "author": "GrainMark Team",
+  "license": "MIT",
+  "main": "dist-electron/main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "npm run build && electron dist-electron/main.js",
+    "pack:dir": "npm run build && electron-builder --dir",
+    "pack": "npm run build && electron-builder",
+    "pack:mac": "npm run build && electron-builder --mac",
+    "pack:win": "npm run build && electron-builder --win",
+    "pack:linux": "npm run build && electron-builder --linux",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:visual": "playwright test --project=visual",
+    "test:integration": "playwright test --project=integration",
+    "test:e2e": "playwright test --project=e2e",
+    "test:packaged": "npm run pack:dir && playwright test --project=packaged",
+    "test:all": "npm run typecheck && npm run lint && npm run test",
+    "bench": "vitest bench",
+    "fixtures:generate": "tsx tests/fixtures/generate.ts",
+    "snapshot:update": "vitest run -u && playwright test --update-snapshots"
+  },
+  "dependencies": {
+    "exiftool-vendored": "^29.1.0",
+    "sharp": "^0.33.5",
+    "lucide-react": "^0.460.0",
+    "zustand": "^5.0.1",
+    "immer": "^10.1.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0",
+    "clsx": "^2.1.1",
+    "nanoid": "^5.0.8",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^22.9.0",
+    "@types/pixelmatch": "^5.2.6",
+    "@types/pngjs": "^6.0.5",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "^2.1.6",
+    "autoprefixer": "^10.4.20",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "electron-playwright-helpers": "^1.7.1",
+    "pixelmatch": "^6.0.0",
+    "pngjs": "^7.0.0",
+    "postcss": "^8.4.49",
+    "rimraf": "^6.0.1",
+    "tailwindcss": "^3.4.15",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.1",
+    "vite-plugin-electron": "^0.28.8",
+    "vite-plugin-electron-renderer": "^0.14.6",
+    "vitest": "^2.1.6"
+  },
+  "build": {
+    "appId": "com.grainmark.app",
+    "productName": "GrainMark",
+    "directories": {
+      "output": "release"
+    },
+    "files": ["dist", "dist-electron"],
+    "asar": true,
+    "mac": {
+      "category": "public.app-category.photography",
+      "target": ["dmg", "zip"],
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "win": {
+      "target": ["nsis"]
+    },
+    "linux": {
+      "target": ["AppImage", "deb"]
+    }
+  }
+}
