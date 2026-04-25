@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- CSP 对齐主窗口但更严格：只加载自身脚本，允许 data: 用于 sourceUrl fetch -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: grain:; connect-src 'self' data: blob: grain: ws://localhost:* http://localhost:*; object-src 'none'; base-uri 'self'; form-action 'none';">
+    <title>GrainMark · Batch GPU</title>
+    <style>body{margin:0;background:#000;color:#fff;font-family:monospace;font-size:12px;padding:8px;}</style>
+  </head>
+  <body>
+    <div id="status">waiting...</div>
+    <canvas id="gl-canvas" style="display:none"></canvas>
+    <script type="module" src="/src/batchGpu.tsx"></script>
+  </body>
+</html>

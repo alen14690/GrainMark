@@ -14,9 +14,13 @@ import { contextBridge, ipcRenderer } from 'electron'
  * 所有实际能力都通过 IPC 走，渲染进程拿不到任何 Node API。
  */
 
-/** IPC 通道白名单（主进程也会做校验，此处只做快速失败） */
+/** IPC 通道白名单（主进程也会做校验，此处只做快速失败）
+ *  支持两种形式：
+ *    - 单段：prefix:actionName        （主入口，如 batch:start / preview:render）
+ *    - 子空间：prefix:sub:actionName  （子系统，如 batch:gpu:ready / batch:gpu:task）
+ */
 const CHANNEL_PATTERN =
-  /^(filter|photo|preview|batch|extract|watermark|ai|trending|sync|settings|dialog|taste|score|evolve|app):[a-zA-Z]+$/
+  /^(filter|photo|preview|batch|extract|watermark|ai|trending|sync|settings|dialog|taste|score|evolve|app):([a-zA-Z]+|[a-zA-Z]+:[a-zA-Z-]+)$/
 
 const api = {
   invoke: (channel: string, ...args: unknown[]) => {

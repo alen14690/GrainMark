@@ -9,14 +9,20 @@
  *
  * 错误隔离：单个 item 失败只影响该 item；worker 崩溃由 pool 重启兜底
  */
+import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Worker } from 'node:worker_threads'
 import { BrowserWindow } from 'electron'
 import { nanoid } from 'nanoid'
+import sharp from 'sharp'
 import type { BatchJob, BatchJobConfig, BatchJobItem, FilterPipeline } from '../../../shared/types.js'
+import { getGpuRenderer } from '../batch/gpuRenderer.js'
+import { renderNamingTemplate, resolveConflict } from '../batch/namingTemplate.js'
+import { detectIgnoredChannels } from '../batch/pipelineSharp.js'
 import type { BatchTask, MainMessage, WorkerMessage } from '../batch/worker.js'
 import { readExif } from '../exif/reader.js'
+import { logger } from '../logger/logger.js'
 import { resolvePreviewBuffer } from '../raw/index.js'
 import { isRawFormat } from '../raw/rawDecoder.js'
 import { getFilter } from '../storage/filterStore.js'
@@ -286,8 +292,16 @@ export async function startBatch(config: BatchJobConfig, photoPaths: string[]): 
         sourceOrientation,
       }
 
+      // 判断该 pipeline 是否需要 GPU 路径（包含任何 CPU sharp 管线不支持的通道）
+      const needsGpu = pipeline ? detectIgnoredChannels(pipeline).length > 0 : false
+
+      // 统一的 Promise：resolve 出 { ok, outputPath?, error? }
+      const runPromise: Promise<{ ok: boolean; outputPath?: string; error?: string }> = needsGpu
+        ? dispatchGpuTask(task, pipeline)
+        : pool.run(task)
+
       // pool.run 本身有 concurrency 上限，这里不等它返回就继续派发（让 pool 内部排队）
-      void pool.run(task).then((r) => {
+      void runPromise.then((r) => {
         if (r.ok) {
           item.status = 'success'
           item.progress = 100
@@ -351,6 +365,117 @@ export function cancelBatch(jobId: string): void {
 
 export function getBatchStatus(jobId: string): BatchJob | null {
   return jobs.get(jobId) ?? null
+}
+
+/**
+ * GPU 任务派发 —— M3-b 路径
+ *
+ * 流程：
+ * 1. 构造 data URL（非 RAW：file://）或 sourceUrl；RAW 已有 previewBuffer 则转 data URL
+ * 2. 调 gpuRenderer.renderToBuffer 获得 RGBA pixels
+ * 3. 用 sharp 从 raw pixels 编码为目标格式并写盘
+ * 4. 命名模板 + 冲突解决与 CPU 路径一致
+ */
+async function dispatchGpuTask(
+  task: BatchTask,
+  pipeline: FilterPipeline | null,
+): Promise<{ ok: boolean; outputPath?: string; error?: string }> {
+  try {
+    // 1) 准备 sourceUrl 给渲染进程 fetch
+    let sourceUrl: string
+    if (task.previewBuffer) {
+      // RAW 已预读：走 data URL
+      sourceUrl = `data:image/jpeg;base64,${task.previewBuffer.toString('base64')}`
+    } else {
+      // 非 RAW：file:// （渲染进程通过 grain:// 也行，但 data URL 更不依赖协议）
+      const buf = await sharp(task.photoPath).rotate().jpeg({ quality: 95 }).toBuffer()
+      sourceUrl = `data:image/jpeg;base64,${buf.toString('base64')}`
+    }
+
+    // 2) 让 GPU 渲染
+    const gpuResult = await getGpuRenderer().renderToBuffer({
+      taskId: task.taskId,
+      pipeline,
+      sourceUrl,
+      maxDim: 0, // 原尺寸
+    })
+
+    // 3) sharp 从 raw RGBA → 目标格式 + EXIF 保留
+    let img = sharp(Buffer.from(gpuResult.pixels.buffer), {
+      raw: {
+        width: gpuResult.width,
+        height: gpuResult.height,
+        channels: 4,
+      },
+    })
+
+    // EXIF 保留：只能从原图带过来（这里简化：只有非 RAW 时能保留）
+    if (task.config.keepExif && task.previewBuffer) {
+      // RAW 的 EXIF 走主进程已拿到的 task.exif；sharp.withMetadata 需要完整 EXIF block，
+      // 暂不完整保留（M3-b A-2 再做）
+    }
+
+    // resize
+    if (task.config.resize && task.config.resize.mode !== 'none' && task.config.resize.value > 0) {
+      const rz = task.config.resize
+      switch (rz.mode) {
+        case 'long-edge':
+          img = img.resize({ width: rz.value, height: rz.value, fit: 'inside', withoutEnlargement: true })
+          break
+        case 'short-edge':
+          img = img.resize({ width: rz.value, height: rz.value, fit: 'outside', withoutEnlargement: true })
+          break
+        case 'width':
+          img = img.resize({ width: rz.value, withoutEnlargement: true })
+          break
+        case 'height':
+          img = img.resize({ height: rz.value, withoutEnlargement: true })
+          break
+      }
+    }
+
+    const q = Math.max(1, Math.min(100, task.config.quality))
+    switch (task.config.format) {
+      case 'jpg':
+        img = img.jpeg({ quality: q, mozjpeg: true })
+        break
+      case 'png':
+        img = img.png({ compressionLevel: 9 })
+        break
+      case 'tiff':
+        img = img.tiff({ quality: q, compression: 'lzw' })
+        break
+      case 'webp':
+        img = img.webp({ quality: q })
+        break
+      case 'avif':
+        img = img.avif({ quality: q })
+        break
+    }
+
+    const buffer = await img.toBuffer()
+
+    // 4) 命名 + 写盘
+    const ext = task.config.format === 'jpg' ? 'jpg' : task.config.format
+    const rawName = renderNamingTemplate(task.config.namingTemplate, {
+      name: path.parse(task.photoName).name,
+      filter: task.filterName,
+      timestamp: task.timestamp,
+      model: task.exif?.model,
+      iso: task.exif?.iso,
+      index: task.index,
+      ext,
+    })
+    const finalName = resolveConflict(rawName, (n) => fs.existsSync(path.join(task.outputDir, n)))
+    const outPath = path.join(task.outputDir, finalName)
+    await fs.promises.mkdir(task.outputDir, { recursive: true })
+    await fs.promises.writeFile(outPath, buffer)
+
+    return { ok: true, outputPath: outPath }
+  } catch (e) {
+    logger.warn('batch.gpu.task.failed', { taskId: task.taskId, error: (e as Error).message })
+    return { ok: false, error: (e as Error).message }
+  }
 }
 
 /** 测试辅助：清空全部 job（仅单测调用） */

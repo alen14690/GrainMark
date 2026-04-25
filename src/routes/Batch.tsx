@@ -197,15 +197,14 @@ export default function Batch() {
               ))}
             </select>
             {ignoredChannels.length > 0 && (
-              <div className="mt-2 flex items-start gap-2 rounded-lg bg-sem-warn/10 border border-sem-warn/30 px-2.5 py-1.5 text-[11px] text-sem-warn">
+              <div className="mt-2 flex items-start gap-2 rounded-lg bg-brand-violet/10 border border-brand-violet/30 px-2.5 py-1.5 text-[11px] text-brand-violet">
                 <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
                 <div>
-                  批处理 CPU 管线尚未覆盖以下通道：
-                  <span className="font-mono font-semibold ml-1">
+                  包含高级通道
+                  <span className="font-mono font-semibold mx-1">
                     {ignoredChannels.map((c) => UNSUPPORTED_CHANNEL_LABELS[c] ?? c).join(' / ')}
                   </span>
-                  。其余通道（曝光 / 对比 / 白平衡 / 饱和 / 清晰度 / 暗角）会正常应用；下一轮（M3-b）接 GPU
-                  批处理管线后可消除该限制。
+                  ，将自动走 <span className="font-semibold">GPU 批处理</span>（隐藏渲染窗口，首次启动约 1-2 秒，后续复用）。
                 </div>
               </div>
             )}

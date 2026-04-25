@@ -6,6 +6,7 @@ import { DialogSelectFilesSchema } from '../shared/ipc-schemas.js'
 import { registerAllIpcHandlers } from './ipc/register.js'
 import { buildAppMenu } from './menu.js'
 import { registerGrainPrivileges, registerGrainProtocol, setPhotoPathResolver } from './protocol/grain.js'
+import { shutdownGpuRenderer } from './services/batch/gpuRenderer.js'
 import { shutdownExiftool } from './services/exif/reader.js'
 import { logger } from './services/logger/logger.js'
 import { PathGuard } from './services/security/pathGuard.js'
@@ -141,7 +142,8 @@ function setupSessionCSP() {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: blob: grain:",
-    "connect-src 'self' ws://localhost:* http://localhost:*",
+    // connect-src：允许 data:/blob:/grain: 是为了批处理隐藏窗口从 data URL fetch 源图
+    "connect-src 'self' data: blob: grain: ws://localhost:* http://localhost:*",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'none'",
@@ -275,8 +277,22 @@ app.on('window-all-closed', () => {
   }
 })
 
+// 主窗口关闭时同步关掉隐藏的 GPU 窗口，避免 window-all-closed 不触发导致进程僵死
+app.on('browser-window-created', (_e, bw) => {
+  bw.once('closed', () => {
+    if (win === bw) {
+      shutdownGpuRenderer()
+    }
+  })
+})
+
 // 退出前清理 exiftool 子进程
 app.on('before-quit', async () => {
+  try {
+    shutdownGpuRenderer()
+  } catch {
+    // ignore
+  }
   try {
     await shutdownExiftool()
   } catch {

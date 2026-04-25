@@ -79,7 +79,7 @@ export interface WebGLPreviewResult {
 }
 
 /** 构造 pipeline step 时需要的 GPU 资源（LUT 纹理等） */
-interface BuildContext {
+export interface BuildContext {
   resolution: [number, number]
   /** LUT 纹理；null 表示 pipeline 无 LUT 或 LUT 尚未 ready */
   lutTexture: Texture | null

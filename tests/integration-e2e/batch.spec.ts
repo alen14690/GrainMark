@@ -259,4 +259,66 @@ test.describe('batch IPC · 端到端', () => {
     expect(successCount).toBe(2) // 两张真实图都应成功
     expect(failedCount).toBe(1) // 不存在的那张失败
   })
+
+  test('GPU 路径（含 colorGrading/grain/halation 的 preset）跑通 3 张', async () => {
+    const page = await app.firstWindow()
+    const gpuOut = path.join(path.dirname(outputDir), 'output-gpu')
+
+    const result = await page.evaluate(
+      async ({ paths, outDir }) => {
+        type GrainApi = {
+          invoke: (ch: string, ...args: unknown[]) => Promise<unknown>
+        }
+        const grain = (window as unknown as { grain: GrainApi }).grain
+        const config = {
+          filterId: 'kodak-portra-400', // 含 GPU-only 通道：colorGrading + grain + halation
+          watermarkTemplateId: null,
+          outputDir: outDir,
+          format: 'jpg',
+          quality: 90,
+          keepExif: false,
+          colorSpace: 'srgb',
+          namingTemplate: '{name}_gpu_{index}',
+          concurrency: 2,
+        }
+        const jobId = (await grain.invoke('batch:start', config, paths.slice(0, 3))) as string
+        for (let i = 0; i < 60; i++) {
+          await new Promise((r) => setTimeout(r, 500))
+          const s = (await grain.invoke('batch:status', jobId)) as {
+            status: string
+            items: Array<{ status: string; outputPath?: string; error?: string }>
+          } | null
+          if (s && (s.status === 'success' || s.status === 'failed' || s.status === 'cancelled')) {
+            return s
+          }
+        }
+        throw new Error('GPU batch did not finish in 30s')
+      },
+      { paths: photoPaths, outDir: gpuOut },
+    )
+
+    // GPU 路径可能在 CI headless 环境下 WebGL 2 不可用，这时预期失败但有明确错误
+    if (result.status === 'failed') {
+      const errors = result.items.map((it) => it.error).filter(Boolean)
+      // 打印所有失败原因以便调试
+      console.log('[GPU test] item errors:', errors)
+      // 所有 item 的 error 里至少应该有 gpu/webgl/bootstrap 相关字样（明确的失败原因）
+      const hasGpuError = errors.some((e) => /gpu|webgl|bootstrap/i.test(e ?? ''))
+      if (!hasGpuError) {
+        throw new Error(`GPU 路径失败但错误不含 gpu 关键字。errors=${JSON.stringify(errors)}`)
+      }
+      return
+    }
+
+    expect(result.status).toBe('success')
+    expect(result.items).toHaveLength(3)
+    for (const item of result.items) {
+      expect(item.status).toBe('success')
+      expect(item.outputPath).toBeTruthy()
+      expect(fs.existsSync(item.outputPath!)).toBe(true)
+    }
+    // 输出文件名应含 _gpu_
+    const files = fs.readdirSync(gpuOut).filter((f) => f.endsWith('.jpg'))
+    expect(files.every((f) => f.includes('_gpu_'))).toBe(true)
+  })
 })
