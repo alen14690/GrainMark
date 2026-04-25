@@ -10,8 +10,9 @@
  * 错误隔离：单个 item 失败只影响该 item；worker 崩溃由 pool 重启兜底
  */
 import * as path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { Worker } from 'node:worker_threads'
-import { BrowserWindow, app } from 'electron'
+import { BrowserWindow } from 'electron'
 import { nanoid } from 'nanoid'
 import type { BatchJob, BatchJobConfig, BatchJobItem, FilterPipeline } from '../../../shared/types.js'
 import type { BatchTask, MainMessage, WorkerMessage } from '../batch/worker.js'
@@ -46,13 +47,16 @@ function broadcastProgress(evt: BatchProgressEvent): void {
   }
 }
 
-/** Worker 路径：dev 与 production 不同 */
+/**
+ * Worker 路径：与编译后的 main.js 同目录（dist-electron/batch-worker.mjs）
+ * - 开发：dist-electron 由 vite-plugin-electron 即时 build
+ * - 生产：被 electron-builder 打包到 app.asar 中的 dist-electron
+ * - 测试：Playwright 启动 dist-electron/main.js，__dirname 自然指向 dist-electron
+ * - 使用 .mjs 扩展名让 Node 按 ESM 加载 worker
+ */
 function getWorkerPath(): string {
-  const isDev = !app.isPackaged
-  if (isDev) {
-    return path.join(app.getAppPath(), 'dist-electron', 'batch-worker.js')
-  }
-  return path.join(app.getAppPath(), 'dist-electron', 'batch-worker.js')
+  const mainDir = path.dirname(fileURLToPath(import.meta.url))
+  return path.join(mainDir, 'batch-worker.mjs')
 }
 
 class WorkerPool {
@@ -68,6 +72,7 @@ class WorkerPool {
   constructor(private readonly size: number) {
     const workerPath = getWorkerPath()
     for (let i = 0; i < size; i++) {
+      // worker 产物为 .mjs，Node 自动按 ESM 加载
       const w = new Worker(workerPath)
       w.on('message', (msg: WorkerMessage) => this.handleMessage(w, msg))
       w.on('error', (err) => this.handleWorkerError(w, err))

@@ -21,6 +21,12 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
 
+// 测试用：允许集成测试指定独立 userData 目录，避免污染用户真实数据
+// 必须在 app.getPath('userData') 首次被调用前设置
+if (process.env.GRAINMARK_USER_DATA) {
+  app.setPath('userData', process.env.GRAINMARK_USER_DATA)
+}
+
 // ============ 全局安全对象（早期初始化） ============
 let pathGuard: PathGuard
 let secureVault: SecureVault | null = null

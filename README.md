@@ -134,9 +134,10 @@ WB → Tone → Curves → HSL → ColorGrading → Adjustments(clarity/sat/vib)
 | 指标 | 当前 | 红线 |
 |---|---|---|
 | 单元测试 | **395 / 395 通过**（29 文件，含 14 个像素级 snapshot） | ≥ 基线无回归 |
+| 集成测试 | **5 / 5 通过**（Playwright + Electron 端到端批处理链路） | ≥ 基线无回归 |
 | tsc --noEmit | **0 错误** | 0 |
-| biome check | **0 警告**（145 文件） | 0 |
-| 打包体积 | renderer 311KB · main 150KB · batch-worker 8.4KB · preload 0.55KB | dmg/exe ≤ 300MB |
+| biome check | **0 警告**（146 文件） | 0 |
+| 打包体积 | renderer 311KB · main 150KB · batch-worker.mjs 6.6KB · preload 0.55KB | dmg/exe ≤ 300MB |
 | WebGL 预览性能 | M-series Mac 24MP Nms（UI 实时显示） | ≤ 8ms/frame |
 | 实时直方图 | readPixels + 120ms debounce，不阻塞滑块 | 滑块 ≥ 60fps |
 | 批处理吞吐 | 4 worker × sharp 约 30-50 张 24MP JPG/分钟（M 系列实测待补） | 可配置 1..16 并行 |

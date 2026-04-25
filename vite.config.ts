@@ -22,13 +22,13 @@ export default defineConfig({
           build: {
             outDir: 'dist-electron',
             rollupOptions: {
-              // worker entry 作为独立 chunk，运行时由 WorkerPool 用 new Worker(new URL('./worker.mjs', ...)) 加载
+              // main 作为 ESM 入口；worker 作为独立 .mjs chunk（扩展名告诉 Node 按 ESM 加载）
               input: {
                 main: 'electron/main.ts',
                 'batch-worker': 'electron/services/batch/worker.ts',
               },
               output: {
-                entryFileNames: '[name].js',
+                entryFileNames: (info) => (info.name === 'batch-worker' ? 'batch-worker.mjs' : '[name].js'),
               },
               external: ['better-sqlite3', 'sharp', 'exiftool-vendored'],
             },
