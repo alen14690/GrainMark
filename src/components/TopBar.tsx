@@ -45,12 +45,12 @@ export default function TopBar() {
   }
 
   return (
-    <header className="h-14 shrink-0 border-b border-fg-4/60 bg-bg-0/95 backdrop-blur-sm drag-region flex items-center gap-4 px-5 relative z-10">
+    <header className="h-14 shrink-0 glass-surface rounded-none border-x-0 border-t-0 drag-region flex items-center gap-4 px-5 relative z-10">
       {/* 标题 */}
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2">
-          <h1 className="font-display-serif text-xl tracking-tight text-fg-1 leading-none">{title.zh}</h1>
-          <span className="text-xxs font-mono text-fg-3 tracking-wider uppercase">{title.en}</span>
+          <h1 className="font-display-serif text-2xl text-fg-1 leading-none">{title.zh}</h1>
+          <span className="text-xxs font-mono text-fg-3 tracking-[0.14em] uppercase">{title.en}</span>
         </div>
         {photoCount > 0 && (
           <div className="flex items-center gap-2 mt-1 no-drag">

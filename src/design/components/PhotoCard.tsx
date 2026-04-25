@@ -50,11 +50,12 @@ export function PhotoCard({
         }
       }}
       className={cn(
-        'group relative aspect-[4/3] overflow-hidden rounded-md cursor-pointer',
-        'bg-bg-1 border transition-all duration-fast',
+        'group relative aspect-[4/3] overflow-hidden rounded-lg cursor-pointer',
+        'transition-all duration-fast ease-liquid',
+        'bg-white/[0.03] border',
         selected
-          ? 'border-brand-amber ring-1 ring-brand-amber/60 shadow-glow'
-          : 'border-fg-4 hover:border-fg-3',
+          ? 'border-brand-violet/60 ring-2 ring-brand-violet/40 shadow-glow-violet'
+          : 'border-white/10 hover:border-white/20 hover:-translate-y-0.5 hover:shadow-soft-md',
         sprocket && 'film-sprocket-top film-sprocket-bottom',
         className,
       )}
@@ -86,17 +87,18 @@ export function PhotoCard({
       {starred && (
         <div
           aria-label="starred"
-          className="absolute top-2 left-2 w-6 h-6 rounded-sm bg-black/60 backdrop-blur-xs flex items-center justify-center"
+          className="absolute top-2 left-2 w-6 h-6 rounded-md bg-black/50 backdrop-blur-md flex items-center justify-center border border-white/10"
         >
           <Star className="w-3 h-3 text-brand-amber fill-brand-amber" />
         </div>
       )}
 
-      {/* 选中标记 */}
+      {/* 选中标记（Aurora 渐变）*/}
       {selected && (
         <div
           aria-label="selected"
-          className="absolute top-2 right-2 w-5 h-5 rounded-full bg-brand-amber text-bg-0 flex items-center justify-center text-xxs font-bold shadow-glow"
+          className="absolute top-2 right-2 w-5 h-5 rounded-full text-bg-0 flex items-center justify-center text-xxs font-bold shadow-glow-violet"
+          style={{ background: 'linear-gradient(135deg,#D4B88A,#B589FF)' }}
         >
           ✓
         </div>

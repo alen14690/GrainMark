@@ -42,15 +42,18 @@ const NAV_STUDIO: NavItem[] = [
 
 export default function Sidebar() {
   return (
-    <aside className="w-60 shrink-0 border-r border-fg-4/60 bg-bg-0 flex flex-col relative">
+    <aside className="w-60 shrink-0 glass-surface flex flex-col relative z-10 border-r-0 rounded-none">
       {/* 品牌 */}
-      <div className="h-14 px-4 flex items-center gap-2.5 drag-region border-b border-fg-4/40">
-        <div className="relative w-8 h-8 rounded-md bg-gradient-to-br from-brand-amber to-brand-red flex items-center justify-center overflow-hidden shadow-glow">
+      <div className="h-14 px-4 flex items-center gap-2.5 drag-region border-b border-white/5">
+        <div
+          className="relative w-8 h-8 rounded-md flex items-center justify-center overflow-hidden shadow-glow-violet"
+          style={{ background: 'linear-gradient(135deg,#D4B88A,#B589FF)' }}
+        >
           <ScanSearch className="w-4 h-4 text-bg-0" strokeWidth={2.5} />
         </div>
         <div className="no-drag flex-1 min-w-0">
-          <div className="font-display-serif text-md tracking-tight text-fg-1 leading-none">GrainMark</div>
-          <div className="text-xxs text-fg-3 font-mono mt-1">FILM · POST v1.0</div>
+          <div className="font-display-serif text-lg text-fg-1 leading-none">GrainMark</div>
+          <div className="text-xxs text-fg-3 font-mono mt-1 tracking-widest">FILM · POST v1.0</div>
         </div>
       </div>
 
@@ -69,14 +72,14 @@ export default function Sidebar() {
       </nav>
 
       {/* 设置 */}
-      <div className="p-3 border-t border-fg-4/40 no-drag">
+      <div className="p-3 border-t border-white/5 no-drag">
         <NavLink
           to="/settings"
           className={({ isActive }) =>
             cn(
               'flex items-center gap-2.5 px-3 py-2 rounded-md text-sm',
               'transition-colors duration-fast',
-              isActive ? 'bg-bg-2 text-fg-1' : 'text-fg-2 hover:text-fg-1 hover:bg-bg-2',
+              isActive ? 'bg-white/8 text-fg-1' : 'text-fg-2 hover:text-fg-1 hover:bg-white/5',
             )
           }
           title="设置（⌘,）"
@@ -108,8 +111,10 @@ function NavItemLink({ to, icon: Icon, label, desc, badge }: NavItem) {
       className={({ isActive }) =>
         cn(
           'group flex items-center gap-3 px-3 py-2 rounded-md',
-          'transition-colors duration-fast',
-          isActive ? 'bg-bg-2 text-fg-1' : 'text-fg-2 hover:text-fg-1 hover:bg-bg-1',
+          'transition-all duration-fast',
+          isActive
+            ? 'bg-white/8 text-fg-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]'
+            : 'text-fg-2 hover:text-fg-1 hover:bg-white/5',
         )
       }
     >
@@ -118,7 +123,7 @@ function NavItemLink({ to, icon: Icon, label, desc, badge }: NavItem) {
           <Icon
             className={cn(
               'w-4 h-4 shrink-0 transition-colors',
-              isActive ? 'text-brand-amber' : 'text-fg-3 group-hover:text-fg-2',
+              isActive ? 'text-brand-violet' : 'text-fg-3 group-hover:text-fg-2',
             )}
             strokeWidth={1.8}
           />
@@ -127,11 +132,11 @@ function NavItemLink({ to, icon: Icon, label, desc, badge }: NavItem) {
             <div className="text-xxs text-fg-3 font-mono leading-tight mt-0.5">{desc}</div>
           </div>
           {badge && (
-            <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-brand-amber/20 text-brand-amber tracking-wider">
+            <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-brand-violet/20 text-brand-violet tracking-wider">
               {badge}
             </span>
           )}
-          {isActive && <span className="w-1 h-1 rounded-full bg-brand-amber shadow-glow" />}
+          {isActive && <span className="w-1.5 h-1.5 rounded-full bg-brand-violet shadow-glow-violet" />}
         </>
       )}
     </NavLink>

@@ -125,7 +125,7 @@ export function Slider({
             className={cn(
               'font-numeric tabular-nums',
               compact ? 'text-xxs' : 'text-xs',
-              dragging ? 'text-brand-amber' : 'text-fg-1',
+              dragging ? 'text-brand-violet' : 'text-fg-1',
             )}
           >
             {displayValue}
@@ -151,10 +151,10 @@ export function Slider({
         onDoubleClick={onDoubleClick}
         onKeyDown={onKey}
         className={cn(
-          'relative h-1 rounded-full bg-fg-4/60 cursor-pointer select-none',
-          'transition-shadow duration-fast',
+          'relative h-1 rounded-full cursor-pointer select-none',
+          'bg-white/8 transition-shadow duration-fast',
           disabled && 'opacity-40 cursor-not-allowed',
-          dragging && 'shadow-[0_0_0_6px_rgba(74,138,158,0.18)]',
+          dragging && 'shadow-glow-violet',
         )}
       >
         {/* 中心点（双极） */}
@@ -165,18 +165,20 @@ export function Slider({
             style={{ left: `${centerPct}%` }}
           />
         )}
-        {/* 填充 */}
+        {/* 填充（Aurora 青→紫渐变） */}
         <span
-          className="absolute top-0 h-full rounded-full bg-brand-cyan"
+          className="absolute top-0 h-full rounded-full bg-aurora-fill"
           style={{ left: `${fillStart}%`, width: `${fillEnd - fillStart}%` }}
         />
-        {/* 拇指 */}
+        {/* 拇指（白 + 紫辉环） */}
         <span
           className={cn(
             'absolute top-1/2 -translate-y-1/2 -translate-x-1/2',
-            'w-3 h-3 rounded-full bg-fg-1 shadow-soft-md',
-            'ring-0 transition-transform duration-instant',
-            dragging && 'scale-110',
+            'w-3.5 h-3.5 rounded-full bg-fg-1',
+            'ring-0 transition-all duration-instant',
+            dragging
+              ? 'scale-110 shadow-[0_0_0_4px_rgba(181,137,255,0.3),0_2px_6px_rgba(0,0,0,0.5)]'
+              : 'shadow-[0_0_0_2px_rgba(181,137,255,0.2),0_2px_4px_rgba(0,0,0,0.4)]',
           )}
           style={{ left: `${pct}%` }}
         />

@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
-import { GrainOverlay } from './design'
+import { AuroraBackdrop, GrainOverlay } from './design'
 import { useAppNavigation } from './lib/useAppNavigation'
 import { useGlobalHotkeys } from './lib/useGlobalHotkeys'
 import AIStudio from './routes/AIStudio'
@@ -33,8 +33,10 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-bg-0 text-fg-1 overflow-hidden relative isolate">
-      {/* 全局颗粒层（可在设置中关闭 — 未来） */}
-      <GrainOverlay opacity={0.03} />
+      {/* Aurora 极光底层（60s 漂移） */}
+      <AuroraBackdrop />
+      {/* 极淡颗粒（保留胶片灵魂，Q3-A） */}
+      <GrainOverlay opacity={0.02} />
 
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 relative z-10">

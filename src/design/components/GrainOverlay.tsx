@@ -15,7 +15,7 @@ interface GrainOverlayProps {
 }
 
 export function GrainOverlay({
-  opacity = 0.04,
+  opacity = 0.02,
   baseFreq = 0.9,
   blend = 'overlay',
   disabled = false,

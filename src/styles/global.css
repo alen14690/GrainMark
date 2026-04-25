@@ -1,5 +1,10 @@
-/* ========== 字体加载（@import 必须放在其他规则之前） ========== */
-@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+/* ========== 字体加载（@import 必须放在其他规则之前）==========
+ * Aurora Glass 精简字体栈：
+ *   Instrument Serif — Display（斜体大标题）
+ *   Inter            — Body（正文/导航）
+ *   JetBrains Mono   — Mono/Numeric（EXIF/参数值）
+ */
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -7,16 +12,19 @@
 
 :root {
   color-scheme: dark;
-  --bg-0: #0e0e10;
-  --bg-1: #16161a;
-  --bg-2: #1e1e24;
-  --bg-3: #2a2a32;
-  --fg-1: #f5f3ee;
-  --fg-2: #a8a39a;
-  --fg-3: #6c6860;
-  --fg-4: #3d3a35;
-  --brand-amber: #e8b961;
-  --brand-cyan: #4a8a9e;
+  --bg-0: #05060e;
+  --bg-1: #0a0b1e;
+  --bg-2: #141430;
+  --bg-3: #1e1e3c;
+  --fg-1: #e8e6f0;
+  --fg-2: #a8a5b8;
+  --fg-3: #6a6882;
+  --fg-4: #2d2d45;
+  --brand-amber: #d4b88a;
+  --brand-violet: #b589ff;
+  --brand-cyan: #5ecdf7;
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-highlight: rgba(255, 255, 255, 0.15);
 }
 
 html,
@@ -31,6 +39,7 @@ body {
   font-size: 13px;
   line-height: 1.55;
   color: var(--fg-1);
+  /* Aurora 深空主色，AuroraBackdrop 覆盖上方做极光 */
   background: var(--bg-0);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -46,7 +55,6 @@ textarea,
   -webkit-user-select: text;
 }
 
-/* macOS 拖动区域 */
 .drag-region {
   -webkit-app-region: drag;
 }
@@ -54,7 +62,7 @@ textarea,
   -webkit-app-region: no-drag;
 }
 
-/* ========== 滚动条（暗房风格） ========== */
+/* ========== 滚动条（Aurora 风） ========== */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -70,38 +78,70 @@ textarea,
   transition: background 150ms;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(181, 137, 255, 0.35); /* 紫辉 */
   background-clip: content-box;
   border: 3px solid transparent;
 }
 
-/* ========== 选中高亮（暖金） ========== */
+/* ========== 选中高亮（紫辉） ========== */
 ::selection {
-  background: rgba(232, 185, 97, 0.35);
+  background: rgba(181, 137, 255, 0.35);
   color: var(--fg-1);
 }
 
-/* ========== Focus visible 暖金光圈（键盘可达性） ========== */
+/* ========== Focus visible（金辉，键盘可达性） ========== */
 :focus-visible {
-  outline: 2px solid rgba(232, 185, 97, 0.55);
+  outline: 2px solid rgba(212, 184, 138, 0.6);
   outline-offset: 2px;
   border-radius: 4px;
 }
 
 /* ========== 通用组件 Layer ========== */
 @layer components {
-  /* 卡片 — 暗房底 + 细描边 */
+  /* ---------- 玻璃面板 primitives ---------- */
+  .glass-surface {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 8px 24px rgba(0, 0, 0, 0.3);
+  }
+  .glass-elevated {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+    backdrop-filter: blur(24px) saturate(150%);
+    -webkit-backdrop-filter: blur(24px) saturate(150%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 12px 32px rgba(0, 0, 0, 0.36);
+  }
+  .glass-overlay {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.03));
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 20px 50px rgba(0, 0, 0, 0.46);
+  }
+
+  /* ---------- 卡片（沿用旧类名，底层切换为 glass） ---------- */
   .card {
-    @apply bg-bg-1 border border-fg-4 rounded-md;
+    @apply rounded-lg;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01));
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
   }
   .card-raised {
     @apply card shadow-soft-sm;
   }
   .card-hover {
-    @apply transition-colors duration-fast hover:bg-bg-2 hover:border-fg-3;
+    @apply transition-all duration-fast;
+  }
+  .card-hover:hover {
+    border-color: rgba(255, 255, 255, 0.18);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
   }
 
-  /* 按钮基底 */
+  /* ---------- 按钮基底 ---------- */
   .btn {
     @apply inline-flex items-center justify-center gap-2
            px-4 py-2 rounded-md font-medium text-sm
@@ -109,21 +149,47 @@ textarea,
            disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-primary {
-    @apply btn bg-brand-amber text-bg-0 hover:bg-brand-amber-soft
-           shadow-glow active:translate-y-px;
+    @apply btn shadow-glow;
+    background: linear-gradient(135deg, #d4b88a, #b589ff);
+    color: #05060e;
+    font-weight: 500;
+    border: none;
+  }
+  .btn-primary:hover {
+    filter: brightness(1.08);
+    box-shadow: 0 0 20px rgba(212, 184, 138, 0.4), 0 0 40px rgba(181, 137, 255, 0.2);
+  }
+  .btn-primary:active {
+    transform: translateY(1px);
   }
   .btn-secondary {
-    @apply btn bg-bg-2 text-fg-1 border border-fg-4
-           hover:bg-bg-3 hover:border-fg-3 active:translate-y-px;
+    @apply btn text-fg-1;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.18);
   }
   .btn-ghost {
-    @apply btn text-fg-2 hover:text-fg-1 hover:bg-bg-2 active:bg-bg-3;
+    @apply btn text-fg-2;
+    background: transparent;
+  }
+  .btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--fg-1);
   }
   .btn-danger {
-    @apply btn bg-sem-error text-fg-1 hover:brightness-110 active:translate-y-px;
+    @apply btn;
+    background: rgba(200, 48, 42, 0.88);
+    color: #fff;
+  }
+  .btn-danger:hover {
+    filter: brightness(1.1);
   }
 
-  /* 尺寸变体 */
   .btn-sm {
     @apply text-xs px-2.5 py-1.5 gap-1.5;
   }
@@ -131,58 +197,86 @@ textarea,
     @apply text-xxs px-2 py-1 gap-1;
   }
 
-  /* 药丸 / 徽章 */
+  /* ---------- 药丸 / 徽章 ---------- */
   .pill {
     @apply inline-flex items-center gap-1 px-2 py-0.5
-           rounded-full text-xxs font-mono
-           bg-bg-2 text-fg-2 border border-fg-4;
+           rounded-full text-xxs font-mono text-fg-2;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(8px);
   }
   .pill-amber {
-    @apply pill bg-brand-amber/15 text-brand-amber border-brand-amber/30;
+    @apply pill text-brand-amber;
+    background: rgba(212, 184, 138, 0.12);
+    border-color: rgba(212, 184, 138, 0.3);
   }
   .pill-cyan {
-    @apply pill bg-brand-cyan/15 text-brand-cyan border-brand-cyan/30;
+    @apply pill text-brand-cyan;
+    background: rgba(94, 205, 247, 0.12);
+    border-color: rgba(94, 205, 247, 0.3);
+  }
+  .pill-violet {
+    @apply pill text-brand-violet;
+    background: rgba(181, 137, 255, 0.14);
+    border-color: rgba(181, 137, 255, 0.32);
   }
   .pill-red {
-    @apply pill bg-brand-red/15 text-brand-red border-brand-red/30;
+    @apply pill;
+    background: rgba(200, 48, 42, 0.14);
+    color: #ff9892;
+    border-color: rgba(200, 48, 42, 0.35);
   }
 
-  /* 输入框 */
+  /* ---------- 输入框 ---------- */
   .input {
-    @apply w-full px-3 py-2 rounded-md bg-bg-1 border border-fg-4
-           text-sm text-fg-1 placeholder-fg-3
-           focus:border-brand-amber/60 focus:bg-bg-0
-           focus:outline-none transition-colors duration-fast;
+    @apply w-full px-3 py-2 rounded-md text-sm text-fg-1 placeholder-fg-3
+           focus:outline-none transition-all duration-fast;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(10px);
+  }
+  .input:focus {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(181, 137, 255, 0.6);
+    box-shadow: 0 0 0 3px rgba(181, 137, 255, 0.15);
   }
 
-  /* 键盘快捷键 */
+  /* ---------- 键盘快捷键 ---------- */
   .kbd {
     @apply inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5
-           rounded text-xxs font-mono text-fg-2 bg-bg-1 border border-fg-4
-           shadow-[0_1px_0_rgba(0,0,0,0.4)];
+           rounded text-xxs font-mono text-fg-2;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
   }
 
-  /* 显示字体（衬线，用于标题/大字） */
+  /* ---------- Display 字体（Aurora 斜体衬线） ---------- */
   .font-display-serif {
-    font-family: "Fraunces", "Source Serif 4", Georgia, serif;
-    font-optical-sizing: auto;
+    font-family: "Instrument Serif", "Source Serif 4", Georgia, serif;
+    font-style: italic;
+    letter-spacing: -0.01em;
+  }
+  .font-display-regular {
+    font-family: "Instrument Serif", "Source Serif 4", Georgia, serif;
+    font-style: normal;
+    letter-spacing: -0.01em;
   }
 
-  /* 数字仪表感（EXIF/评分等） */
+  /* ---------- 数字仪表 ---------- */
   .font-numeric {
-    font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
     font-feature-settings: "tnum", "zero";
   }
 
-  /* 金属拉丝细分隔 */
+  /* ---------- 分隔线（Aurora 薄辉） ---------- */
   .divider-metal {
     @apply h-px w-full;
     background-image: linear-gradient(
       90deg,
       transparent 0%,
-      rgba(255, 255, 255, 0.06) 20%,
-      rgba(255, 255, 255, 0.12) 50%,
-      rgba(255, 255, 255, 0.06) 80%,
+      rgba(255, 255, 255, 0.08) 20%,
+      rgba(255, 255, 255, 0.16) 50%,
+      rgba(255, 255, 255, 0.08) 80%,
       transparent 100%
     );
   }
@@ -191,14 +285,14 @@ textarea,
     background-image: linear-gradient(
       180deg,
       transparent 0%,
-      rgba(255, 255, 255, 0.06) 20%,
-      rgba(255, 255, 255, 0.12) 50%,
-      rgba(255, 255, 255, 0.06) 80%,
+      rgba(255, 255, 255, 0.08) 20%,
+      rgba(255, 255, 255, 0.16) 50%,
+      rgba(255, 255, 255, 0.08) 80%,
       transparent 100%
     );
   }
 
-  /* 胶片齿孔装饰（画廊图片卡用） */
+  /* ---------- 胶片齿孔（沿用） ---------- */
   .film-sprocket-top::before,
   .film-sprocket-bottom::after {
     content: "";
@@ -223,7 +317,7 @@ textarea,
     bottom: 4px;
   }
 
-  /* 局部颗粒层（用于卡片） */
+  /* ---------- 局部颗粒层（卡片） ---------- */
   .grain-local {
     position: relative;
     isolation: isolate;
@@ -234,13 +328,14 @@ textarea,
     inset: 0;
     pointer-events: none;
     mix-blend-mode: overlay;
-    opacity: 0.08;
+    opacity: 0.06;
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0.12 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
   }
 
-  /* 评分条底色（12 维度用） */
+  /* ---------- 评分条 ---------- */
   .score-track {
-    @apply h-1 rounded-full bg-fg-4 overflow-hidden;
+    @apply h-1 rounded-full overflow-hidden;
+    background: rgba(255, 255, 255, 0.08);
   }
   .score-fill {
     @apply h-full transition-all duration-base ease-decelerate rounded-full;
@@ -252,8 +347,15 @@ textarea,
   .will-animate {
     will-change: transform, opacity;
   }
-  /* 防止深色背景下小图片的"黑边感" */
   .img-contain-clean {
     background: var(--bg-0);
+  }
+  /* reduce motion：尊重系统偏好 */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-aurora-drift,
+    .animate-glow-pulse,
+    .animate-shimmer {
+      animation: none !important;
+    }
   }
 }

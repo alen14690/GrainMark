@@ -35,17 +35,15 @@ export function EmptyState({
       {icon && (
         <div
           className={cn(
-            'mx-auto rounded-xl bg-gradient-to-br from-bg-2 to-bg-1 border border-fg-4',
+            'mx-auto rounded-xl glass-surface',
             'flex items-center justify-center relative grain-local',
             compact ? 'w-16 h-16' : 'w-24 h-24',
           )}
         >
-          <div className="text-fg-3">{icon}</div>
+          <div className="text-fg-2">{icon}</div>
         </div>
       )}
-      <h2 className={cn('mt-5 font-display-serif tracking-tight text-fg-1', compact ? 'text-lg' : 'text-xl')}>
-        {title}
-      </h2>
+      <h2 className={cn('mt-6 font-display-serif text-fg-1', compact ? 'text-2xl' : 'text-3xl')}>{title}</h2>
       {description && (
         <div className={cn('mt-2 max-w-md text-fg-2 leading-relaxed', compact ? 'text-xs' : 'text-sm')}>
           {description}
