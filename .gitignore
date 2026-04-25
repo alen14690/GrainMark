@@ -18,3 +18,7 @@ playwright-report
 *.njsproj
 *.sln
 *.sw?
+
+# Benchmark 临时 JSON（每次 npm run bench:run 重算）
+bench-output.json
+

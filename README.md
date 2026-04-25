@@ -139,9 +139,10 @@ WB → Tone → Curves → HSL → ColorGrading → Adjustments(clarity/sat/vib)
 | biome check | **0 警告**（150 文件） | 0 |
 | 打包体积 | renderer main 268KB + batch-gpu 1.5KB + webgl chunk 42KB · main.js 157KB · batch-worker.mjs 1.6KB · preload 0.55KB | dmg/exe ≤ 300MB |
 | WebGL 预览性能 | M-series Mac 24MP Nms（UI 实时显示） | ≤ 8ms/frame |
-| 实时直方图 | readPixels + 120ms debounce，不阻塞滑块 | 滑块 ≥ 60fps |
-| 批处理吞吐 | 4 worker × sharp 约 30-50 张 24MP JPG/分钟（M 系列实测待补） | 可配置 1..16 并行 |
+| 实时直方图 | readPixels + 120ms debounce，不阻塞滑块（stride=4 下 1600×1067 preview ≈ 1.07ms，bench 实测）| 滑块 ≥ 60fps |
+| 批处理吞吐 | 4 worker × sharp：1600×1067 preview 全 6 通道 56ms（bench 实测），外推 24MP ≈ 500 张/分钟 | 可配置 1..16 并行 |
 | 像素级 Snapshot | 14 张 100×100 PNG baseline（10 shader × 算法语义快照） | 单次 diff ≤ 0.5% |
+| Benchmark 基线 | 27 用例 baseline.json（histogram / pipelineSharp / namingTemplate / pipelineToSteps），`npm run bench:report` | 回归 > 10% 要解释 |
 
 ## ⚖️ 版权与合规
 

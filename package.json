@@ -28,6 +28,9 @@
     "test:packaged": "npm run pack:dir && playwright test --project=packaged",
     "test:all": "npm run typecheck && npm run lint && npm run test",
     "bench": "vitest bench",
+    "bench:run": "vitest bench --run --outputJson=bench-output.json",
+    "bench:report": "npm run bench:run && tsx scripts/bench-report.ts",
+    "bench:baseline": "npm run bench:run && tsx scripts/bench-report.ts --update-baseline",
     "fixtures:generate": "tsx tests/fixtures/generate.ts",
     "snapshot:update": "vitest run -u && playwright test --update-snapshots"
   },

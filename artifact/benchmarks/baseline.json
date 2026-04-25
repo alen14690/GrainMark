@@ -1,0 +1,137 @@
+{
+  "tests/bench/histogram.bench.ts::histogram · 1600x1067 preview::stride=1 (精确)": {
+    "hz": 233.95895751591854,
+    "mean": 4.274253957264962,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  },
+  "tests/bench/histogram.bench.ts::histogram · 1600x1067 preview::stride=4 (Editor 默认)": {
+    "hz": 934.6819209019632,
+    "mean": 1.0698826816239317,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  },
+  "tests/bench/histogram.bench.ts::histogram · 1600x1067 preview::stride=16 (低精度快反馈)": {
+    "hz": 3801.4265700076867,
+    "mean": 0.2630591388742721,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  },
+  "tests/bench/histogram.bench.ts::histogram · 12MP::stride=1 (精确)": {
+    "hz": 33.42958530294626,
+    "mean": 29.913622647058887,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  },
+  "tests/bench/histogram.bench.ts::histogram · 12MP::stride=4 (Editor 默认)": {
+    "hz": 135.70726883595373,
+    "mean": 7.368802044117655,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  },
+  "tests/bench/histogram.bench.ts::histogram · 12MP::stride=16 (低精度快反馈)": {
+    "hz": 546.576534334333,
+    "mean": 1.8295699452554879,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  },
+  "tests/bench/histogram.bench.ts::histogram · 24MP::stride=1 (精确)": {
+    "hz": 17.039598442096715,
+    "mean": 58.686829000000216,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  },
+  "tests/bench/histogram.bench.ts::histogram · 24MP::stride=4 (Editor 默认)": {
+    "hz": 67.34205692506058,
+    "mean": 14.849561264705912,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  },
+  "tests/bench/histogram.bench.ts::histogram · 24MP::stride=16 (低精度快反馈)": {
+    "hz": 221.88053463877762,
+    "mean": 4.506929828828851,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  },
+  "tests/bench/namingTemplate.bench.ts::namingTemplate · sanitizeFilename::干净名（no-op）": {
+    "hz": 6466031.857748007,
+    "mean": 0.0001546543571080209,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  },
+  "tests/bench/namingTemplate.bench.ts::namingTemplate · sanitizeFilename::含路径分隔符": {
+    "hz": 2410895.0452856584,
+    "mean": 0.00041478371360687477,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  },
+  "tests/bench/namingTemplate.bench.ts::namingTemplate · sanitizeFilename::混合非法字符": {
+    "hz": 2237618.5723984158,
+    "mean": 0.0004469036914223228,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  },
+  "tests/bench/namingTemplate.bench.ts::namingTemplate · renderNamingTemplate::默认模板 {name}_{filter}_{index}.{ext}": {
+    "hz": 1040926.99654658,
+    "mean": 0.0009606821643762137,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  },
+  "tests/bench/namingTemplate.bench.ts::namingTemplate · renderNamingTemplate::富模板（全 9 变量）": {
+    "hz": 700942.0822225163,
+    "mean": 0.0014266513958317982,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  },
+  "tests/bench/namingTemplate.bench.ts::namingTemplate · resolveConflict::0 次冲突（直返）": {
+    "hz": 43084270.6392669,
+    "mean": 0.00002321032676571766,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  },
+  "tests/bench/namingTemplate.bench.ts::namingTemplate · resolveConflict::5 次冲突": {
+    "hz": 22931582.945040792,
+    "mean": 0.00004360797954492108,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  },
+  "tests/bench/namingTemplate.bench.ts::namingTemplate · resolveConflict::50 次冲突": {
+    "hz": 7768665.766942012,
+    "mean": 0.00012872223236264045,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  },
+  "tests/bench/pipelineSharp.bench.ts::pipelineSharp · 1600x1067 preview · 输出 jpg::passthrough（无滤镜）": {
+    "hz": 23.665890869181613,
+    "mean": 42.25490625,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  },
+  "tests/bench/pipelineSharp.bench.ts::pipelineSharp · 1600x1067 preview · 输出 jpg::tone 单通道": {
+    "hz": 20.185964741656168,
+    "mean": 49.53937118181821,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  },
+  "tests/bench/pipelineSharp.bench.ts::pipelineSharp · 1600x1067 preview · 输出 jpg::全 6 通道": {
+    "hz": 17.8111347242032,
+    "mean": 56.14465419999995,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  },
+  "tests/bench/pipelineSharp.bench.ts::pipelineSharp · 1600x1067 preview · 输出格式对比（全 6 通道）::jpg q=90": {
+    "hz": 17.775229994811898,
+    "mean": 56.258062499999866,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  },
+  "tests/bench/pipelineSharp.bench.ts::pipelineSharp · 1600x1067 preview · 输出格式对比（全 6 通道）::webp q=90": {
+    "hz": 13.785930828124288,
+    "mean": 72.53772070000005,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  },
+  "tests/bench/pipelineSharp.bench.ts::pipelineSharp · 1600x1067 preview · 输出格式对比（全 6 通道）::png": {
+    "hz": 12.975775729308186,
+    "mean": 77.06668340000014,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  },
+  "tests/bench/pipelineToSteps.bench.ts::pipelineToSteps::null pipeline → 空 steps": {
+    "hz": 43804437.546968706,
+    "mean": 0.0000228287373608613,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  },
+  "tests/bench/pipelineToSteps.bench.ts::pipelineToSteps::tone 单通道": {
+    "hz": 12972567.896211494,
+    "mean": 0.00007708574030990733,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  },
+  "tests/bench/pipelineToSteps.bench.ts::pipelineToSteps::稀疏 pipeline（3 个非 identity）": {
+    "hz": 2927622.407374336,
+    "mean": 0.00034157410377824607,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  },
+  "tests/bench/pipelineToSteps.bench.ts::pipelineToSteps::全 10 通道（LUT 除外）": {
+    "hz": 430653.16625549656,
+    "mean": 0.002322054215216714,
+    "updatedAt": "2026-04-25T13:36:02.745Z"
+  }
+}
