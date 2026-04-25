@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: Inter, "SF Pro Text", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* macOS 拖动区域 */
+.drag-region {
+  -webkit-app-region: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* 滚动条 */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.24);
+  background-clip: content-box;
+  border: 2px solid transparent;
+}
+
+/* 通用组件 */
+@layer components {
+  .card {
+    @apply bg-ink-900/80 border border-ink-800 rounded-xl backdrop-blur-sm;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium text-sm
+           transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply btn bg-accent-500 hover:bg-accent-400 text-ink-950 shadow-lg shadow-accent-500/20;
+  }
+  .btn-secondary {
+    @apply btn bg-ink-800 hover:bg-ink-700 text-ink-50 border border-ink-700;
+  }
+  .btn-ghost {
+    @apply btn text-ink-300 hover:text-ink-50 hover:bg-ink-800;
+  }
+  .pill {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium
+           bg-ink-800 text-ink-300 border border-ink-700;
+  }
+  .pill-accent {
+    @apply pill bg-accent-500/15 text-accent-400 border-accent-500/30;
+  }
+  .input {
+    @apply w-full px-3 py-2 rounded-lg bg-ink-900 border border-ink-800
+           text-sm text-ink-50 placeholder-ink-500 focus:border-accent-500/60
+           focus:outline-none transition-colors;
+  }
+  .kbd {
+    @apply inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded
+           text-[11px] font-mono text-ink-300 bg-ink-800 border border-ink-700
+           shadow-[0_1px_0_rgba(0,0,0,0.4)];
+  }
+}
+
+/* 胶片颗粒纹理 (装饰用) */
+.film-grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0.08 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  opacity: 0.55;
+  mix-blend-mode: overlay;
+}
+
+/* 防闪烁动画 */
+.will-animate {
+  will-change: transform, opacity;
+}
