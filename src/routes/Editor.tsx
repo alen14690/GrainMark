@@ -12,6 +12,7 @@ import { useParams } from 'react-router-dom'
 import { Histogram, ScoreBar, ValueBadge, cn } from '../design'
 import type { HistogramData } from '../design'
 import { ipc } from '../lib/ipc'
+import { useWebGLPreview } from '../lib/useWebGLPreview'
 import { useAppStore } from '../stores/appStore'
 
 export default function Editor() {
@@ -27,11 +28,18 @@ export default function Editor() {
   const [loading, setLoading] = useState(false)
   const [showOriginal, setShowOriginal] = useState(false)
 
+  const activeFilter = filters.find((f) => f.id === activeFilterId)
+  const pipeline = showOriginal ? null : (activeFilter?.pipeline ?? null)
+
+  // WebGL 预览（Pass 3a：只启用 tone + vignette）
+  const webgl = useWebGLPreview(previewUrl, pipeline)
+
   useEffect(() => {
     if (!photo) return
     let alive = true
     setLoading(true)
-    ipc('preview:render', photo.path, showOriginal ? null : activeFilterId, undefined)
+    // IPC 只要"原图预览"（不带 filter），filter 在 GPU 上叠加
+    ipc('preview:render', photo.path, null, undefined)
       .then((url) => {
         if (alive) setPreviewUrl(url)
       })
@@ -42,7 +50,7 @@ export default function Editor() {
     return () => {
       alive = false
     }
-  }, [photo, activeFilterId, showOriginal])
+  }, [photo])
 
   if (!photo) {
     return (
@@ -50,9 +58,12 @@ export default function Editor() {
     )
   }
 
-  const activeFilter = filters.find((f) => f.id === activeFilterId)
   // P4 会从 IPC 拉到真实直方图；P2 用空占位
   const histogramData: HistogramData | null = null
+
+  const useWebglCanvas = webgl.status === 'ready' || webgl.status === 'loading'
+  const showImgFallback = !useWebglCanvas && previewUrl
+  const canvasStyle = { maxWidth: '100%', maxHeight: 'calc(100vh - 240px)' } as const
 
   return (
     <div className="h-full flex animate-fade-in">
@@ -96,18 +107,26 @@ export default function Editor() {
         {/* 画布 */}
         <div className="flex-1 flex items-center justify-center p-6 overflow-hidden">
           <div className="relative max-w-full max-h-full">
-            {previewUrl ? (
+            {/* WebGL 画布（主路径） */}
+            <canvas
+              ref={webgl.canvasRef}
+              className={cn('rounded-md shadow-soft-lg object-contain', useWebglCanvas ? 'block' : 'hidden')}
+              style={canvasStyle}
+            />
+            {/* IPC base64 兜底（WebGL 初始化前 / 不可用时） */}
+            {showImgFallback && (
               <img
-                src={previewUrl}
+                src={previewUrl!}
                 alt="preview"
                 className="max-w-full max-h-[calc(100vh-240px)] object-contain rounded-md shadow-soft-lg"
               />
-            ) : (
+            )}
+            {!previewUrl && (
               <div className="w-[600px] h-[400px] bg-bg-1 rounded-md flex items-center justify-center text-fg-3 text-sm font-mono">
                 rendering…
               </div>
             )}
-            {loading && (
+            {(loading || webgl.status === 'loading') && (
               <div className="absolute top-3 right-3">
                 <ValueBadge value="RENDERING" variant="muted" size="sm" />
               </div>
@@ -115,6 +134,21 @@ export default function Editor() {
             {showOriginal && (
               <div className="absolute top-3 left-3">
                 <ValueBadge value="ORIGINAL" variant="amber" size="sm" />
+              </div>
+            )}
+            {webgl.status === 'ready' && webgl.lastDurationMs !== undefined && (
+              <div className="absolute bottom-3 right-3">
+                <ValueBadge value={`GPU · ${webgl.lastDurationMs.toFixed(1)}ms`} variant="muted" size="sm" />
+              </div>
+            )}
+            {webgl.status === 'unsupported' && (
+              <div className="absolute bottom-3 right-3">
+                <ValueBadge value="CPU FALLBACK" variant="muted" size="sm" />
+              </div>
+            )}
+            {webgl.status === 'error' && webgl.error && (
+              <div className="absolute bottom-3 left-3 text-xxs text-sem-error font-mono">
+                GL: {webgl.error}
               </div>
             )}
           </div>
