@@ -12,20 +12,46 @@
  *   - WebGL 2 不可用（GLContext.ok=false）→ status='unsupported'
  *   - sourceUrl 载入失败 → status='error' + error.message
  *   - context lost → status='lost'，尝试自动重建
- *   - Pipeline 含 WebGL 未实现通道（LUT/HSL/curves/colorGrading/grain/halation/wb）
- *     → needsCpuFallback=true，Editor 应改用 IPC 带 filter 的预览
+ *   - Pipeline 含 WebGL 未实现通道（Pass 3b-1 后仅剩 LUT）→ needsCpuFallback=true
+ *
+ * Pipeline 顺序（Lightroom 约定 + 摄影工作流直觉）：
+ *   WhiteBalance → Tone → Curves → HSL → ColorGrading → Adjustments(clarity/sat/vib)
+ *   → Halation → Grain → Vignette
+ *
+ * 注：Halation/Grain 放在最后颜色处理之后、Vignette 前；Vignette 永远是最后一步
+ * （否则颗粒/溢光被暗角遮住就看不见了）
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FilterPipeline } from '../../shared/types'
 import {
+  ADJUSTMENTS_FRAG,
+  COLOR_GRADING_FRAG,
+  CURVES_FRAG,
   DEFAULT_VERT,
   GLContext,
+  GRAIN_FRAG,
+  HALATION_FRAG,
+  HSL_FRAG,
   Pipeline,
   ShaderRegistry,
   TONE_FRAG,
   VIGNETTE_FRAG,
+  WHITE_BALANCE_FRAG,
+  isAdjustmentsIdentity,
+  isColorGradingIdentity,
+  isCurvesIdentity,
+  isGrainIdentity,
+  isHalationIdentity,
+  isHslIdentity,
+  normalizeAdjustmentsParams,
+  normalizeColorGradingParams,
+  normalizeCurvesParams,
+  normalizeGrainParams,
+  normalizeHalationParams,
+  normalizeHslParams,
   normalizeToneParams,
   normalizeVignetteParams,
+  normalizeWhiteBalanceParams,
   textureFromBitmap,
 } from '../engine/webgl'
 import type { PipelineStep, Texture } from '../engine/webgl'
@@ -38,33 +64,39 @@ export interface WebGLPreviewResult {
   error?: string
   lastDurationMs?: number
   /**
-   * Pipeline 中含 GPU 未实现的通道（wb/hsl/curves/colorGrading/grain/halation/LUT/adjustments）。
-   * Editor 接到此信号应调用带 filterId 的 IPC preview:render，用 CPU 兜底展示。
+   * Pipeline 中含 GPU 未实现的通道。Pass 3b-1 后只剩 LUT 需要 CPU 兜底。
+   * Editor 接到此信号应调用带 filterId 的 IPC preview:render。
    */
   needsCpuFallback: boolean
 }
 
-/** GPU 当前已实现的通道（随 Pass 3b-1 shader 逐步补齐） */
+/** GPU 未实现的通道（Pass 3b-1 之后仅 LUT） */
 function hasGpuUnsupportedChannels(pipe: FilterPipeline | null): boolean {
   if (!pipe) return false
-  // 下列通道 WebGL 3a 尚未实现 → 需要 CPU 兜底
-  if (pipe.whiteBalance) return true
-  if (pipe.hsl && Object.keys(pipe.hsl).length > 0) return true
-  if (pipe.curves && (pipe.curves.rgb || pipe.curves.r || pipe.curves.g || pipe.curves.b)) return true
-  if (pipe.colorGrading) return true
-  if (pipe.grain && (pipe.grain.amount ?? 0) !== 0) return true
-  if (pipe.halation && (pipe.halation.amount ?? 0) !== 0) return true
   if (pipe.lut) return true
-  if ((pipe.clarity ?? 0) !== 0) return true
-  if ((pipe.saturation ?? 0) !== 0) return true
-  if ((pipe.vibrance ?? 0) !== 0) return true
   return false
 }
 
-/** 把 FilterPipeline 翻译成 Pass 3a 范围内支持的步骤（tone + vignette） */
-function pipelineToSteps(pipe: FilterPipeline | null, aspect: number): PipelineStep[] {
+/**
+ * 把 FilterPipeline 翻译成 GPU 步骤。只有 "非恒等" 的通道才会产生 step，
+ * 避免浪费一个 ping-pong（一条空调整的 HSL/curves 也不是恒等 fast-path）。
+ */
+export function pipelineToSteps(pipe: FilterPipeline | null, resolution: [number, number]): PipelineStep[] {
   if (!pipe) return []
+  const [w, h] = resolution
+  const aspect = w / Math.max(h, 1)
   const steps: PipelineStep[] = []
+
+  // 1. White Balance（最先应用，影响后续所有色彩）
+  if (pipe.whiteBalance && (pipe.whiteBalance.temp !== 0 || pipe.whiteBalance.tint !== 0)) {
+    steps.push({
+      id: 'wb',
+      frag: WHITE_BALANCE_FRAG,
+      uniforms: { ...normalizeWhiteBalanceParams(pipe.whiteBalance) },
+    })
+  }
+
+  // 2. Tone（曝光/对比/高光/阴影/白黑点）
   if (pipe.tone) {
     steps.push({
       id: 'tone',
@@ -72,6 +104,62 @@ function pipelineToSteps(pipe: FilterPipeline | null, aspect: number): PipelineS
       uniforms: { ...normalizeToneParams(pipe.tone) },
     })
   }
+
+  // 3. Curves（RGB + R/G/B）
+  if (pipe.curves && !isCurvesIdentity(pipe.curves)) {
+    steps.push({
+      id: 'curves',
+      frag: CURVES_FRAG,
+      uniforms: { ...normalizeCurvesParams(pipe.curves) },
+    })
+  }
+
+  // 4. HSL（8 通道）
+  if (pipe.hsl && !isHslIdentity(pipe.hsl)) {
+    steps.push({
+      id: 'hsl',
+      frag: HSL_FRAG,
+      uniforms: { ...normalizeHslParams(pipe.hsl) },
+    })
+  }
+
+  // 5. Color Grading（三向色轮）
+  if (pipe.colorGrading && !isColorGradingIdentity(pipe.colorGrading)) {
+    steps.push({
+      id: 'colorGrading',
+      frag: COLOR_GRADING_FRAG,
+      uniforms: { ...normalizeColorGradingParams(pipe.colorGrading) },
+    })
+  }
+
+  // 6. Adjustments（clarity + saturation + vibrance 合并为一个 pass）
+  if (!isAdjustmentsIdentity(pipe)) {
+    steps.push({
+      id: 'adjustments',
+      frag: ADJUSTMENTS_FRAG,
+      uniforms: { ...normalizeAdjustmentsParams(pipe, resolution) },
+    })
+  }
+
+  // 7. Halation（高光溢光，颜色处理的最后一步）
+  if (pipe.halation && !isHalationIdentity(pipe.halation)) {
+    steps.push({
+      id: 'halation',
+      frag: HALATION_FRAG,
+      uniforms: { ...normalizeHalationParams(pipe.halation, resolution) },
+    })
+  }
+
+  // 8. Grain（胶片颗粒）
+  if (pipe.grain && !isGrainIdentity(pipe.grain)) {
+    steps.push({
+      id: 'grain',
+      frag: GRAIN_FRAG,
+      uniforms: { ...normalizeGrainParams(pipe.grain, resolution) },
+    })
+  }
+
+  // 9. Vignette（必须最后，否则会被后续操作覆盖）
   if (pipe.vignette) {
     steps.push({
       id: 'vignette',
@@ -79,6 +167,7 @@ function pipelineToSteps(pipe: FilterPipeline | null, aspect: number): PipelineS
       uniforms: { ...normalizeVignetteParams(pipe.vignette, aspect) },
     })
   }
+
   return steps
 }
 
@@ -93,7 +182,6 @@ export function useWebGLPreview(
 
   // 长期持有的 GL 对象（跨 render）
   const glRef = useRef<GLContext | null>(null)
-  const registryRef = useRef<ShaderRegistry | null>(null)
   const pipelineRef = useRef<Pipeline | null>(null)
   const sourceTexRef = useRef<Texture | null>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -113,8 +201,8 @@ export function useWebGLPreview(
     abortRef.current?.abort()
     const ctrl = new AbortController()
     abortRef.current = ctrl
-    const aspect = source.width / Math.max(source.height, 1)
-    pipe.setSteps(pipelineToSteps(latestPipelineRef.current, aspect))
+    const resolution: [number, number] = [source.width, source.height]
+    pipe.setSteps(pipelineToSteps(latestPipelineRef.current, resolution))
     try {
       const stats = await pipe.run({ source, signal: ctrl.signal })
       if (stats.aborted) return
@@ -138,7 +226,6 @@ export function useWebGLPreview(
     const pipelineObj = new Pipeline(ctx, registry, DEFAULT_VERT)
 
     glRef.current = ctx
-    registryRef.current = registry
     pipelineRef.current = pipelineObj
 
     const offLost = ctx.onLost(() => setStatus('lost'))
@@ -153,7 +240,6 @@ export function useWebGLPreview(
       registry.dispose()
       ctx.dispose()
       glRef.current = null
-      registryRef.current = null
       pipelineRef.current = null
       sourceTexRef.current = null
     }
