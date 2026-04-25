@@ -3,10 +3,35 @@ import path from 'node:path'
 import { nanoid } from 'nanoid'
 import type { Photo } from '../../../shared/types.js'
 import { readExif } from '../exif/reader.js'
-import { makeThumbnail } from '../filter-engine/thumbnail.js'
+import { detectDisplayDimensions, makeThumbnail } from '../filter-engine/thumbnail.js'
 import { logger } from '../logger/logger.js'
 import { validateImageDimensions, validateImageFile } from '../security/imageGuard.js'
 import { getPhotosTable } from './init.js'
+
+/** EXIF orientation 是否表示"传感器横拍 → 实际竖拍"（5..8 都需要交换宽高） */
+function isRotatedOrientation(o?: number): boolean {
+  return typeof o === 'number' && o >= 5 && o <= 8
+}
+
+async function resolveDisplayDimensions(
+  filePath: string,
+  exifWidth?: number,
+  exifHeight?: number,
+  exifOrientation?: number,
+): Promise<{ width: number; height: number }> {
+  // 优先：对内嵌 JPEG 做 sharp 探测（最准，已考虑 orientation）
+  const detected = await detectDisplayDimensions(filePath)
+  if (detected) return detected
+
+  // 降级：用 EXIF 的原始尺寸 + orientation 旋转一下
+  if (exifWidth && exifHeight) {
+    if (isRotatedOrientation(exifOrientation)) {
+      return { width: exifHeight, height: exifWidth }
+    }
+    return { width: exifWidth, height: exifHeight }
+  }
+  return { width: 0, height: 0 }
+}
 
 export async function importPhotos(paths: string[]): Promise<Photo[]> {
   const table = getPhotosTable()
@@ -20,7 +45,10 @@ export async function importPhotos(paths: string[]): Promise<Photo[]> {
 
     const existing = table.find((ph) => ph.path === p)
     if (existing) {
-      results.push(existing)
+      // 已存在的照片：顺手做缩略图/尺寸的懒补（老数据 thumbPath 丢失 / 宽高为 0 等）
+      const repaired = await repairPhotoRecord(existing)
+      if (repaired !== existing) table.upsert(repaired)
+      results.push(repaired)
       continue
     }
 
@@ -38,7 +66,7 @@ export async function importPhotos(paths: string[]): Promise<Photo[]> {
     const stat = fs.statSync(p)
     const exif = await readExif(p)
 
-    // 维度守卫（EXIF 声明的维度）
+    // 尺寸守卫（用 EXIF 原始宽高，不考虑方向 —— 这里是 pixel-count 守卫，不依赖方向）
     if (exif.width && exif.height) {
       try {
         validateImageDimensions(exif.width, exif.height)
@@ -51,6 +79,9 @@ export async function importPhotos(paths: string[]): Promise<Photo[]> {
       }
     }
 
+    // 呈现尺寸（已应用 orientation）—— 用于 UI 的 aspect ratio
+    const { width, height } = await resolveDisplayDimensions(p, exif.width, exif.height, exif.orientation)
+
     const thumbPath = await makeThumbnail(p, 360).catch((err) => {
       logger.warn('photo.thumb.failed', { path: p, err: (err as Error).message })
       return undefined
@@ -62,8 +93,8 @@ export async function importPhotos(paths: string[]): Promise<Photo[]> {
       name: path.basename(p),
       format: path.extname(p).slice(1).toLowerCase(),
       sizeBytes: stat.size,
-      width: exif.width ?? 0,
-      height: exif.height ?? 0,
+      width,
+      height,
       thumbPath,
       exif,
       starred: false,
@@ -78,8 +109,96 @@ export async function importPhotos(paths: string[]): Promise<Photo[]> {
   return results
 }
 
+/**
+ * 尝试修复一条旧 Photo 记录（懒补机制）：
+ *   - thumbPath 缺失 / 文件不存在 → 重新 makeThumbnail
+ *   - width/height 为 0（Pass 2.8 前导入的 RAW 常见）→ 重新 detect
+ *
+ * 返回：修复后的对象；未修复返回原对象（引用相等）
+ */
+export async function repairPhotoRecord(photo: Photo): Promise<Photo> {
+  let next: Photo = photo
+  let changed = false
+
+  // 1. thumb 失效检测
+  const thumbMissing = !photo.thumbPath || (photo.thumbPath && !fs.existsSync(photo.thumbPath))
+  if (thumbMissing) {
+    try {
+      // 源文件还要在才谈得上重建
+      if (fs.existsSync(photo.path)) {
+        const thumbPath = await makeThumbnail(photo.path, 360)
+        next = { ...next, thumbPath }
+        changed = true
+        logger.info('photo.thumb.repaired', { path: photo.path })
+      }
+    } catch (err) {
+      logger.warn('photo.thumb.repair.failed', { path: photo.path, err: (err as Error).message })
+    }
+  }
+
+  // 2. 尺寸缺失检测（width 或 height 为 0）
+  if ((!photo.width || !photo.height) && fs.existsSync(photo.path)) {
+    try {
+      const dims = await resolveDisplayDimensions(
+        photo.path,
+        photo.exif.width,
+        photo.exif.height,
+        photo.exif.orientation,
+      )
+      if (dims.width > 0 && dims.height > 0) {
+        next = { ...next, width: dims.width, height: dims.height }
+        changed = true
+        logger.info('photo.dims.repaired', {
+          path: photo.path,
+          width: dims.width,
+          height: dims.height,
+        })
+      }
+    } catch (err) {
+      logger.warn('photo.dims.repair.failed', { path: photo.path, err: (err as Error).message })
+    }
+  }
+
+  return changed ? next : photo
+}
+
+/**
+ * listPhotos 对调用方是"当前快照"；修复发生在后台，不阻塞 UI 首屏
+ * （修复后下次 listPhotos 调用即可见新值）
+ */
 export function listPhotos(): Photo[] {
-  return getPhotosTable()
+  const all = getPhotosTable()
     .all()
     .sort((a, b) => b.importedAt - a.importedAt)
+
+  // 后台异步懒补：每次 listPhotos 最多尝试修复前 N 张缺 thumb / 缺尺寸的记录
+  // 控制在 N=8 避免首次进入图库时一次性吞吐大量 RAW
+  void repairMissingInBackground(all, 8)
+
+  return all
+}
+
+/** 过滤出需要修复的条目，异步触发（fire-and-forget） */
+async function repairMissingInBackground(photos: Photo[], limit: number): Promise<void> {
+  const targets = photos.filter(
+    (p) => !p.thumbPath || !fs.existsSync(p.thumbPath ?? '') || !p.width || !p.height,
+  )
+  if (targets.length === 0) return
+  const table = getPhotosTable()
+  let repaired = 0
+  for (const photo of targets) {
+    if (repaired >= limit) break
+    try {
+      const next = await repairPhotoRecord(photo)
+      if (next !== photo) {
+        table.upsert(next)
+        repaired++
+      }
+    } catch {
+      // repairPhotoRecord 内部已记日志
+    }
+  }
+  if (repaired > 0) {
+    logger.info('photo.repair.batch.done', { repaired })
+  }
 }

@@ -85,6 +85,7 @@ export default function Library() {
               selected={selected.includes(photo.id)}
               cameraLabel={cameraLabel}
               dimensions={photo.width ? `${photo.width}×${photo.height}` : undefined}
+              aspectRatio={photo.width && photo.height ? photo.width / photo.height : undefined}
               onClick={() => toggleSelect(photo.id)}
               onDoubleClick={() => navigate(`/editor/${photo.id}`)}
             />

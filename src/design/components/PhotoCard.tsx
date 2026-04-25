@@ -1,6 +1,6 @@
 /**
  * PhotoCard — 画廊图片卡
- * 卤化银风格：带胶片齿孔装饰（可开关）、star、选中描边、hover 信息蒙层
+ * Aurora Glass：玻璃卡片 + 紫辉选中 + 真实宽高比（不强制裁切）
  */
 import { Star } from 'lucide-react'
 import { cn } from '../utils'
@@ -13,12 +13,27 @@ export interface PhotoCardProps {
   selected?: boolean
   cameraLabel?: string // e.g. "LEICA M11 · 35mm · f/2"
   dimensions?: string // "6000×4000"
+  /**
+   * 图片显示比例 = width / height。
+   * - 缺省或 0 → 回退到 4/3（老行为）
+   * - 竖拍图传 <1（如 2/3）；横拍传 >1（如 3/2）；方形传 1
+   * 注意：aspect 决定的是"卡片本身的外形"，图片内部用 object-contain
+   * 避免裁切导致的变形/信息丢失。
+   */
+  aspectRatio?: number
   /** 胶片齿孔（画廊感） */
   sprocket?: boolean
   onClick?: () => void
   onDoubleClick?: () => void
   className?: string
   ariaLabel?: string
+}
+
+/** 将任意 aspect 归到合理范围，避免极端值撑爆网格 */
+export function clampAspect(a: number | undefined): number {
+  if (!a || !Number.isFinite(a) || a <= 0) return 4 / 3
+  // 限制 [0.5, 2.2] ≈ [极竖 1:2, 极横 2.2:1]，超过的走上/下限并在 UI 上显示 letterbox
+  return Math.max(0.5, Math.min(2.2, a))
 }
 
 export function PhotoCard({
@@ -29,12 +44,14 @@ export function PhotoCard({
   selected,
   cameraLabel,
   dimensions,
+  aspectRatio,
   sprocket = false,
   onClick,
   onDoubleClick,
   className,
   ariaLabel,
 }: PhotoCardProps) {
+  const aspect = clampAspect(aspectRatio)
   return (
     <div
       role="button"
@@ -49,8 +66,9 @@ export function PhotoCard({
           onClick?.()
         }
       }}
+      style={{ aspectRatio: `${aspect}` }}
       className={cn(
-        'group relative aspect-[4/3] overflow-hidden rounded-lg cursor-pointer',
+        'group relative overflow-hidden rounded-lg cursor-pointer',
         'transition-all duration-fast ease-liquid',
         'bg-white/[0.03] border',
         selected
@@ -64,7 +82,9 @@ export function PhotoCard({
         <img
           src={src}
           alt={name}
-          className="w-full h-full object-cover img-contain-clean"
+          // object-contain 保持原比例，不变形；因为 aspect 已用图片真实比例设定，
+          // 通常无明显 letterbox；极端比例时留黑边而不是挤压
+          className="w-full h-full object-contain img-contain-clean"
           loading="lazy"
           draggable={false}
         />
