@@ -204,7 +204,8 @@ export default function Batch() {
                   <span className="font-mono font-semibold mx-1">
                     {ignoredChannels.map((c) => UNSUPPORTED_CHANNEL_LABELS[c] ?? c).join(' / ')}
                   </span>
-                  ，将自动走 <span className="font-semibold">GPU 批处理</span>（隐藏渲染窗口，首次启动约 1-2 秒，后续复用）。
+                  ，将自动走 <span className="font-semibold">GPU 批处理</span>（隐藏渲染窗口，首次启动约 1-2
+                  秒，后续复用）。
                 </div>
               </div>
             )}

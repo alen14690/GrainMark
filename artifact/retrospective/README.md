@@ -12,6 +12,8 @@
 | `M1.5-P3b-1-retrospective.md` | 7 个 GPU shader | `6080f67` |
 | `M1.5-P3b-2-retrospective.md` | LUT3D shader + 全量 GPU | `6a4ef03` |
 | `M2-retrospective.md` | editStore + 直方图 + AdjustmentsPanel | `dee0e96` |
+| `M3-a-retrospective.md` | 批处理 Worker Pool（CPU 6 通道 + 像素级 snapshot + 集成测试基建） | `ad508d3` + `e441a24` + `e1251b1` |
+| `M3-b-retrospective.md` | GPU 批处理（隐藏 BrowserWindow + 10 通道全覆盖） | `a411c12` |
 
 ---
 
