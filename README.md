@@ -133,10 +133,10 @@ WB → Tone → Curves → HSL → ColorGrading → Adjustments(clarity/sat/vib)
 
 | 指标 | 当前 | 红线 |
 |---|---|---|
-| 单元测试 | **395 / 395 通过**（29 文件，含 14 个像素级 snapshot） | ≥ 基线无回归 |
+| 单元测试 | **405 / 405 通过**（31 文件，含 14 个像素级 snapshot） | ≥ 基线无回归 |
 | 集成测试 | **6 / 6 通过**（Playwright + Electron · CPU 路径 5 + GPU 路径 1） | ≥ 基线无回归 |
 | tsc --noEmit | **0 错误** | 0 |
-| biome check | **0 警告**（148 文件） | 0 |
+| biome check | **0 警告**（150 文件） | 0 |
 | 打包体积 | renderer main 268KB + batch-gpu 1.5KB + webgl chunk 42KB · main.js 157KB · batch-worker.mjs 1.6KB · preload 0.55KB | dmg/exe ≤ 300MB |
 | WebGL 预览性能 | M-series Mac 24MP Nms（UI 实时显示） | ≤ 8ms/frame |
 | 实时直方图 | readPixels + 120ms debounce，不阻塞滑块 | 滑块 ≥ 60fps |

@@ -8,10 +8,11 @@ import { pathToFileURL } from 'node:url'
  * 方案：用自定义协议代理文件访问，只允许访问经过 PathGuard 授权的路径。
  *
  * URL 形式：
- *   grain://photo/<id>        — 原始照片（需 id → path 映射）
- *   grain://thumb/<id>        — 缩略图
- *   grain://preview/<id>?v=N  — 预览（带版本号缓存破坏）
- *   grain://lut/<filename>    — 用户 LUT 文件
+ *   grain://photo/<id>           — 原始照片（需 id → path 映射）
+ *   grain://thumb/<id>           — 缩略图
+ *   grain://preview/<id>?v=N     — 预览（带版本号缓存破坏）
+ *   grain://preview-tmp/<file>   — Editor 大图预览缓存（renderPreview 输出 > 2MB 时走此路）
+ *   grain://lut/<filename>       — 用户 LUT 文件
  *
  * RAW 支持（Pass 2.8）：photo / preview kind 对 RAW 文件会透明地返回内嵌 JPEG，
  * UI 层不需感知。对非 RAW 走 net.fetch(file://) 零开销透传。
@@ -21,11 +22,13 @@ import { logger } from '../services/logger/logger.js'
 import { isRawFormat, resolvePreviewBuffer } from '../services/raw/index.js'
 import { UnsupportedRawError } from '../services/raw/rawDecoder.js'
 import type { PathGuard } from '../services/security/pathGuard.js'
-import { getLUTDir, getThumbsDir } from '../services/storage/init.js'
+import { getLUTDir, getPreviewCacheDir, getThumbsDir } from '../services/storage/init.js'
 
 const MAP: Record<string, () => string> = {
   thumb: () => getThumbsDir(),
   lut: () => getLUTDir(),
+  // Editor 大图预览缓存（renderPreview 输出 > 2MB 时走这个）
+  'preview-tmp': () => getPreviewCacheDir(),
 }
 
 /** photo id → 绝对路径 的解析器（由 photoStore 注入） */

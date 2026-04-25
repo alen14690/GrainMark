@@ -155,6 +155,13 @@ export interface Photo {
   rating: 0 | 1 | 2 | 3 | 4 | 5
   tags: string[]
   importedAt: number
+  /**
+   * 尺寸方向已通过 thumb 做过一次校对（迁移字段）。
+   * 旧版本可能在 Pass 3b 前把 RAW 的未旋转传感器尺寸存进了 width/height，
+   * 卡片 aspectRatio 因此与 thumb 内容不一致。
+   * 一次校对成功后置为 true，避免重复扫描。
+   */
+  dimsVerified?: boolean
 }
 
 // ============ 批量任务 ============

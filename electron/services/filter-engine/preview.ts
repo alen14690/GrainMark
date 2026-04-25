@@ -10,13 +10,37 @@
  *   - GPU 端支持的通道（tone/vignette）在 WebGL 渲染，这里的 `pipeline` 可传 null；
  *   - GPU 未实现的通道（LUT/HSL/curves/colorGrading/grain/halation/wb）仍走 sharp CPU 路径
  *     作为"过渡期 CPU 兜底"。
+ *
+ * 返回形式（M3-c 修复）：
+ *   - 早期实现返回 base64 data URL；对大 RAW（内嵌 JPEG ≥ 8MB）在 Chromium 里
+ *     fetch(data:...) 偶发失败 / 超时 → 渲染进程拿不到 bitmap，表现为"切滤镜无响应"
+ *   - 现在改为写到 userData/preview-cache/<hash>.jpg，返回 grain://preview-tmp/<file> URL，
+ *     走 net.fetch 流式传输，对大图更稳
  */
+import crypto from 'node:crypto'
+import fs from 'node:fs'
+import path from 'node:path'
 import sharp from 'sharp'
 import type { FilterPipeline } from '../../../shared/types.js'
+import { logger } from '../logger/logger.js'
 import { orientationToRotationDegrees, resolvePreviewBuffer } from '../raw/index.js'
 import { getFilter } from '../storage/filterStore.js'
+import { getPreviewCacheDir } from '../storage/init.js'
 
 const PREVIEW_MAX_DIM = 1600
+/**
+ * 大于此阈值的 JPEG 走临时文件路径（避免大 data URL 在渲染进程 fetch 失败）。
+ * 可通过环境变量 GRAINMARK_PREVIEW_DATAURL_MAX 注入（字节数），测试下调小用。
+ */
+const DEFAULT_DATA_URL_THRESHOLD = 2 * 1024 * 1024
+function getDataUrlThreshold(): number {
+  const env = process.env.GRAINMARK_PREVIEW_DATAURL_MAX
+  if (env) {
+    const n = Number(env)
+    if (Number.isFinite(n) && n > 0) return n
+  }
+  return DEFAULT_DATA_URL_THRESHOLD
+}
 
 export async function renderPreview(
   photoPath: string,
@@ -52,7 +76,30 @@ export async function renderPreview(
   }
 
   const out = await img.jpeg({ quality: 85 }).toBuffer()
-  return `data:image/jpeg;base64,${out.toString('base64')}`
+
+  // 小图走 data URL（零 IO 开销）；大图写临时文件 + grain 协议
+  if (out.length <= getDataUrlThreshold()) {
+    return `data:image/jpeg;base64,${out.toString('base64')}`
+  }
+
+  // 哈希基于"源路径 + filterId + 输出字节数"，相同输入复用缓存文件
+  const hash = crypto
+    .createHash('md5')
+    .update(`${photoPath}:${filterId ?? 'none'}:${out.length}`)
+    .digest('hex')
+  const fileName = `${hash}.jpg`
+  const outPath = path.join(getPreviewCacheDir(), fileName)
+  try {
+    fs.writeFileSync(outPath, out)
+  } catch (err) {
+    logger.warn('preview.cache.write.failed', {
+      path: outPath,
+      err: (err as Error).message,
+    })
+    // 写失败回退到 data URL（再大也比完全失败好）
+    return `data:image/jpeg;base64,${out.toString('base64')}`
+  }
+  return `grain://preview-tmp/${encodeURIComponent(fileName)}`
 }
 
 /** M2 会扩展此函数以覆盖完整 pipeline */

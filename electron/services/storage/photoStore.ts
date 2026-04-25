@@ -101,6 +101,8 @@ export async function importPhotos(paths: string[]): Promise<Photo[]> {
       rating: 0,
       tags: [],
       importedAt: Date.now(),
+      // 新导入照片：dims 是用 detectDisplayDimensions 现算的，天然已校对
+      dimsVerified: true,
     }
 
     table.upsert(photo)
@@ -113,6 +115,9 @@ export async function importPhotos(paths: string[]): Promise<Photo[]> {
  * 尝试修复一条旧 Photo 记录（懒补机制）：
  *   - thumbPath 缺失 / 文件不存在 → 重新 makeThumbnail
  *   - width/height 为 0（Pass 2.8 前导入的 RAW 常见）→ 重新 detect
+ *   - width/height 方向与 thumb 方向不一致（老数据在 Pass 3b 前可能存了
+ *     未旋转的 EXIF 尺寸，而 thumb 已旋正 → 卡片 aspectRatio 与 thumb 内容
+ *     不匹配，视觉上照片被挤压）→ 以 thumb 的真实方向为准重算
  *
  * 返回：修复后的对象；未修复返回原对象（引用相等）
  */
@@ -159,6 +164,39 @@ export async function repairPhotoRecord(photo: Photo): Promise<Photo> {
     }
   }
 
+  // 3. 尺寸方向一致性检测（已存在的老数据可能存了错方向的 width/height）
+  //    判据：thumb 已旋正，其长宽比应与 photo.width/height 的长宽比一致（±5% 误差）
+  //    不一致 → 以 thumb 为权威，交换 width/height
+  const currentThumb = next.thumbPath
+  if (next.width && next.height && currentThumb && fs.existsSync(currentThumb)) {
+    try {
+      const { default: sharpLib } = await import('sharp')
+      const thumbMeta = await sharpLib(currentThumb).metadata()
+      if (thumbMeta.width && thumbMeta.height) {
+        const photoAspect = next.width / next.height
+        const thumbAspect = thumbMeta.width / thumbMeta.height
+        // 方向反了：横/竖显著不一致（一个 > 1 一个 < 1，且偏离超过 5%）
+        const swapped =
+          (photoAspect > 1.05 && thumbAspect < 0.95) || (photoAspect < 0.95 && thumbAspect > 1.05)
+        if (swapped) {
+          next = { ...next, width: next.height, height: next.width }
+          changed = true
+          logger.info('photo.dims.orientation.repaired', {
+            path: next.path,
+            before: { w: photo.width, h: photo.height },
+            after: { w: next.width, h: next.height },
+            thumbAspect,
+          })
+        }
+      }
+    } catch (err) {
+      logger.warn('photo.dims.orientation.check.failed', {
+        path: next.path,
+        err: (err as Error).message,
+      })
+    }
+  }
+
   return changed ? next : photo
 }
 
@@ -196,7 +234,13 @@ export function _waitRepairIdle(): Promise<void> {
 /** 过滤出需要修复的条目，异步触发（fire-and-forget） */
 async function repairMissingInBackground(photos: Photo[], limit: number): Promise<void> {
   const targets = photos.filter(
-    (p) => !p.thumbPath || !fs.existsSync(p.thumbPath ?? '') || !p.width || !p.height,
+    (p) =>
+      !p.thumbPath ||
+      !fs.existsSync(p.thumbPath ?? '') ||
+      !p.width ||
+      !p.height ||
+      // 方向可能错的老数据：必须同时有 thumb + 尺寸才能进行校对
+      (p.thumbPath && p.width && p.height && !p.dimsVerified),
   )
   if (targets.length === 0) return
   const table = getPhotosTable()
@@ -205,9 +249,11 @@ async function repairMissingInBackground(photos: Photo[], limit: number): Promis
     if (repaired >= limit) break
     try {
       const next = await repairPhotoRecord(photo)
-      if (next !== photo) {
-        table.upsert(next)
-        repaired++
+      // 校对过的标记一下，避免下次 listPhotos 再次 O(N) 扫描
+      const withFlag: Photo = next.dimsVerified ? next : { ...next, dimsVerified: true }
+      if (withFlag !== photo) {
+        table.upsert(withFlag)
+        if (next !== photo) repaired++
       }
     } catch {
       // repairPhotoRecord 内部已记日志

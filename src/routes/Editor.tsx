@@ -60,8 +60,13 @@ export default function Editor() {
   const renderPipeline = showOriginal ? null : currentPipeline
   const webgl = useWebGLPreview(previewUrl, renderPipeline)
 
-  // CPU 兜底：正常 Pass 3b-2 后只剩 LUT 解析失败触发
-  const needsCpuFallback = !showOriginal && webgl.needsCpuFallback
+  // CPU 兜底：下面三种情况都走 IPC 主进程应用 pipeline（data URL 回来已烘焙滤镜）：
+  //   1. webgl.needsCpuFallback：LUT 纹理解析失败（历史兜底）
+  //   2. webgl.status === 'error'：WebGL 初始化 / 纹理上传 / 着色器编译任一阶段挂掉
+  //   3. webgl.status === 'lost'：GPU context lost 尚未恢复
+  // 注意：'idle'/'loading' 不触发兜底，它们会在首次 renderNow 后转为 'ready'
+  const webglBroken = webgl.status === 'error' || webgl.status === 'lost'
+  const needsCpuFallback = !showOriginal && (webgl.needsCpuFallback || webglBroken)
   const ipcFilterId = showOriginal ? null : needsCpuFallback ? activeFilterId : null
 
   const photoPath = photo?.path
