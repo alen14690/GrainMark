@@ -6,14 +6,16 @@
  *   - 首次 mount 创建 GLContext + ShaderRegistry + Pipeline
  *   - sourceUrl 变化 → fetch → createImageBitmap → 上传 GPU
  *   - pipeline 变化 → setSteps + run (自动 abort 上一次 run)
- *   - 返回：{ canvasRef, status, stats, error }
+ *   - 返回：{ canvasRef, status, stats, error, needsCpuFallback }
  *
  * 降级：
- *   - WebGL 2 不可用（GLContext.ok=false）→ status='unsupported'，调用方显示 Sharp 兜底
+ *   - WebGL 2 不可用（GLContext.ok=false）→ status='unsupported'
  *   - sourceUrl 载入失败 → status='error' + error.message
  *   - context lost → status='lost'，尝试自动重建
+ *   - Pipeline 含 WebGL 未实现通道（LUT/HSL/curves/colorGrading/grain/halation/wb）
+ *     → needsCpuFallback=true，Editor 应改用 IPC 带 filter 的预览
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FilterPipeline } from '../../shared/types'
 import {
   DEFAULT_VERT,
@@ -35,6 +37,28 @@ export interface WebGLPreviewResult {
   status: WebGLPreviewStatus
   error?: string
   lastDurationMs?: number
+  /**
+   * Pipeline 中含 GPU 未实现的通道（wb/hsl/curves/colorGrading/grain/halation/LUT/adjustments）。
+   * Editor 接到此信号应调用带 filterId 的 IPC preview:render，用 CPU 兜底展示。
+   */
+  needsCpuFallback: boolean
+}
+
+/** GPU 当前已实现的通道（随 Pass 3b-1 shader 逐步补齐） */
+function hasGpuUnsupportedChannels(pipe: FilterPipeline | null): boolean {
+  if (!pipe) return false
+  // 下列通道 WebGL 3a 尚未实现 → 需要 CPU 兜底
+  if (pipe.whiteBalance) return true
+  if (pipe.hsl && Object.keys(pipe.hsl).length > 0) return true
+  if (pipe.curves && (pipe.curves.rgb || pipe.curves.r || pipe.curves.g || pipe.curves.b)) return true
+  if (pipe.colorGrading) return true
+  if (pipe.grain && (pipe.grain.amount ?? 0) !== 0) return true
+  if (pipe.halation && (pipe.halation.amount ?? 0) !== 0) return true
+  if (pipe.lut) return true
+  if ((pipe.clarity ?? 0) !== 0) return true
+  if ((pipe.saturation ?? 0) !== 0) return true
+  if ((pipe.vibrance ?? 0) !== 0) return true
+  return false
 }
 
 /** 把 FilterPipeline 翻译成 Pass 3a 范围内支持的步骤（tone + vignette） */
@@ -78,6 +102,8 @@ export function useWebGLPreview(
   useEffect(() => {
     latestPipelineRef.current = pipeline
   }, [pipeline])
+
+  const needsCpuFallback = useMemo(() => hasGpuUnsupportedChannels(pipeline), [pipeline])
 
   const renderNow = useCallback(async () => {
     const source = sourceTexRef.current
@@ -185,5 +211,5 @@ export function useWebGLPreview(
     renderNow()
   }, [pipeline, renderNow])
 
-  return { canvasRef, status, error, lastDurationMs }
+  return { canvasRef, status, error, lastDurationMs, needsCpuFallback }
 }

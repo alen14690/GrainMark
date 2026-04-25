@@ -29,6 +29,7 @@ const JPEG_BYTES = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 10, 20, 30, 40])
 const hoisted = vi.hoisted(() => {
   return {
     extractSpy: vi.fn<(file: string) => Promise<{ buffer: Buffer; tag: string }>>(),
+    readExifSpy: vi.fn<(file: string) => Promise<{ orientation?: number }>>(),
   }
 })
 
@@ -42,12 +43,19 @@ vi.mock('../../electron/services/raw/rawDecoder', async () => {
   }
 })
 
+vi.mock('../../electron/services/exif/reader', () => ({
+  readExif: (file: string) => hoisted.readExifSpy(file),
+  shutdownExiftool: vi.fn(async () => undefined),
+}))
+
 let mod: typeof import('../../electron/services/raw/index')
 let cache: typeof import('../../electron/services/raw/rawCache')
 
 beforeEach(async () => {
   vi.resetModules()
   hoisted.extractSpy.mockReset()
+  hoisted.readExifSpy.mockReset()
+  hoisted.readExifSpy.mockResolvedValue({}) // 默认无 orientation
   mod = await import('../../electron/services/raw/index')
   cache = await import('../../electron/services/raw/rawCache')
   await cache.clearRawCache()
@@ -147,5 +155,69 @@ describe('isRawFormat 重导出', () => {
   it('从 raw/index 重导出', () => {
     expect(mod.isRawFormat('x.nef')).toBe(true)
     expect(mod.isRawFormat('x.jpg')).toBe(false)
+  })
+})
+
+describe('resolvePreviewBuffer · orientation 传递', () => {
+  it('RAW：sourceOrientation 从 readExif 取得', async () => {
+    const file = path.join(tmpRoot, 'portrait.arw')
+    fs.writeFileSync(file, Buffer.alloc(4096))
+    hoisted.readExifSpy.mockResolvedValueOnce({ orientation: 6 })
+    hoisted.extractSpy.mockResolvedValueOnce({ buffer: JPEG_BYTES, tag: 'JpgFromRaw' })
+
+    const r = await mod.resolvePreviewBuffer(file)
+    expect(r.sourceOrientation).toBe(6)
+  })
+
+  it('RAW cache hit 也带 sourceOrientation', async () => {
+    const file = path.join(tmpRoot, 'portrait2.arw')
+    fs.writeFileSync(file, Buffer.alloc(1024))
+    hoisted.readExifSpy.mockResolvedValue({ orientation: 8 })
+    hoisted.extractSpy.mockResolvedValueOnce({ buffer: JPEG_BYTES, tag: 'JpgFromRaw' })
+
+    await mod.resolvePreviewBuffer(file)
+    await new Promise((r) => setTimeout(r, 50))
+    const r2 = await mod.resolvePreviewBuffer(file)
+    expect(r2.source).toBe('raw-cache-hit')
+    expect(r2.sourceOrientation).toBe(8)
+  })
+
+  it('非 RAW 不返回 sourceOrientation', async () => {
+    const file = path.join(tmpRoot, 'landscape.jpg')
+    fs.writeFileSync(file, JPEG_BYTES)
+    const r = await mod.resolvePreviewBuffer(file)
+    expect(r.sourceOrientation).toBeUndefined()
+    expect(hoisted.readExifSpy).not.toHaveBeenCalled()
+  })
+
+  it('readExif 抛错时 sourceOrientation=undefined 但仍正常返回 buffer', async () => {
+    const file = path.join(tmpRoot, 'bad-exif.nef')
+    fs.writeFileSync(file, Buffer.alloc(1024))
+    hoisted.readExifSpy.mockRejectedValueOnce(new Error('exif boom'))
+    hoisted.extractSpy.mockResolvedValueOnce({ buffer: JPEG_BYTES, tag: 'PreviewImage' })
+
+    const r = await mod.resolvePreviewBuffer(file)
+    expect(r.buffer.equals(JPEG_BYTES)).toBe(true)
+    expect(r.sourceOrientation).toBeUndefined()
+  })
+})
+
+describe('orientationToRotationDegrees', () => {
+  it('1 / undefined → 0', () => {
+    expect(mod.orientationToRotationDegrees(1)).toBe(0)
+    expect(mod.orientationToRotationDegrees(undefined)).toBe(0)
+  })
+  it('3 → 180', () => {
+    expect(mod.orientationToRotationDegrees(3)).toBe(180)
+  })
+  it('6 → 90 顺时针', () => {
+    expect(mod.orientationToRotationDegrees(6)).toBe(90)
+  })
+  it('8 → 270 顺时针 (= 90 逆时针)', () => {
+    expect(mod.orientationToRotationDegrees(8)).toBe(270)
+  })
+  it('包含镜像的 2/4/5/7 目前当作 0 处理（相机罕见）', () => {
+    expect(mod.orientationToRotationDegrees(2)).toBe(0)
+    expect(mod.orientationToRotationDegrees(5)).toBe(0)
   })
 })

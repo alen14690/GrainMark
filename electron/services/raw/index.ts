@@ -6,9 +6,16 @@
  *   - RAW：命中 rawCache → 直接返回；否则 extractEmbeddedJpeg + 入缓存 + 返回
  *
  * 这样 thumbnail / preview / grain:// 协议三处改动都可以压到"一行替换"。
+ *
+ * Orientation 契约：
+ *   - 除了 buffer，还返回 `sourceOrientation`（来自 RAW 原文件 EXIF 的 Orientation 标签，1..8）
+ *   - 上层（thumbnail / preview）不要依赖 sharp 对 buffer 自带 EXIF 的自动 rotate，
+ *     因为 RAW 内嵌 JPEG 的 EXIF orientation 有时与原 RAW 不一致（Sony ARW 常见）
+ *   - 正确做法：用 sourceOrientation 显式 .rotate(angle) 旋转
  */
 import { promises as fsp } from 'node:fs'
 import path from 'node:path'
+import { readExif } from '../exif/reader.js'
 import { logger } from '../logger/logger.js'
 import { getCached, makeCacheKey, putCached } from './rawCache.js'
 import { UnsupportedRawError, extractEmbeddedJpeg, isRawFormat } from './rawDecoder.js'
@@ -21,6 +28,30 @@ export interface ResolvedPreview {
   source: PreviewSource
   /** 如为 RAW 且命中 tag，返回 JpgFromRaw / PreviewImage / ThumbnailImage */
   rawTag?: string
+  /**
+   * RAW 原文件 EXIF 的 Orientation 标签（1..8）。
+   * - 1 / undefined：无需旋转
+   * - 3：180°
+   * - 6：顺时针 90°（竖拍机身）
+   * - 8：逆时针 90°（竖拍机身另一向）
+   * 注意：非 RAW 文件（JPG/PNG/HEIC）不返回此值；上层 sharp(buffer).rotate()
+   * 对它们自己的 EXIF 已能正确处理。
+   */
+  sourceOrientation?: number
+}
+
+/** EXIF orientation → 顺时针旋转角度（度）。2/4/5/7 含镜像，暂不处理（相机罕见） */
+export function orientationToRotationDegrees(orientation?: number): number {
+  switch (orientation) {
+    case 3:
+      return 180
+    case 6:
+      return 90
+    case 8:
+      return 270
+    default:
+      return 0
+  }
 }
 
 /**
@@ -46,22 +77,36 @@ export async function resolvePreviewBuffer(filePath: string): Promise<ResolvedPr
   const stat = await fsp.stat(absPath)
   const key = makeCacheKey(absPath, stat.mtimeMs, stat.size)
 
+  // 先把原文件 orientation 拿到（用于后续显式旋转）
+  // readExif 对 RAW 耗时 ~30-80ms，但 exiftool 复用进程，后续很快
+  const orientation = await readRawOrientation(absPath)
+
   const cached = await getCached(key)
   if (cached) {
-    return { buffer: cached, source: 'raw-cache-hit' }
+    return { buffer: cached, source: 'raw-cache-hit', sourceOrientation: orientation }
   }
 
   try {
     const { buffer, tag } = await extractEmbeddedJpeg(absPath)
     // 异步入缓存，不阻塞调用方
     void putCached(key, buffer)
-    logger.info('raw.extracted', { path: absPath, tag, size: buffer.length })
-    return { buffer, source: 'raw-extracted', rawTag: tag }
+    logger.info('raw.extracted', { path: absPath, tag, size: buffer.length, orientation })
+    return { buffer, source: 'raw-extracted', rawTag: tag, sourceOrientation: orientation }
   } catch (err) {
     if (err instanceof UnsupportedRawError) {
       logger.warn('raw.unsupported', { path: absPath, reason: err.reason })
     }
     throw err
+  }
+}
+
+/** 读取 RAW 原文件的 Orientation；读 EXIF 失败时返回 undefined（调用方按不旋转处理） */
+async function readRawOrientation(filePath: string): Promise<number | undefined> {
+  try {
+    const exif = await readExif(filePath)
+    return exif.orientation
+  } catch {
+    return undefined
   }
 }
 

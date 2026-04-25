@@ -34,12 +34,17 @@ export default function Editor() {
   // WebGL 预览（Pass 3a：只启用 tone + vignette）
   const webgl = useWebGLPreview(previewUrl, pipeline)
 
+  // 滤镜含 GPU 未实现通道（LUT/HSL/曲线/色彩分级/颗粒/光晕/WB/adjustments）→ 让 IPC 端用 CPU 渲染后再给 canvas
+  // 注意：showOriginal=true 时永远强制走"原图"（不让 CPU 兜底污染）
+  const needsCpuFallback = !showOriginal && webgl.needsCpuFallback
+  const ipcFilterId = showOriginal ? null : needsCpuFallback ? activeFilterId : null
+
   useEffect(() => {
     if (!photo) return
     let alive = true
     setLoading(true)
-    // IPC 只要"原图预览"（不带 filter），filter 在 GPU 上叠加
-    ipc('preview:render', photo.path, null, undefined)
+    // ipcFilterId = null：取原图，交给 GPU 叠加；否则让 IPC CPU 带 filter 渲染
+    ipc('preview:render', photo.path, ipcFilterId, undefined)
       .then((url) => {
         if (alive) setPreviewUrl(url)
       })
@@ -50,7 +55,7 @@ export default function Editor() {
     return () => {
       alive = false
     }
-  }, [photo])
+  }, [photo, ipcFilterId])
 
   if (!photo) {
     return (
@@ -136,9 +141,14 @@ export default function Editor() {
                 <ValueBadge value="ORIGINAL" variant="amber" size="sm" />
               </div>
             )}
-            {webgl.status === 'ready' && webgl.lastDurationMs !== undefined && (
+            {webgl.status === 'ready' && webgl.lastDurationMs !== undefined && !needsCpuFallback && (
               <div className="absolute bottom-3 right-3">
                 <ValueBadge value={`GPU · ${webgl.lastDurationMs.toFixed(1)}ms`} variant="muted" size="sm" />
+              </div>
+            )}
+            {needsCpuFallback && (
+              <div className="absolute bottom-3 right-3">
+                <ValueBadge value="CPU" variant="muted" size="sm" />
               </div>
             )}
             {webgl.status === 'unsupported' && (
