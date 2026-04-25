@@ -1,0 +1,18 @@
+# Git LFS 配置
+tests/baselines/**/*.png filter=lfs diff=lfs merge=lfs -text
+tests/baselines/**/*.jpg filter=lfs diff=lfs merge=lfs -text
+tests/baselines/**/*.webp filter=lfs diff=lfs merge=lfs -text
+tests/fixtures/rawfiles/** filter=lfs diff=lfs merge=lfs -text
+tests/fixtures/malicious/** filter=lfs diff=lfs merge=lfs -text
+tests/fixtures/images/real/** filter=lfs diff=lfs merge=lfs -text
+*.psd filter=lfs diff=lfs merge=lfs -text
+*.onnx filter=lfs diff=lfs merge=lfs -text
+*.cube filter=lfs diff=lfs merge=lfs -text
+
+# 标准化换行
+* text=auto eol=lf
+*.ts text
+*.tsx text
+*.js text
+*.json text
+*.md text

@@ -1,0 +1,19 @@
+<type>(<scope>): <subject>
+
+# -------- What (改了什么) --------
+# 
+# -------- Why (为什么要这么改) --------
+# 
+# -------- Alternatives (是否有更好的修改方案) --------
+# - 方案 A: ... (未选原因)
+# - 方案 B: ... (未选原因)
+# - 最终选择: ... (理由)
+# 
+# -------- Verification (校验结果) --------
+# tsc:     0 errors
+# biome:   0 warnings
+# tests:   N/N passed, coverage X%
+# 
+# ==== Conventional Commits 参考 ====
+# type:  feat | fix | refactor | perf | test | chore | docs | sec
+# scope: p1-security | p1-test | engine | ai | design | ...
