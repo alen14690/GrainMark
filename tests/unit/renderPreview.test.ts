@@ -175,4 +175,68 @@ describe('renderPreview 输出形态', () => {
     expect(meta.width).toBe(600)
     expect(meta.height).toBe(900)
   })
+
+  it('pipelineOverride 优先于 filterId（CPU 兜底路径的关键契约）', async () => {
+    // 构造灰色输入：tone.exposure +2 应让输出显著变亮
+    const gray = await sharp({
+      create: { width: 200, height: 200, channels: 3, background: { r: 128, g: 128, b: 128 } },
+    })
+      .jpeg({ quality: 95 })
+      .toBuffer()
+    hoisted.resolveSpy.mockResolvedValue({ buffer: gray, source: 'passthrough' })
+    process.env.GRAINMARK_PREVIEW_DATAURL_MAX = String(10 * 1024 * 1024) // 走 data URL 便于 decode
+
+    const { renderPreview } = await import('../../electron/services/filter-engine/preview')
+
+    // Baseline：不传 override，不传 filterId → 原图 passthrough
+    const base = await renderPreview('/fake/gray.jpg', null)
+    expect(base).toMatch(/^data:image\/jpeg;base64,/)
+    const baseMeta = await sharp(Buffer.from(base.slice(23), 'base64')).stats()
+    // 灰色中值约 128
+    expect(baseMeta.channels[0].mean).toBeGreaterThan(120)
+    expect(baseMeta.channels[0].mean).toBeLessThan(135)
+
+    // With override：tone.exposure +2 EV → 亮度明显上升
+    const withOverride = await renderPreview('/fake/gray.jpg', null, {
+      tone: {
+        exposure: 2,
+        contrast: 0,
+        highlights: 0,
+        shadows: 0,
+        whites: 0,
+        blacks: 0,
+      },
+    })
+    expect(withOverride).toMatch(/^data:image\/jpeg;base64,/)
+    const overrideMeta = await sharp(Buffer.from(withOverride.slice(23), 'base64')).stats()
+    // +2 EV ≈ 4x 线性亮度；JPEG 非线性但至少应从 ~128 升到接近 255 饱和
+    expect(overrideMeta.channels[0].mean).toBeGreaterThan(baseMeta.channels[0].mean + 50)
+  })
+
+  it('pipelineOverride 存在时不再读取 filterId 对应的 preset', async () => {
+    const gray = await sharp({
+      create: { width: 200, height: 200, channels: 3, background: { r: 128, g: 128, b: 128 } },
+    })
+      .jpeg({ quality: 95 })
+      .toBuffer()
+    hoisted.resolveSpy.mockResolvedValue({ buffer: gray, source: 'passthrough' })
+    process.env.GRAINMARK_PREVIEW_DATAURL_MAX = String(10 * 1024 * 1024)
+
+    const { renderPreview } = await import('../../electron/services/filter-engine/preview')
+
+    // 即使传了不存在的 filterId，只要 pipelineOverride 在就该走 override
+    const withOverride = await renderPreview('/fake/gray.jpg', 'nonexistent-filter', {
+      tone: {
+        exposure: -3,
+        contrast: 0,
+        highlights: 0,
+        shadows: 0,
+        whites: 0,
+        blacks: 0,
+      },
+    })
+    const meta = await sharp(Buffer.from(withOverride.slice(23), 'base64')).stats()
+    // -3 EV ≈ 1/8 亮度，灰色 128 → 应显著变暗
+    expect(meta.channels[0].mean).toBeLessThan(80)
+  })
 })

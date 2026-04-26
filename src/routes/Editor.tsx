@@ -69,21 +69,65 @@ export default function Editor() {
   const renderPipeline = showOriginal ? null : currentPipeline
   const webgl = useWebGLPreview(previewUrl, renderPipeline)
 
-  // CPU 兜底：下面三种情况都走 IPC 主进程应用 pipeline（data URL 回来已烘焙滤镜）：
+  // CPU 兜底：下面情况都走 IPC 主进程应用 pipeline（data URL 回来已烘焙滤镜）：
   //   1. webgl.needsCpuFallback：LUT 纹理解析失败（历史兜底）
   //   2. webgl.status === 'error'：WebGL 初始化 / 纹理上传 / 着色器编译任一阶段挂掉
   //   3. webgl.status === 'lost'：GPU context lost 尚未恢复
-  // 注意：'idle'/'loading' 不触发兜底，它们会在首次 renderNow 后转为 'ready'
-  const webglBroken = webgl.status === 'error' || webgl.status === 'lost'
+  //   4. webgl.status === 'unsupported'：老机器 / 驱动不支持 WebGL 2
+  // 'idle' 是瞬时态（WebGL 初始化到 sourceUrl 载入触发 loading 之间的窗口，通常 < 100ms），
+  // 为避免"idle CPU → ready GPU"瞬切带来的像素跳变，idle 不触发兜底；
+  // 'loading' 同理（canvas 已显示上一次的结果，短暂 loading 期间用户看到旧帧是可接受的）
+  const webglBroken = webgl.status === 'error' || webgl.status === 'lost' || webgl.status === 'unsupported'
   const needsCpuFallback = !showOriginal && (webgl.needsCpuFallback || webglBroken)
   const ipcFilterId = showOriginal ? null : needsCpuFallback ? activeFilterId : null
 
   const photoPath = photo?.path
+
+  /**
+   * CPU 兜底路径下 IPC pipelineOverride 的 debounce key。
+   *
+   * 背景：
+   *   - GPU 路径（webgl.status='ready' 且无 needsCpuFallback）：previewUrl 只是原图的
+   *     基准 JPEG，滤镜/滑块由 WebGL 实时叠加 → pipelineOverride 无需传
+   *   - CPU 兜底路径（webgl 挂 / lost / LUT 失败）：previewUrl 需要是"已烘焙 pipeline"
+   *     的成图，拖滑块时必须带上 currentPipeline 让主进程重新 sharp 处理
+   *
+   * 高频调用保护：滑块拖动每帧触发 setTone → currentPipeline 每帧新引用 → 若直接
+   *   把 currentPipeline 放进 useEffect deps，会每帧发 IPC（sharp 24MP 处理 400ms+）
+   *   → 完全卡死。
+   *   → 改用 JSON.stringify 哈希作 key + 150ms debounce：滑块松手后才重拉一次，
+   *     拖动过程用上一次的 previewUrl 先顶着（视觉上接受"松手后更新"延迟）
+   */
+  const pipelineKey = useMemo(() => {
+    if (!needsCpuFallback) return null
+    // CPU 兜底：使用 currentPipeline 作 key；JSON.stringify 对纯数据结构稳定
+    try {
+      return JSON.stringify(currentPipeline ?? null)
+    } catch {
+      return null
+    }
+  }, [needsCpuFallback, currentPipeline])
+
+  // debounce pipelineKey 150ms，只在静止态触发 IPC 重拉
+  const [debouncedPipelineKey, setDebouncedPipelineKey] = useState<string | null>(null)
+  useEffect(() => {
+    if (pipelineKey === debouncedPipelineKey) return
+    const t = window.setTimeout(() => setDebouncedPipelineKey(pipelineKey), 150)
+    return () => window.clearTimeout(t)
+  }, [pipelineKey, debouncedPipelineKey])
+
+  // 拉取 previewUrl：
+  //   - GPU 正常路径：override=undefined，主进程只根据 photoPath + filterId 给"基准原图"
+  //   - CPU 兜底：override=currentPipeline，主进程烘焙滤镜到 data URL
+  //   - currentPipeline / needsCpuFallback 经 debouncedPipelineKey 间接依赖，避免每帧 IPC
+  // biome-ignore lint/correctness/useExhaustiveDependencies: currentPipeline/needsCpuFallback 已由 debouncedPipelineKey 代理
   useEffect(() => {
     if (!photoPath) return
     let alive = true
     setLoading(true)
-    ipc('preview:render', photoPath, ipcFilterId, undefined)
+    // CPU 兜底时传 currentPipeline 作 pipelineOverride，GPU 路径传 undefined
+    const override = needsCpuFallback ? (currentPipeline ?? undefined) : undefined
+    ipc('preview:render', photoPath, ipcFilterId, override)
       .then((url) => {
         if (alive) setPreviewUrl(url)
       })
@@ -94,7 +138,7 @@ export default function Editor() {
     return () => {
       alive = false
     }
-  }, [photoPath, ipcFilterId])
+  }, [photoPath, ipcFilterId, debouncedPipelineKey])
 
   if (!photo) {
     return (
@@ -208,6 +252,19 @@ export default function Editor() {
                 GL: {webgl.error}
               </div>
             )}
+            {/* Dev 诊断条：webgl 状态 + pipeline 通道数 + 兜底原因；仅 import.meta.env.DEV 显示 */}
+            {import.meta.env.DEV && (
+              <div className="absolute top-3 left-3 text-xxs font-mono bg-black/60 text-fg-2 px-2 py-1 rounded pointer-events-none">
+                <div>
+                  gl: {webgl.status}
+                  {webgl.error ? ` (${webgl.error.slice(0, 40)})` : ''}
+                </div>
+                <div>
+                  pipeline: {currentPipeline ? countPipelineChannels(currentPipeline) : 0} ch ·{' '}
+                  {needsCpuFallback ? 'CPU' : 'GPU'}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -314,6 +371,22 @@ export default function Editor() {
       </aside>
     </div>
   )
+}
+
+/** dev 诊断条用：统计 pipeline 里实际激活的通道数（粗略指标，不强求精确） */
+function countPipelineChannels(p: import('../../shared/types').FilterPipeline): number {
+  let n = 0
+  if (p.whiteBalance) n++
+  if (p.tone) n++
+  if (p.curves) n++
+  if (p.hsl) n++
+  if (p.colorGrading) n++
+  if (p.clarity || p.saturation || p.vibrance) n++
+  if (p.lut) n++
+  if (p.halation) n++
+  if (p.grain) n++
+  if (p.vignette) n++
+  return n
 }
 
 function TabButton({
