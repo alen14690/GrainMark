@@ -5,14 +5,28 @@
 
 ---
 
-## 🎯 六大工作原则
+## 🎯 七大工作原则
 
 1. **方案合理** — 任何结构性变更前必须先出方案或在 plan 中有对应条目
 2. **性能至上** — 性能敏感路径的改动必须附带 benchmark 对比（`npm run bench:report`，详见 `artifact/benchmarks/README.md`）
 3. **安全兜底** — 任何文件/路径/凭证/网络操作必须经过安全守卫
-4. **测试覆盖** — 核心算法 ≥ 80%，UI ≥ 80%，整体 ≥ 80%
+4. **测试价值优先（2026-04-26 修订）** — **每条测试必须对应可描述的真实 bug 模式或契约；数量不是目标**
+   - 核心算法（engine / shader / pipeline）：像素级或数学契约覆盖，每个 shader 至少一条 perceptibility（用户可感知）+ 一条 snapshot（baseline 稳定性）
+   - 状态层（store / IPC / schema）：合约 + 边界必覆盖，mock 隔离 IO
+   - 安全红线（PathGuard / imageGuard / cubeIO / logger）：威胁回归必覆盖
+   - UI / 设计 token / 简单工具函数：**不做覆盖率要求**；只测真实 edge case（NaN / Infinity / 退化区间 / 用户可见的错位）
+   - **禁止形式**：
+     * 测字符串字面值（`frag.toContain('u_image')`）——运行时编译已隐式保证
+     * 测常量值（`colors.bg[0]).toBe('#05060E')`）——改值不是 bug
+     * 白断言（`expect(x).toBeLessThanOrEqual(A).toBeGreaterThanOrEqual(B)` 而 x 只能是 A 或 B）
+     * 纯存在性断言（`expect(presets.hover).toBeTruthy()`）—— TS 类型已保证
 5. **每轮复盘** — 每个 Pass / 阶段结束输出 retrospective 文档
 6. **提交可追溯** — 每个任务完成即 `commit` + `push`；每次修改必须说明「改了什么 · 为什么改 · 是否有更优方案」
+7. **视觉 Bug 诊断 SOP（M3.5 踩坑总结）** — 遇到"UI 看起来不对"类 bug 时强制执行：
+   1. **查数据真值**：先读 photos.json / filter preset 看字段实际值
+   2. **查磁盘像素**：再用 `sharp`/`sips` 看生成的 thumb/preview 真实尺寸和方向
+   3. **查 URL/协议**：对照前端发出的 `grain://` URL 是否命中对应文件（WebContents cache）
+   4. **再改代码**：前三步都确认后再定位代码层 bug；严禁跳过前三步直接改算法
 
 ---
 

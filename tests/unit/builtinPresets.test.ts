@@ -1,40 +1,29 @@
 /**
- * 内置滤镜 preset 结构完整性测试
+ * 内置滤镜 preset · Schema 校验（唯一真防线）
+ *
+ * 其他"数量 ≥ 30 / source=builtin / popularity 在范围"属于 TS 类型或数据录入约定，
+ * Schema parse 一次性覆盖了全部字段校验 —— 不重复测。
  */
 import { describe, expect, it } from 'vitest'
 import { BUILTIN_PRESETS } from '../../electron/assets/presets/index'
 import { FilterPresetSchema } from '../../shared/ipc-schemas'
 
-describe('Builtin filter presets', () => {
-  it('has 30 presets', () => {
-    expect(BUILTIN_PRESETS.length).toBeGreaterThanOrEqual(30)
-  })
-
-  it('每款 preset 都通过 Schema 校验', () => {
+describe('builtin presets · Schema 校验', () => {
+  it('所有内置 preset 都通过 FilterPresetSchema.safeParse（杜绝脏数据）', () => {
+    const errors: string[] = []
     for (const preset of BUILTIN_PRESETS) {
       const result = FilterPresetSchema.safeParse(preset)
       if (!result.success) {
-        throw new Error(`Preset "${preset.id}" invalid: ${result.error.message}`)
+        errors.push(`"${preset.id}": ${result.error.message}`)
       }
     }
+    if (errors.length > 0) {
+      throw new Error(`${errors.length} invalid preset(s):\n${errors.join('\n')}`)
+    }
   })
 
-  it('所有 id 唯一', () => {
+  it('所有 id 唯一（重复 id 会导致 filterStore 覆盖）', () => {
     const ids = BUILTIN_PRESETS.map((p) => p.id)
-    const unique = new Set(ids)
-    expect(unique.size).toBe(ids.length)
-  })
-
-  it('所有 source 为 builtin', () => {
-    for (const p of BUILTIN_PRESETS) {
-      expect(p.source).toBe('builtin')
-    }
-  })
-
-  it('popularity 在 0..100 范围', () => {
-    for (const p of BUILTIN_PRESETS) {
-      expect(p.popularity).toBeGreaterThanOrEqual(0)
-      expect(p.popularity).toBeLessThanOrEqual(100)
-    }
+    expect(new Set(ids).size).toBe(ids.length)
   })
 })
