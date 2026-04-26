@@ -320,6 +320,24 @@ export const DialogSelectFilesSchema = z
   })
   .optional()
 
+// ============ 诊断 / 性能日志 ============
+/**
+ * 渲染进程上报到主进程的性能事件。宽松 schema —— 这是诊断通道，
+ * 不允许因为 schema 过严而把诊断数据丢掉。
+ */
+export const PerfLogEventSchema = z.object({
+  /** 事件类型：frame / user-action / marker */
+  kind: z.enum(['frame', 'user', 'marker']),
+  /** 事件名（如 'renderNow' / 'setTone' / 'setActiveFilter' / 'loadFromPreset'） */
+  name: z.string().min(1).max(64),
+  /** 毫秒级耗时（用户操作事件可省略） */
+  durationMs: z.number().nonnegative().max(60_000).optional(),
+  /** 客户端时间戳（performance.now-ish，仅用于排序） */
+  tsMs: z.number().nonnegative(),
+  /** 附加元数据（已脱敏；main 进程再脱一次） */
+  data: z.record(z.string(), z.union([z.number(), z.string(), z.boolean(), z.null()])).optional(),
+})
+
 // ============ 通道 → Schema 映射 ============
 export const IPC_SCHEMAS = {
   'filter:list': null,
@@ -365,9 +383,15 @@ export const IPC_SCHEMAS = {
   'llm:clearConfig': null,
   'llm:testConnection': null,
   'llm:listModels': null,
+  'llm:analyzePhoto': PathSchema,
 
   'dialog:selectFiles': DialogSelectFilesSchema,
   'dialog:selectDir': null,
+
+  // ============ 诊断 / 性能日志沉淀 ============
+  // 2026-04-26 新增：让渲染进程的 perf / 用户操作事件落盘到 userData/logs/perf.ndjson
+  // 单纯的数据收集通道，无副作用；不走 PathGuard（没有路径字段）
+  'perf:log': PerfLogEventSchema,
 } as const
 
 export type IpcChannelName = keyof typeof IPC_SCHEMAS

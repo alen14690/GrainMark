@@ -423,6 +423,16 @@ export interface IpcApi {
   'llm:clearConfig': () => Promise<LLMConfigPublic>
   'llm:testConnection': () => Promise<LLMTestResult>
   'llm:listModels': () => Promise<LLMModelCatalog>
+
+  /**
+   * M5-LLM-B · 让 LLM 看一张照片，输出「主体识别 + 光影建议 + 可应用的 pipeline 参数」
+   *
+   * 流程：主进程读原图 → sharp 降采样到 768px JPEG base64 → 发给 OpenRouter →
+   *      LLM 按 system prompt 返回 structured JSON → Zod 严校验 + clamp → 返回给 Editor
+   *
+   * 失败策略：任一环节失败返回 AIAnalysisResult.ok=false + 错误分类；UI 展示友好文案。
+   */
+  'llm:analyzePhoto': (photoPath: string) => Promise<AIAnalysisResult>
 }
 
 // ============ LLM 配置（M5-LLM-A） ============
@@ -504,5 +514,109 @@ export interface LLMModelCatalog {
   /** 失败分类（API 拉不通时前端要知道，用于展示"当前是兜底列表"的提示） */
   fallback?: 'no-config' | 'invalid-key' | 'network' | 'rate-limit' | 'unknown'
 }
+
+// ============ AI 照片分析（M5-LLM-B） ============
+
+/**
+ * LLM 返回的「场景/主体识别」——只用于展示给用户，不驱动任何自动处理
+ *
+ * 字段命名中性不做技术判断（"strong/soft/none"），由 UI 决定如何可视化。
+ */
+export interface AISceneAnalysis {
+  /** 一句话概括这张照片「是什么」+ 摄影意图推测；用户可视的解释 */
+  summary: string
+  /** 主体描述（"站在窗前的人像" / "雪山日落前景小树") */
+  subject: string
+  /** 次要环境描述（"逆光柔雾背景" / "杂乱绿植"），用于说明什么该被弱化 */
+  environment: string
+  /**
+   * 这张照片当前「缺什么」的诊断清单（2~6 条）——每条是可读中文，用户能看懂
+   * 例：["主体面部偏暗，建议提亮阴影"、"背景过亮抢戏，建议压暗高光"]
+   */
+  diagnosis: string[]
+}
+
+/**
+ * LLM 建议的参数调整——所有字段可选（AI 判断无需调就不返回）
+ *
+ * **硬约束**（在主进程 clamp，不信任 LLM 输出）：
+ *   - tone.*：±40 上限
+ *   - whiteBalance.*：±30 上限
+ *   - clarity / saturation / vibrance：±40 上限
+ *   - colorGrading.hue：0~360，s/l：±40
+ *
+ * 这是「全局参数」版本，不含局部 mask（M5-LLM-C 再加）。
+ */
+export interface AISuggestedAdjustments {
+  tone?: {
+    exposure?: number
+    contrast?: number
+    highlights?: number
+    shadows?: number
+    whites?: number
+    blacks?: number
+  }
+  whiteBalance?: {
+    temp?: number
+    tint?: number
+  }
+  clarity?: number
+  saturation?: number
+  vibrance?: number
+  /** 可选：调色分离（shadows/highlights 色相） */
+  colorGrading?: {
+    shadows?: { h?: number; s?: number; l?: number }
+    highlights?: { h?: number; s?: number; l?: number }
+    blending?: number
+  }
+  /** LLM 对每项调整的一句话理由（用于 UI 展示「为什么这么改」），key 与上面字段对应 */
+  reasons?: Partial<{
+    exposure: string
+    contrast: string
+    highlights: string
+    shadows: string
+    whites: string
+    blacks: string
+    temp: string
+    tint: string
+    clarity: string
+    saturation: string
+    vibrance: string
+    colorGrading: string
+  }>
+}
+
+/** 分析结果 · 成功 */
+export interface AIAnalysisSuccess {
+  ok: true
+  analysis: AISceneAnalysis
+  adjustments: AISuggestedAdjustments
+  /** 诊断元数据（可展示给用户）：用了哪个模型 + 总耗时 + token 估算 */
+  meta: {
+    model: string
+    latencyMs: number
+    /** LLM 返回的用量（若有），单位 token */
+    promptTokens?: number
+    completionTokens?: number
+  }
+}
+
+/** 分析结果 · 失败 */
+export interface AIAnalysisFailure {
+  ok: false
+  errorKind:
+    | 'no-config' // 没配 apiKey
+    | 'not-opted-in' // 没勾选 opt-in 上传同意
+    | 'image-prep-failed' // 原图读取/压缩失败
+    | 'invalid-key' // apiKey 被拒
+    | 'rate-limit' // 速率限制
+    | 'network' // 网络错误
+    | 'timeout' // 超时（30s）
+    | 'invalid-response' // LLM 返回非法 JSON / schema 不通过
+    | 'unknown'
+  message: string
+}
+
+export type AIAnalysisResult = AIAnalysisSuccess | AIAnalysisFailure
 
 export type IpcChannel = keyof IpcApi
