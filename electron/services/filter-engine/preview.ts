@@ -5,7 +5,7 @@
  * 不再承担 CPU 滤镜烘焙——CPU 兜底路径已从产品中移除（详见下面的「架构决策」）。
  *
  * RAW 支持：对 RAW 文件先走 resolvePreviewBuffer 抽取内嵌 JPEG。UI 完全透明。
- * Orientation 修正：RAW 用 sourceOrientation 显式 rotate；非 RAW 走 .rotate() 自动。
+ * Orientation 修正：统一用 sharp.rotate() 无参数模式（读 buffer 内的 EXIF 自动转正）。
  *
  * 返回形式：
  *   - 小图（≤ 阈值）→ `data:image/jpeg;base64,...`
@@ -26,7 +26,7 @@ import path from 'node:path'
 import sharp from 'sharp'
 import type { FilterPipeline } from '../../../shared/types.js'
 import { logger } from '../logger/logger.js'
-import { orientationToRotationDegrees, resolvePreviewBuffer } from '../raw/index.js'
+import { resolvePreviewBuffer } from '../raw/index.js'
 import { getPhotosTable, getPreviewCacheDir } from '../storage/init.js'
 
 const PREVIEW_MAX_DIM = 1600
@@ -62,19 +62,19 @@ export async function renderPreview(
     // storage 未初始化 — 走旧路径让 resolvePreviewBuffer 自己 readExif
   }
 
-  const { buffer, sourceOrientation } = await resolvePreviewBuffer(photoPath, knownOrientation)
-  const rotationDeg = sourceOrientation !== undefined ? orientationToRotationDegrees(sourceOrientation) : null
+  const { buffer } = await resolvePreviewBuffer(photoPath, knownOrientation)
 
   // 用 sharp 完成旋转 + resize，输出 JPEG；不做任何滤镜（全部交 GPU）
-  // 关键：rotate(deg) 显式模式不会移除 EXIF orientation tag，
-  //   而渲染端 createImageBitmap 若用 'from-image' 会二次旋转导致倒挂。
-  //   解法双保险：(1) 渲染端用 'none'；(2) 这里 withMetadata({ orientation: 1 }) 强制置正。
-  let base = sharp(buffer, { failOn: 'none' })
-  if (rotationDeg !== null && rotationDeg !== 0) {
-    base = base.rotate(rotationDeg)
-  } else {
-    base = base.rotate() // 非 RAW：读 buffer 自带 EXIF 自动转正
-  }
+  //
+  // orientation 处理策略（2026-04-27 二次修复）：
+  //   - RAW 的 sourceOrientation 来自 RAW 文件头 EXIF，描述的是**传感器数据**的方向
+  //   - 但 extractEmbeddedJpeg 提取的内嵌 JPEG 通常已经被相机固件物理旋转过了（Sony ARW 尤甚）
+  //   - 如果再对内嵌 JPEG 做 rotate(270) 就变成二次旋转 → 照片倒挂
+  //   - 正确做法：**统一用 sharp.rotate() 无参数模式**，让 sharp 自己读 buffer 内的 EXIF
+  //     - 如果内嵌 JPEG 带 EXIF orientation tag → sharp 读到并物理旋转 + 移除 tag
+  //     - 如果内嵌 JPEG 已经是正向（orientation=1 或无 tag）→ sharp 不做任何旋转
+  //   - 这种方式对 RAW 和非 RAW 都安全、统一
+  const base = sharp(buffer, { failOn: 'none' }).rotate()
   const outBuffer = await base
     .resize({
       width: PREVIEW_MAX_DIM,
@@ -82,7 +82,7 @@ export async function renderPreview(
       fit: 'inside',
       withoutEnlargement: true,
     })
-    .withMetadata({ orientation: 1 }) // 强制 EXIF orientation=1（正），防二次旋转
+    .withMetadata({ orientation: 1 }) // 强制 EXIF orientation=1（正），防任何下游二次旋转
     .jpeg({ quality: 85 })
     .toBuffer()
 

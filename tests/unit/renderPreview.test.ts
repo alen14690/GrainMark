@@ -136,10 +136,15 @@ describe('renderPreview 输出形态', () => {
     expect(url1).toMatch(/^grain:\/\/preview-tmp\//)
   })
 
-  it('RAW 含 sourceOrientation=6 → 输出已旋正，高度方向正确', async () => {
-    // 本用例：也调回默认阈值，确保小旋转图走 data URL 好解析
+  it('RAW sourceOrientation 不再用于显式旋转 · 防 Sony ARW 倒挂（2026-04-27 修正）', async () => {
+    // 2026-04-27 架构修正：preview.ts 不再用 RAW 文件头的 sourceOrientation 显式旋转。
+    // 改为统一 sharp.rotate() 无参数（读 buffer 内 EXIF tag 自动处理）。
+    //
+    // 根因：Sony ARW 的内嵌 JPEG 已被固件物理旋转过，再根据 RAW 文件头做 rotate(90°/270°)
+    // 会导致"双重旋转 = 照片 180° 倒挂"——用户截图已实锤此 bug。
+    //
+    // 本 mock buffer 由 sharp raw 模式生成（无 EXIF tag），新契约：不旋转 → 保持原尺寸。
     process.env.GRAINMARK_PREVIEW_DATAURL_MAX = String(2 * 1024 * 1024)
-    // 构造"传感器横着但 orientation=6"的小 RAW 缓冲：900×600 彩色渐变
     const hPixels = new Uint8Array(900 * 600 * 3)
     for (let i = 0; i < hPixels.length; i += 3) {
       hPixels[i] = (i / (900 * 600 * 3)) * 255
@@ -155,13 +160,12 @@ describe('renderPreview 输出形态', () => {
     hoisted.resolveSpy.mockResolvedValue({
       buffer: rawLikeJpeg,
       source: 'raw-extracted',
-      sourceOrientation: 6, // 需顺时针 90°
+      sourceOrientation: 6, // RAW 文件头说要旋转，但 preview.ts 不再使用
     })
 
     const { renderPreview } = await import('../../electron/services/filter-engine/preview')
     const url = await renderPreview('/fake/raw.nef', null)
 
-    // 解析 URL → 读实际像素，校验已旋转（high > wide）
     let imgBuffer: Buffer
     if (url.startsWith('data:image/jpeg;base64,')) {
       imgBuffer = Buffer.from(url.slice('data:image/jpeg;base64,'.length), 'base64')
@@ -170,10 +174,11 @@ describe('renderPreview 输出形态', () => {
       imgBuffer = fs.readFileSync(path.join(tmpRoot, 'preview-cache', fileName))
     }
     const meta = await sharp(imgBuffer).metadata()
-    // 原 900×600（横），旋转 90° 后应为 600×900（竖）
-    // 经 PREVIEW_MAX_DIM=1600 resize/inside 不放大 → 仍应是 600×900
-    expect(meta.width).toBe(600)
-    expect(meta.height).toBe(900)
+    // 新契约：mock buffer 无 EXIF tag → sharp.rotate() 不旋转 → 保持 900×600
+    expect(meta.width).toBe(900)
+    expect(meta.height).toBe(600)
+    // EXIF orientation 必须被 withMetadata 强制置为 1
+    expect(meta.orientation).toBe(1)
   })
 
   it('GPU-only 契约：pipelineOverride 被忽略（不再烘焙 CPU pipeline）', async () => {
