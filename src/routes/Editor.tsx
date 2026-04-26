@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AdjustmentsPanel } from '../components/AdjustmentsPanel'
 import { Histogram, ScoreBar, ValueBadge, cn } from '../design'
+import { type FilterGroup, groupAndSortFilters } from '../lib/filterOrder'
 import { ipc } from '../lib/ipc'
 import { useWebGLPreview } from '../lib/useWebGLPreview'
 import { useAppStore } from '../stores/appStore'
@@ -34,6 +35,14 @@ export default function Editor() {
   const [rightTab, setRightTab] = useState<RightPanelTab>('filters')
 
   const activeFilter = filters.find((f) => f.id === activeFilterId)
+
+  /**
+   * 滤镜分组：
+   *   1) 我的参考作品（extracted）  2) 我导入的滤镜（imported）  3) 社区与内置（community + builtin）
+   * 每组内按 category 二级分组 → 同 category 按 popularity / updatedAt 降序。
+   * 详见 src/lib/filterOrder.ts
+   */
+  const filterGroups = useMemo<FilterGroup[]>(() => groupAndSortFilters(filters), [filters])
 
   // ---- editStore 与 activeFilter 同步 ----
   const currentPipeline = useEditStore((s) => s.currentPipeline)
@@ -241,18 +250,51 @@ export default function Editor() {
         {/* 内容 */}
         <div className="flex-1 overflow-y-auto">
           {rightTab === 'filters' ? (
-            <div className="p-3 space-y-1.5">
+            <div className="p-3 space-y-3">
+              {/* 原图 —— 永远在最顶部，与分组解耦 */}
               <FilterRow name="原图" active={!activeFilterId} onClick={() => setActiveFilter(null)} />
-              {filters.map((f) => (
-                <FilterRow
-                  key={f.id}
-                  name={f.name}
-                  popularity={f.popularity}
-                  tags={f.tags}
-                  active={f.id === activeFilterId}
-                  onClick={() => setActiveFilter(f.id)}
-                />
-              ))}
+
+              {/* 三层分组（extracted → imported → community），空组隐藏 */}
+              {filterGroups
+                .filter((g) => g.total > 0)
+                .map((g) => (
+                  <section key={g.meta.key} className="space-y-1.5">
+                    {/* 组标题 */}
+                    <header className="flex items-baseline gap-2 px-1 pt-1">
+                      <span className="text-xxs uppercase tracking-[0.16em] font-mono text-fg-2">
+                        {g.meta.title}
+                      </span>
+                      <span className="text-xxs font-numeric text-fg-4">{g.total}</span>
+                      <span className="text-xxs text-fg-4 truncate hidden xl:inline">
+                        · {g.meta.subtitle}
+                      </span>
+                    </header>
+
+                    {/* 二级 category 分组 */}
+                    {g.subgroups.map((sub) => (
+                      <div key={`${g.meta.key}:${sub.category}`} className="space-y-1.5">
+                        {/* category 小标签（同组多 category 时才显示，单一时省略减少噪音） */}
+                        {g.subgroups.length > 1 && (
+                          <div className="px-1">
+                            <span className="inline-block px-1.5 py-0.5 rounded bg-white/[0.04] text-xxs font-mono text-fg-3 tracking-wide">
+                              {sub.label}
+                            </span>
+                          </div>
+                        )}
+                        {sub.filters.map((f) => (
+                          <FilterRow
+                            key={f.id}
+                            name={f.name}
+                            popularity={f.popularity}
+                            tags={f.tags}
+                            active={f.id === activeFilterId}
+                            onClick={() => setActiveFilter(f.id)}
+                          />
+                        ))}
+                      </div>
+                    ))}
+                  </section>
+                ))}
             </div>
           ) : (
             <AdjustmentsPanel />
