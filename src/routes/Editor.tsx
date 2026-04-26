@@ -110,6 +110,63 @@ export default function Editor() {
     commitHistory('重置到滤镜预设')
   }
 
+  /**
+   * 保存当前 pipeline 为"我的滤镜"（M4.4）
+   *
+   * 流程：
+   *   1. 若 currentPipeline 为空 / 与 baseline 完全一致 → 给出提示不保存
+   *   2. window.prompt 让用户输入名称（默认"我的滤镜 YYYY-MM-DD HH:mm"）
+   *   3. 生成 id = user-<timestamp>-<random>，source='imported'，category='custom'
+   *   4. IPC filter:save → refreshFilters → setActiveFilter(newId) 立刻切过去
+   *   5. filterOrder 会把它归到"我导入的滤镜"组并显示在 Editor 右栏顶部
+   */
+  const refreshFilters = useAppStore((s) => s.refreshFilters)
+  const handleSavePreset = async () => {
+    if (!currentPipeline || !hasDirtyEdits(currentPipeline, baselinePipeline ?? {})) {
+      // 与基准完全一致没必要保存（用户通常想保存"修改过的参数组合"）
+      window.alert('当前参数与起点完全一致，无需保存')
+      return
+    }
+    const defaultName = `我的滤镜 ${new Date().toLocaleString('zh-CN', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    })}`
+    const name = window.prompt('为这个滤镜命名：', defaultName)
+    if (!name) return // 用户取消
+    const trimmed = name.trim().slice(0, 128)
+    if (!trimmed) return
+
+    const now = Date.now()
+    // id 满足 FilterIdSchema 正则 ^[a-zA-Z0-9_\-:.]+$
+    const id = `user-${now}-${Math.random().toString(36).slice(2, 8)}`
+    const preset = {
+      id,
+      name: trimmed,
+      category: 'custom' as const,
+      author: 'user',
+      version: '1.0',
+      popularity: 0,
+      source: 'imported' as const,
+      description: `从照片 ${photo?.name ?? ''} 的当前调整保存`,
+      tags: ['my'],
+      pipeline: JSON.parse(JSON.stringify(currentPipeline)) as typeof currentPipeline,
+      createdAt: now,
+      updatedAt: now,
+    }
+    try {
+      await ipc('filter:save', preset)
+      await refreshFilters()
+      setActiveFilter(id)
+      // 新滤镜作为新 baseline，历史也重置（切换滤镜的标准行为由 loadFromPreset 承担）
+    } catch (err) {
+      console.error('[filter:save]', err)
+      window.alert(`保存失败：${(err as Error).message}`)
+    }
+  }
+
   // ---- WebGL 预览：按 showOriginal 短路 pipeline ----
   const renderPipeline = showOriginal ? null : currentPipeline
   const webgl = useWebGLPreview(previewUrl, renderPipeline)
@@ -242,7 +299,13 @@ export default function Editor() {
             </button>
           )}
           <div className="divider-metal-v mx-1" />
-          <button type="button" className="btn-secondary btn-xs">
+          <button
+            type="button"
+            onClick={handleSavePreset}
+            disabled={!dirty}
+            className={cn('btn-secondary btn-xs', !dirty && 'opacity-40 cursor-not-allowed')}
+            title={dirty ? '把当前调整保存为"我的滤镜"' : '当前参数与起点一致，无需保存'}
+          >
             <Save className="w-3.5 h-3.5" />
             保存预设
           </button>
