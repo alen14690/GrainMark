@@ -20,7 +20,6 @@ import {
   applyGrainCpu,
   applyHalationCpu,
   applyHslFullCpu,
-  applyHslSimpleCpu,
   applyLut3dCpu,
   applySaturationCpu,
   applyToneCpu,
@@ -137,12 +136,6 @@ describe('shader snapshots · 10 shader × 100×100', () => {
     // red h+50 s+80：标准输入第 0 带是灰度，satGate 应让该带几乎不变
     const out = applyHslFullCpu(src, W, H, { red: { h: 50, s: 80, l: 0 } })
     expectMatchBaseline(toPNG(out, W, H), 'hsl-full-satgate-red.png')
-  })
-
-  it('hsl · simple（deprecated wrapper）仍与 full 等价（迁移期契约）', () => {
-    // applyHslSimpleCpu 是 applyHslFullCpu 的薄包装，应产出与直接调 full 等价的结果
-    const out = applyHslSimpleCpu(src, W, H, 'red', 0, -50, 0)
-    expectMatchBaseline(toPNG(out, W, H), 'hsl-red-desat50.png')
   })
 
   it('grain · amount 30 size 2（seed 42 固定）', () => {

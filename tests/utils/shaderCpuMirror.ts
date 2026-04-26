@@ -275,7 +275,13 @@ export function applyWhiteBalanceCpu(src: RGBA, w: number, h: number, p: WBParam
   return out
 }
 
-/** saturation 简化版（整体饱和度乘子，围绕 luma） */
+/**
+ * saturation 单通道 CPU 镜像（围绕 luma 的线性饱和度，与 GPU
+ * ADJUSTMENTS_FRAG 的 saturation 分支等价）。
+ *
+ * GPU 数学：mix(vec3(gray), c, 1 + u_saturation) = gray + (c - gray) * (1 + s)
+ * CPU 实现：逐通道 L + (ch - L) * (1 + s)
+ */
 export function applySaturationCpu(src: RGBA, w: number, h: number, amount: number): RGBA {
   const out = createCanvas(w, h)
   const s = 1 + amount / 100
@@ -292,26 +298,17 @@ export function applySaturationCpu(src: RGBA, w: number, h: number, amount: numb
   return out
 }
 
-/** vibrance 低饱和加权 saturation */
+/**
+ * vibrance 单通道 CPU 镜像。
+ *
+ * **M4.5 前置整改**：原实现用 `weight = 1 - curSat` 线性权重，
+ *   与 GPU `factor = u_vibrance * (1 - smoothstep(0.1, 0.6, curSat))` 有约 8% 偏差。
+ *   新实现复用 applyAdjustmentsPass，保证与 GPU ADJUSTMENTS_FRAG 严格等价。
+ *
+ * 如需单独测 vibrance，优先走此函数（内部 delegate 到 adjustments pass）。
+ */
 export function applyVibranceCpu(src: RGBA, w: number, h: number, amount: number): RGBA {
-  const out = createCanvas(w, h)
-  const v = amount / 100
-  for (let i = 0; i < src.length; i += 4) {
-    const r = src[i]! / 255
-    const g = src[i + 1]! / 255
-    const b = src[i + 2]! / 255
-    const L = luma(r, g, b)
-    const maxC = Math.max(r, g, b)
-    const minC = Math.min(r, g, b)
-    const curSat = maxC - minC
-    const weight = 1 - curSat // 越低饱和权重越大
-    const s = 1 + v * weight
-    out[i] = Math.round(clamp01(L + (r - L) * s) * 255)
-    out[i + 1] = Math.round(clamp01(L + (g - L) * s) * 255)
-    out[i + 2] = Math.round(clamp01(L + (b - L) * s) * 255)
-    out[i + 3] = src[i + 3]!
-  }
-  return out
+  return applyAdjustmentsPass(src, w, h, { vibrance: amount })
 }
 
 /** clarity 简化：中频增强 近似 = (1+c)*src - c*blurred，blurred 用 3x3 box */
@@ -825,27 +822,6 @@ function clamp01Signed(v: number): number {
 function smoothstep(edge0: number, edge1: number, x: number): number {
   const t = clamp01((x - edge0) / (edge1 - edge0))
   return t * t * (3 - 2 * t)
-}
-
-/**
- * @deprecated 过渡期保留：只支持 red/green/blue 三通道的简化版。
- *   新代码请用 applyHslFullCpu。老 snapshot 测试仍引用；将在下一轮清理
- */
-export function applyHslSimpleCpu(
-  src: RGBA,
-  w: number,
-  h: number,
-  channel: 'red' | 'green' | 'blue',
-  hShift: number,
-  sMul: number,
-  lMul: number,
-): RGBA {
-  // 映射到 applyHslFullCpu：只修对应通道
-  const params: HSLParams = {}
-  if (channel === 'red') params.red = { h: hShift, s: sMul, l: lMul }
-  else if (channel === 'green') params.green = { h: hShift, s: sMul, l: lMul }
-  else params.blue = { h: hShift, s: sMul, l: lMul }
-  return applyHslFullCpu(src, w, h, params)
 }
 
 // ========== Baseline IO ==========
