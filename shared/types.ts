@@ -367,6 +367,11 @@ export interface IpcApi {
   'photo:list': () => Promise<Photo[]>
   'photo:readExif': (path: string) => Promise<PhotoExif>
   'photo:thumb': (path: string, size: number) => Promise<string>
+  /**
+   * 仅移除导入记录（`photos.json` + 孤儿 thumb 文件），**不会删除硬盘上的原图**。
+   * @returns { removed: 实际被删的记录数; orphanedThumbs: 顺带清理的缩略图数 }
+   */
+  'photo:remove': (ids: string[]) => Promise<{ removed: number; orphanedThumbs: number }>
 
   // 预览
   'preview:render': (

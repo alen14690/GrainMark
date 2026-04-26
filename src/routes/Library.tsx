@@ -3,7 +3,7 @@
  *
  * 卤化银风格：EXIF 徽章统计 + PhotoCard（含胶片齿孔装饰）
  */
-import { ImageIcon, Upload } from 'lucide-react'
+import { ImageIcon, Trash2, Upload } from 'lucide-react'
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { EmptyState, PhotoCard, ValueBadge } from '../design'
@@ -16,6 +16,7 @@ export default function Library() {
   const selected = useAppStore((s) => s.selectedPhotoIds)
   const toggleSelect = useAppStore((s) => s.toggleSelectPhoto)
   const importPhotos = useAppStore((s) => s.importPhotos)
+  const removePhotos = useAppStore((s) => s.removePhotos)
   const navigate = useNavigate()
 
   const stats = useMemo(
@@ -30,6 +31,21 @@ export default function Library() {
   const handleImport = async () => {
     const paths = await ipc('dialog:selectFiles', { multi: true })
     if (paths.length > 0) await importPhotos(paths)
+  }
+
+  /**
+   * 仅从图库移除导入记录（**不会删除硬盘上的原图文件**）。
+   * 二次确认后调用 `removePhotos(selected)`，主进程只删 photos.json 记录 +
+   * userData/thumbs 下的孤儿缩略图。
+   */
+  const handleRemoveSelected = async () => {
+    if (selected.length === 0) return
+    const msg =
+      selected.length === 1
+        ? '从图库移除此照片的导入记录？\n\n（不会删除硬盘上的原图文件）'
+        : `从图库移除 ${selected.length} 张照片的导入记录？\n\n（不会删除硬盘上的原图文件）`
+    if (!window.confirm(msg)) return
+    await removePhotos(selected)
   }
 
   if (photos.length === 0) {
@@ -62,6 +78,24 @@ export default function Library() {
         <ValueBadge label="STARRED" value={stats.starred} />
         <ValueBadge label="CAMERAS" value={stats.cameras} />
         {selected.length > 0 && <ValueBadge label="SELECTED" value={selected.length} variant="amber" />}
+
+        {/* 选中态下出现移除按钮；强调"仅记录"避免误操作 */}
+        {selected.length > 0 && (
+          <button
+            type="button"
+            onClick={handleRemoveSelected}
+            title="从图库移除选中照片的导入记录；不会删除硬盘上的原文件"
+            className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md
+              text-xs font-medium
+              bg-white/[0.04] hover:bg-red-500/15
+              border border-white/10 hover:border-red-400/50
+              text-fg-2 hover:text-red-300
+              transition-all duration-fast ease-liquid"
+          >
+            <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />
+            <span>移除 {selected.length} 张（仅记录）</span>
+          </button>
+        )}
       </div>
 
       {/* Grid */}

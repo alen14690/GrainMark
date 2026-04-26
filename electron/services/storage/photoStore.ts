@@ -6,7 +6,7 @@ import { readExif } from '../exif/reader.js'
 import { detectDisplayDimensions, makeThumbnail } from '../filter-engine/thumbnail.js'
 import { logger } from '../logger/logger.js'
 import { validateImageDimensions, validateImageFile } from '../security/imageGuard.js'
-import { getPhotosTable } from './init.js'
+import { getPhotosTable, getThumbsDir } from './init.js'
 
 /**
  * 尺寸校对算法当前版本号。
@@ -235,6 +235,75 @@ export async function repairPhotoRecord(photo: Photo): Promise<Photo> {
   }
 
   return changed ? next : photo
+}
+
+/**
+ * 移除导入记录（**仅删 JsonTable + 受控目录下的孤儿 thumb**，绝不碰硬盘原图文件）。
+ *
+ * 安全要点：
+ *   - 只删 photos.json 里的记录
+ *   - 若 thumbPath 位于 userData/thumbs/ 下且没有其他 photo 仍在引用，才物理删除 thumb 文件
+ *   - thumbPath 若不在 userData/thumbs/（极端场景：老数据手动编辑过 JSON 指到外部路径），一概跳过不删
+ *   - **绝不 rm photo.path**（原始照片，硬盘上的实体文件）
+ *
+ * 返回：{ removed: 成功删除的记录数, orphanedThumbs: 顺带清理的 thumb 文件数 }
+ */
+export function removePhotoRecords(ids: string[]): { removed: number; orphanedThumbs: number } {
+  if (ids.length === 0) return { removed: 0, orphanedThumbs: 0 }
+  const table = getPhotosTable()
+
+  // Step 1: 找出待删记录 + 其引用的 thumbPath
+  const idSet = new Set(ids)
+  const toRemove = table.all().filter((p) => idSet.has(p.id))
+  if (toRemove.length === 0) return { removed: 0, orphanedThumbs: 0 }
+
+  // Step 2: 删记录
+  for (const p of toRemove) {
+    table.delete(p.id)
+  }
+
+  // Step 3: 计算哪些 thumb 成了孤儿（所有引用该 thumbPath 的 photo 都被删了）
+  //         仅在 thumb 位于 userData/thumbs/ 下时才尝试 unlink
+  const thumbsDir = path.resolve(getThumbsDir())
+  const stillReferenced = new Set(
+    table
+      .all()
+      .map((p) => p.thumbPath)
+      .filter((v): v is string => typeof v === 'string' && v.length > 0),
+  )
+  let orphanedThumbs = 0
+  for (const p of toRemove) {
+    if (!p.thumbPath) continue
+    if (stillReferenced.has(p.thumbPath)) continue // 还有其他 photo 在引用
+    try {
+      // 安全：用 path.resolve 消除 ../ 后再判断是否处于 thumbsDir 之内
+      const resolved = path.resolve(p.thumbPath)
+      if (!resolved.startsWith(`${thumbsDir}${path.sep}`) && resolved !== thumbsDir) {
+        // 不在受控目录 → 跳过（防止误删用户其它目录的文件）
+        logger.warn('photo.remove.thumb.skip.out-of-dir', {
+          id: p.id,
+          thumbPath: p.thumbPath,
+        })
+        continue
+      }
+      if (fs.existsSync(resolved)) {
+        fs.unlinkSync(resolved)
+        orphanedThumbs++
+      }
+    } catch (err) {
+      logger.warn('photo.remove.thumb.cleanup.failed', {
+        id: p.id,
+        err: (err as Error).message,
+      })
+    }
+  }
+
+  logger.info('photo.remove.batch.done', {
+    requested: ids.length,
+    removed: toRemove.length,
+    orphanedThumbs,
+  })
+  return { removed: toRemove.length, orphanedThumbs }
 }
 
 /**

@@ -130,6 +130,9 @@ export const PhotoImportSchema = z.object({
   paths: z.array(PathSchema).min(1).max(10_000),
 })
 
+/** 仅删 photos.json 的导入记录（以及孤儿缩略图），不会触及硬盘原文件 */
+export const PhotoRemoveSchema = z.array(z.string().min(1).max(64)).min(1).max(1000)
+
 // ============ 预览 ============
 export const PreviewRenderSchema = z.object({
   photoPath: PathSchema,
@@ -270,6 +273,7 @@ export const IPC_SCHEMAS = {
   'photo:list': null,
   'photo:readExif': PathSchema,
   'photo:thumb': z.tuple([PathSchema, z.number().int().min(64).max(4096)]),
+  'photo:remove': PhotoRemoveSchema,
 
   'preview:render': z.tuple([PathSchema, FilterIdSchema.nullable(), FilterPipelineSchema.optional()]),
 
