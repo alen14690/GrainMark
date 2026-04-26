@@ -97,7 +97,8 @@ GrainMark/
 | **M2** | ✅ 完成 | **完整 Pipeline 执行器 + 实时预览 + editStore + 手动调整面板 + 实时 GPU 直方图** |
 | **M3-a** | ✅ 完成 | **批处理 Worker Pool**（worker_threads + sharp · 6 通道保真 · 进度事件 · cancel · 命名模板 · EXIF 保留 · 5 种格式） |
 | **M3-b** | ✅ 完成 | **GPU 批处理**（隐藏 BrowserWindow · WebGL 2 引擎复用 · 10 通道全覆盖 · 自动分流 CPU/GPU 路径） |
-| **M4** | 待办 | 编辑器 UI（历史栈 / 撤销重做 / 前后对比） |
+| **M3.5** | ✅ 完成 | **补丁期**（RAW 方向 / 缩略图算法版本号 / Editor CPU 兜底 pipeline / 图库移除记录 / 滤镜三级分组 / Lightroom 滑块对齐 / bench 基建） |
+| **M4** | 待办 | 编辑器 UI（历史栈 / 撤销重做 / 前后对比 / 保存为我的滤镜） |
 | **M5** | 待办 | 参考图 L2 提取 + .cube 烘焙 |
 | **M6** | 待办 | 水印 Sharp 渲染实装 |
 | **M7** | 待办 | ONNX Runtime 接入 + 5 种本地 AI 模型 |
@@ -133,10 +134,10 @@ WB → Tone → Curves → HSL → ColorGrading → Adjustments(clarity/sat/vib)
 
 | 指标 | 当前 | 红线 |
 |---|---|---|
-| 单元测试 | **407 / 407 通过**（31 文件，含 14 个像素级 snapshot） | ≥ 基线无回归 |
+| 单元测试 | **446 / 446 通过**（34 文件，含 14 个像素级 snapshot + 17 个 Slider 映射契约） | ≥ 基线无回归 |
 | 集成测试 | **6 / 6 通过**（Playwright + Electron · CPU 路径 5 + GPU 路径 1） | ≥ 基线无回归 |
 | tsc --noEmit | **0 错误** | 0 |
-| biome check | **0 警告**（150 文件） | 0 |
+| biome check | **0 警告**（161 文件） | 0 |
 | 打包体积 | renderer main 268KB + batch-gpu 1.5KB + webgl chunk 42KB · main.js 157KB · batch-worker.mjs 1.6KB · preload 0.55KB | dmg/exe ≤ 300MB |
 | WebGL 预览性能 | M-series Mac 24MP Nms（UI 实时显示） | ≤ 8ms/frame |
 | 实时直方图 | readPixels + 120ms debounce，不阻塞滑块（stride=4 下 1600×1067 preview ≈ 1.07ms，bench 实测）| 滑块 ≥ 60fps |

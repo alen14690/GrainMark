@@ -14,6 +14,7 @@
 | `M2-retrospective.md` | editStore + 直方图 + AdjustmentsPanel | `dee0e96` |
 | `M3-a-retrospective.md` | 批处理 Worker Pool（CPU 6 通道 + 像素级 snapshot + 集成测试基建） | `ad508d3` + `e441a24` + `e1251b1` |
 | `M3-b-retrospective.md` | GPU 批处理（隐藏 BrowserWindow + 10 通道全覆盖） | `a411c12` |
+| `M3.5-retrospective.md` | 补丁期（RAW 方向 / 缩略图 / Editor CPU 兜底 / 图库移除 / 滤镜分组 / Lightroom 滑块 · bench 基建）| `fcd469c` + `bcee39a` + `9434087` + `49a2ccd` + `2172558` + `9220334` + `37f5c98` + `4b9e797` |
 
 ---
 
