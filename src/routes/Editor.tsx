@@ -182,12 +182,16 @@ export default function Editor() {
 
   // 拉取 previewUrl：只依赖 photoPath。filterId / pipelineOverride 永远传 null/undefined，
   // preview:render 主进程只做 "取原图 + resize + encode"，所有滤镜/滑块实时 GPU 渲染
+  //
+  // 关键：schema 是 z.tuple([path, filterId, pipelineOverride?]) —— 必须传 3 个参数
+  //   即使第 3 个是 undefined 也要显式传，否则 args.length=2 会被 Zod 拒绝
+  //   （Array must contain at least 3 element(s)）
   useEffect(() => {
     if (!photoPath) return
     let alive = true
     setLoading(true)
     setPreviewError(null)
-    ipc('preview:render', photoPath, null)
+    ipc('preview:render', photoPath, null, undefined)
       .then((url) => {
         if (alive) {
           setPreviewUrl(url)

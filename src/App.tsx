@@ -32,40 +32,51 @@ export default function App() {
   useGlobalHotkeys()
 
   return (
-    <div className="flex h-screen bg-bg-0 text-fg-1 overflow-hidden relative isolate">
+    <div className="flex flex-col h-screen bg-bg-0 text-fg-1 overflow-hidden relative isolate">
       {/* Aurora 极光底层（60s 漂移） */}
       <AuroraBackdrop />
       {/* 极淡颗粒（保留胶片灵魂，Q3-A） */}
       <GrainOverlay opacity={0.02} />
 
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0 relative z-10">
-        <TopBar />
-        <main className="flex-1 overflow-auto relative">
-          {loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-bg-0/60 backdrop-blur-sm z-40">
-              <div className="text-fg-2 text-sm font-mono animate-pulse">Loading…</div>
-            </div>
-          )}
-          {error && (
-            <div className="m-6 card p-4 border-sem-error/40 bg-sem-error/10 text-sem-error text-sm">
-              ⚠ {error}
-            </div>
-          )}
-          <Routes>
-            <Route path="/" element={<Navigate to="/library" replace />} />
-            <Route path="/library" element={<Library />} />
-            <Route path="/editor/:photoId?" element={<Editor />} />
-            <Route path="/batch" element={<Batch />} />
-            <Route path="/filters" element={<Filters />} />
-            <Route path="/extract" element={<Extract />} />
-            <Route path="/taste" element={<TasteLab />} />
-            <Route path="/watermark" element={<Watermark />} />
-            <Route path="/ai" element={<AIStudio />} />
-            <Route path="/trending" element={<Trending />} />
-            <Route path="/settings" element={<Settings />} />
-          </Routes>
-        </main>
+      {/*
+        macOS 标题栏安全区（2026-04-26 新增）
+        - titleBarStyle='hiddenInset' 下系统的红黄绿交通灯固定在 (16,16) 附近
+        - 若业务 UI 从 y=0 布局会和交通灯重叠
+        - 这条 30px 高的条带负责：(1) 避开交通灯区；(2) 提供 app 级别的可拖动区
+        - 只在 macOS 渲染；其它平台由 CSS `:is([data-platform="darwin"])` 控制
+      */}
+      <div className="mac-titlebar drag-region shrink-0 relative z-20" aria-hidden />
+
+      <div className="flex flex-1 min-h-0 relative">
+        <Sidebar />
+        <div className="flex-1 flex flex-col min-w-0 relative z-10">
+          <TopBar />
+          <main className="flex-1 overflow-auto relative">
+            {loading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-bg-0/60 backdrop-blur-sm z-40">
+                <div className="text-fg-2 text-sm font-mono animate-pulse">Loading…</div>
+              </div>
+            )}
+            {error && (
+              <div className="m-6 card p-4 border-sem-error/40 bg-sem-error/10 text-sem-error text-sm">
+                ⚠ {error}
+              </div>
+            )}
+            <Routes>
+              <Route path="/" element={<Navigate to="/library" replace />} />
+              <Route path="/library" element={<Library />} />
+              <Route path="/editor/:photoId?" element={<Editor />} />
+              <Route path="/batch" element={<Batch />} />
+              <Route path="/filters" element={<Filters />} />
+              <Route path="/extract" element={<Extract />} />
+              <Route path="/taste" element={<TasteLab />} />
+              <Route path="/watermark" element={<Watermark />} />
+              <Route path="/ai" element={<AIStudio />} />
+              <Route path="/trending" element={<Trending />} />
+              <Route path="/settings" element={<Settings />} />
+            </Routes>
+          </main>
+        </div>
       </div>
     </div>
   )

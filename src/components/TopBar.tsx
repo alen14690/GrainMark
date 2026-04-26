@@ -45,15 +45,15 @@ export default function TopBar() {
   }
 
   return (
-    <header className="h-14 shrink-0 glass-surface rounded-none border-x-0 border-t-0 drag-region flex items-center gap-4 px-5 relative z-10">
+    <header className="h-16 shrink-0 glass-surface rounded-none border-x-0 border-t-0 drag-region flex items-center gap-5 px-8 relative z-10">
       {/* 标题 */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-baseline gap-2">
+        <div className="flex items-baseline gap-3">
           <h1 className="font-display-serif text-2xl text-fg-1 leading-none">{title.zh}</h1>
-          <span className="text-xxs font-mono text-fg-3 tracking-[0.14em] uppercase">{title.en}</span>
+          <span className="text-[10px] font-mono text-fg-3 tracking-[0.18em] uppercase">{title.en}</span>
         </div>
         {photoCount > 0 && (
-          <div className="flex items-center gap-2 mt-1 no-drag">
+          <div className="flex items-center gap-2 mt-2 no-drag">
             <ValueBadge label="LIBRARY" value={photoCount} size="sm" variant="muted" />
             {selectedCount > 0 && (
               <ValueBadge label="SELECTED" value={selectedCount} size="sm" variant="amber" />

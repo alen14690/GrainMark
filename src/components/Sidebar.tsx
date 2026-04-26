@@ -52,7 +52,7 @@ export default function Sidebar() {
           <ScanSearch className="w-4 h-4 text-bg-0" strokeWidth={2.5} />
         </div>
         <div className="no-drag flex-1 min-w-0">
-          <div className="font-display-serif text-lg text-fg-1 leading-none">GrainMark</div>
+          <div className="font-display-latin text-lg text-fg-1 leading-none">GrainMark</div>
           <div className="text-xxs text-fg-3 font-mono mt-1 tracking-widest">FILM · POST v1.0</div>
         </div>
       </div>

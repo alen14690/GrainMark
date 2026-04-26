@@ -56,7 +56,9 @@ async function createWindow() {
     backgroundColor: '#0E0E10',
     show: false, // 等 ready-to-show 再显示，避免白屏闪
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-    trafficLightPosition: { x: 16, y: 16 },
+    // 交通灯位置：renderer 顶部有一条 30px 高的 `.mac-titlebar` 安全区，
+    //   交通灯 12px 高，让 y 居中到 (30-12)/2 = 9
+    trafficLightPosition: { x: 18, y: 9 },
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       contextIsolation: true,

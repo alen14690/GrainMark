@@ -62,6 +62,23 @@ textarea,
   -webkit-app-region: no-drag;
 }
 
+/*
+ * macOS 标题栏安全区（2026-04-26 新增）
+ *   - titleBarStyle='hiddenInset' 下红黄绿交通灯固定在 (16, 16) 区域
+ *   - 业务 UI 从 y=0 布局会和交通灯重叠（Sidebar logo 和关闭按钮撞在一起）
+ *   - 这条 30px 高的透明可拖动条带让业务 UI 从 y=30 开始布局，交通灯在独立区域
+ *   - 背景为 bg-0（和应用底色一致），不露出桌面/终端，同时保留 Aurora 底层
+ *   - 仅 macOS 生效（Windows/Linux 系统控件是窗口级的，不需要让位）
+ */
+.mac-titlebar {
+  display: none; /* 默认隐藏；下方选择器在 macOS 启用 */
+}
+html[data-platform="darwin"] .mac-titlebar {
+  display: block;
+  height: 30px;
+  background-color: var(--bg-0);
+}
+
 /* ========== 滚动条（Aurora 风） ========== */
 ::-webkit-scrollbar {
   width: 10px;
@@ -250,16 +267,54 @@ textarea,
     box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
   }
 
-  /* ---------- Display 字体（Aurora 斜体衬线） ---------- */
+  /* ---------- Display 字体（Aurora 斜体衬线 + 中文高级 sans）----------
+   *
+   * 质感分层（2026-04-26 修订 — 解决"中文伪斜体粗糙"问题）：
+   *   - 英文/拉丁：Instrument Serif italic — 意式优雅，保留原 Aurora 美学
+   *   - 中文：PingFang SC / Hiragino Sans GB / Microsoft YaHei — 系统原生高级黑体
+   *     注意：中文字体**没有真实斜体字形**，浏览器对字形做仿斜变换会粗糙。
+   *     所以针对 `:lang(zh)` 的元素强制 font-style: normal，依靠字重+字距营造高级感。
+   *   - 纯英文场景（如品牌名 "GrainMark"）想保留意式斜体的，用 `.font-display-latin`
+   */
   .font-display-serif {
+    font-family: "Instrument Serif", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+      "Source Han Sans SC", "Source Serif 4", Georgia, serif;
+    font-style: italic;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    /* 优化渲染：对 macOS/Windows 都生效 */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* 中文强制非斜体（字形仿斜变换粗糙），靠字重+字距营造高级感 */
+  .font-display-serif:lang(zh),
+  .font-display-serif:lang(ja),
+  .font-display-serif:lang(ko) {
+    font-style: normal;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+
+  /* 纯拉丁场景：不受 :lang(zh) 约束，永远保持意式斜体（品牌名等） */
+  .font-display-latin {
     font-family: "Instrument Serif", "Source Serif 4", Georgia, serif;
     font-style: italic;
+    font-weight: 400;
     letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
+
   .font-display-regular {
-    font-family: "Instrument Serif", "Source Serif 4", Georgia, serif;
+    font-family: "Instrument Serif", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+      "Source Han Sans SC", "Source Serif 4", Georgia, serif;
     font-style: normal;
+    font-weight: 400;
     letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   /* ---------- 数字仪表 ---------- */
