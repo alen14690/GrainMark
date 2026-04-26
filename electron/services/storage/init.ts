@@ -2,6 +2,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { app } from 'electron'
 import type { BatchJob, CloudAccount, Photo } from '../../../shared/types.js'
+import { logger } from '../logger/logger.js'
+import { runStartupSweep } from './cacheSweeper.js'
 import { seedBuiltinPresets } from './filterStore.js'
 import { JsonKV, JsonTable } from './jsonTable.js'
 
@@ -70,4 +72,19 @@ export async function initStorage(): Promise<void> {
 
   // 同步内置滤镜
   seedBuiltinPresets()
+
+  // 启动期磁盘 GC（异步 fire-and-forget，不阻塞主窗口启动）
+  // - preview-cache/ LRU 清理（上限 500MB）
+  // - thumbs/ 孤儿清理（不被 photos.json 引用的 jpg）
+  void (async () => {
+    try {
+      const inUseThumbs = new Set<string>()
+      for (const p of photosTable?.all() ?? []) {
+        if (p.thumbPath) inUseThumbs.add(p.thumbPath)
+      }
+      await runStartupSweep(inUseThumbs)
+    } catch (err) {
+      logger.warn('startupSweep.unhandled', { err: (err as Error).message })
+    }
+  })()
 }

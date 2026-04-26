@@ -22,3 +22,6 @@ playwright-report
 # Benchmark 临时 JSON（每次 npm run bench:run 重算）
 bench-output.json
 
+
+# 本地设计草稿，不入仓（按 2026-04-26 决策）
+artifact/ui-mockups/

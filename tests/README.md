@@ -65,6 +65,7 @@
 | `photoStoreRepair.test.ts` | thumbPath/width/height 缺失修复调度（mock 隔离） | 启动懒补触发条件 |
 | `repairPhotoOrientation.test.ts` | sharp 实打实方向翻转校验（wide/tall/square） | Sony A7S3 ARW 竖拍修复 |
 | `photoStoreRemove.test.ts` | 只删记录不动硬盘原图 + fs.unlinkSync spy 防越界 | **安全契约** |
+| `cacheSweeper.test.ts` | preview-cache LRU 水位 + thumb 孤儿清理 + 路径守卫 | **启动 GC 安全契约** |
 | `jsonTable.test.ts` | KV 存储读写 + 并发 upsert | storage 基础 |
 | `rawCache.test.ts` | LRU 命中 / 淘汰 / 磁盘预算 | RAW 解码缓存 |
 | `rawDecoder.test.ts` | 多格式 RAW（ARW / NEF / CR2）解码 | RAW 主路径 |
