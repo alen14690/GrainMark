@@ -12,8 +12,16 @@
  *   - 用户未勾选 optIn 时，所有走网络的 LLM 能力将在后续 IPC 层被拒绝
  *   - 不硬编码任何模型名 —— 全部从 IPC 拉取；拉不通才用后端兜底
  *   - 支持"下拉选择最新模型"和"手动输入自定义 ID"双通道
+ *
+ * UX 修复（2026-04-26 · 响应用户反馈"模型列表没展示"）：
+ *   - 挂载时无条件拉一次 catalog（此前仅在 hasApiKey=true 时才拉，导致首次访问下拉永远空）
+ *   - 用户输入 apiKey 后，立即在输入框正下方显示"保存并加载模型"高亮按钮，
+ *     不让用户去页面最下方找"保存"按钮
+ *   - apiKey 输入框右上角加「未保存 / 已保存」状态徽章，消除"我是不是没点保存"的疑惑
+ *   - 回车即保存，符合 apiKey 输入框惯例
+ *   - 清除配置后不清空 catalog，用户仍能看到兜底列表作为参考
  */
-import { AlertTriangle, CheckCircle2, Loader2, RefreshCw, XCircle } from 'lucide-react'
+import { AlertTriangle, Check, CheckCircle2, Loader2, RefreshCw, Sparkles, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type {
   LLMConfigInput,
@@ -32,7 +40,7 @@ export function LLMConfigCard(): JSX.Element {
   const [loadingCatalog, setLoadingCatalog] = useState(false)
   const [apiKeyDraft, setApiKeyDraft] = useState<string>('')
   const [modelDraft, setModelDraft] = useState<string>('')
-  const [manualMode, setManualMode] = useState<boolean>(false) // true=手动输入，false=下拉选择
+  const [manualMode, setManualMode] = useState<boolean>(false)
   const [optInDraft, setOptInDraft] = useState<boolean>(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -44,8 +52,10 @@ export function LLMConfigCard(): JSX.Element {
       setCfg(c)
       setModelDraft(c.model ?? '')
       setOptInDraft(c.optInUploadImages)
-      // 首次挂载若已配 apiKey，自动拉一次目录
-      if (c.hasApiKey) void refreshCatalog()
+      // UX 修复（2026-04-26）：挂载即拉 catalog，不依赖 hasApiKey。
+      // 未配 apiKey → 后端快速返回兜底列表，下拉框立即有可选内容。
+      // 已配 apiKey → 后端拉 OpenRouter 实时列表。
+      void refreshCatalog()
     })()
   }, [])
 
@@ -65,10 +75,9 @@ export function LLMConfigCard(): JSX.Element {
     try {
       const next = await ipc('llm:setConfig', patch)
       setCfg(next)
-      setApiKeyDraft('') // 清空输入框（已写入 vault）
+      setApiKeyDraft('')
       setModelDraft(next.model ?? '')
       setOptInDraft(next.optInUploadImages)
-      // 保存 apiKey 后自动刷新目录（可能此前一直是兜底）
       if (patch.apiKey !== undefined && next.hasApiKey) void refreshCatalog()
     } catch (err) {
       setSaveError((err as Error).message.replace(/^\[llm:setConfig]\s*/, ''))
@@ -105,7 +114,8 @@ export function LLMConfigCard(): JSX.Element {
       setModelDraft('')
       setOptInDraft(false)
       setTestState({ status: 'idle' })
-      setCatalog(null)
+      // UX：清除后保留 catalog（此时应重拉一次，得到兜底列表）
+      void refreshCatalog()
     } finally {
       setSaving(false)
     }
@@ -120,6 +130,15 @@ export function LLMConfigCard(): JSX.Element {
   const pendingModel = modelDraft !== (cfg.model ?? '')
   const pendingOptIn = optInDraft !== cfg.optInUploadImages
   const canSave = (pendingKey || pendingModel || pendingOptIn) && !saving
+
+  const handleSave = () => {
+    if (!canSave) return
+    const patch: LLMConfigInput = { provider: 'openrouter' }
+    if (pendingKey) patch.apiKey = apiKeyDraft.trim()
+    if (pendingModel) patch.model = modelDraft.trim() || ''
+    if (pendingOptIn) patch.optInUploadImages = optInDraft
+    void applyPatch(patch)
+  }
 
   return (
     <div className="mt-6 pt-5 border-t border-bg-1 space-y-4">
@@ -141,11 +160,14 @@ export function LLMConfigCard(): JSX.Element {
         </div>
       </div>
 
-      {/* apiKey */}
+      {/* apiKey 区 */}
       <div className="space-y-1.5">
-        <label className="text-[11.5px] text-fg-2" htmlFor="or-apikey">
-          OpenRouter apiKey
-        </label>
+        <div className="flex items-center justify-between">
+          <label className="text-[11.5px] text-fg-2" htmlFor="or-apikey">
+            OpenRouter apiKey
+          </label>
+          <ApiKeyStatusBadge hasConfig={hasConfig} pendingKey={pendingKey} masked={cfg.apiKeyMasked} />
+        </div>
         <input
           id="or-apikey"
           type="password"
@@ -155,7 +177,30 @@ export function LLMConfigCard(): JSX.Element {
           placeholder={hasConfig ? `已保存：${cfg.apiKeyMasked ?? '****'}（输入新值以替换）` : 'sk-or-v1-...'}
           value={apiKeyDraft}
           onChange={(e) => setApiKeyDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleSave()
+          }}
         />
+
+        {/* 有 draft 未保存 → 醒目的保存入口（UX 修复核心） */}
+        {pendingKey ? (
+          <div className="flex items-center justify-between gap-2 mt-2 p-2 rounded bg-brand-amber/10 border border-brand-amber/30">
+            <div className="text-[11.5px] text-brand-amber flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5" />
+              输入完毕？保存后即可加载实时模型目录
+            </div>
+            <button
+              type="button"
+              className="btn-primary text-[11.5px] px-2.5 py-1 shrink-0 flex items-center gap-1"
+              disabled={saving}
+              onClick={handleSave}
+            >
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              保存并加载模型
+            </button>
+          </div>
+        ) : null}
+
         <div className="text-[10.5px] text-fg-3">
           来源：
           <a
@@ -170,7 +215,7 @@ export function LLMConfigCard(): JSX.Element {
         </div>
       </div>
 
-      {/* model 选择（下拉 + 手动切换） */}
+      {/* model 选择 */}
       <ModelPicker
         hasApiKey={hasConfig}
         catalog={catalog}
@@ -207,18 +252,7 @@ export function LLMConfigCard(): JSX.Element {
 
       {/* 操作按钮 */}
       <div className="flex gap-2 items-center flex-wrap">
-        <button
-          type="button"
-          className="btn-primary text-[12px]"
-          disabled={!canSave}
-          onClick={() => {
-            const patch: LLMConfigInput = { provider: 'openrouter' }
-            if (pendingKey) patch.apiKey = apiKeyDraft.trim()
-            if (pendingModel) patch.model = modelDraft.trim() || ''
-            if (pendingOptIn) patch.optInUploadImages = optInDraft
-            void applyPatch(patch)
-          }}
-        >
+        <button type="button" className="btn-primary text-[12px]" disabled={!canSave} onClick={handleSave}>
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
           保存
         </button>
@@ -256,7 +290,35 @@ export function LLMConfigCard(): JSX.Element {
   )
 }
 
-// ==================== ModelPicker 子组件 ====================
+// ==================== ApiKeyStatusBadge ====================
+
+interface BadgeProps {
+  hasConfig: boolean
+  pendingKey: boolean
+  masked: string | null
+}
+
+function ApiKeyStatusBadge({ hasConfig, pendingKey, masked }: BadgeProps): JSX.Element {
+  if (pendingKey) {
+    return (
+      <span className="flex items-center gap-1 text-[10.5px] text-brand-amber">
+        <AlertTriangle className="w-3 h-3" />
+        未保存
+      </span>
+    )
+  }
+  if (hasConfig) {
+    return (
+      <span className="flex items-center gap-1 text-[10.5px] text-emerald-400">
+        <CheckCircle2 className="w-3 h-3" />
+        已保存 <span className="font-mono text-fg-3">{masked}</span>
+      </span>
+    )
+  }
+  return <span className="text-[10.5px] text-fg-3">未配置</span>
+}
+
+// ==================== ModelPicker ====================
 
 interface ModelPickerProps {
   hasApiKey: boolean
@@ -293,8 +355,8 @@ function ModelPicker({
             type="button"
             className="text-fg-3 hover:text-fg-1 flex items-center gap-1"
             onClick={onRefresh}
-            disabled={!hasApiKey || loading}
-            title={hasApiKey ? '从 OpenRouter 刷新模型目录' : '请先保存 apiKey'}
+            disabled={loading}
+            title={hasApiKey ? '从 OpenRouter 刷新模型目录' : '未配 apiKey 时拉取将返回内置兜底列表'}
           >
             {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
             刷新目录
@@ -306,7 +368,6 @@ function ModelPicker({
         </div>
       </div>
 
-      {/* 推荐三档快速选择（未进手动模式时显示） */}
       {!manualMode && recommended.length > 0 ? (
         <div className="flex flex-wrap gap-1.5 mb-1">
           {recommended.map((r) => {
@@ -331,7 +392,6 @@ function ModelPicker({
         </div>
       ) : null}
 
-      {/* 主控件：下拉 or 手动输入 */}
       {manualMode ? (
         <input
           type="text"
@@ -350,7 +410,6 @@ function ModelPicker({
               {renderModelOption(m)}
             </option>
           ))}
-          {/* 若当前保存的模型不在目录里（可能是用户手动输入过），仍要保留展示 */}
           {current && !models.some((m) => m.id === current) ? (
             <option value={current}>{current}（自定义）</option>
           ) : null}
@@ -358,20 +417,19 @@ function ModelPicker({
       )}
 
       <div className="text-[10.5px] text-fg-3">
-        {!hasApiKey ? (
-          <>先保存 apiKey 后才能从 OpenRouter 拉取实时模型目录</>
+        {usingLiveCatalog ? (
+          <span className="text-emerald-400/80">
+            ✓ 实时目录 · {models.length} 个支持图像的模型 · 最后刷新{' '}
+            {new Date(catalog!.fetchedAt!).toLocaleTimeString()}
+          </span>
+        ) : showFallbackHint && catalog?.fallback === 'no-config' ? (
+          <span>显示 {models.length} 个旗舰模型作为参考 · 保存 apiKey 后可拉 OpenRouter 实时完整目录</span>
         ) : showFallbackHint ? (
           <span className="text-amber-400">
-            ⚠ 目录拉取失败（{fallbackHint(catalog!.fallback!)}），当前为内置兜底列表（可能已过时） ·
-            稍后点击「刷新目录」重试
+            ⚠ 目录拉取失败（{fallbackHint(catalog!.fallback!)}） · 当前为内置兜底列表 · 点击「刷新目录」重试
           </span>
-        ) : usingLiveCatalog ? (
-          <>
-            实时目录 · 共 {models.length} 个支持图像输入的模型 · 最后刷新{' '}
-            {new Date(catalog!.fetchedAt!).toLocaleTimeString()}
-          </>
         ) : (
-          <>准备就绪，点击「刷新目录」拉取模型</>
+          <>加载中...</>
         )}
       </div>
     </div>
@@ -401,7 +459,7 @@ function fallbackHint(kind: NonNullable<LLMModelCatalog['fallback']>): string {
   return '未知错误'
 }
 
-// ==================== TestResultBadge 子组件 ====================
+// ==================== TestResultBadge ====================
 
 function TestResultBadge({ r }: { r: LLMTestResult }): JSX.Element {
   if (r.ok) {
