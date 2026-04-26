@@ -350,11 +350,27 @@ export function useWebGLPreview(
     }
   }, [sourceUrl, gl, renderNow])
 
-  // pipeline 或 LUT 纹理变化 → 重渲染
+  // pipeline 或 LUT 纹理变化 → 重渲染（用 rAF 合并同帧多次触发，比如连续
+  // set 多个分组 reset 时只跑一次 renderNow）
+  const renderRafRef = useRef<number | null>(null)
+  useEffect(() => {
+    return () => {
+      if (renderRafRef.current !== null) {
+        cancelAnimationFrame(renderRafRef.current)
+        renderRafRef.current = null
+      }
+    }
+  }, [])
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: pipeline/lut.texture are intentional triggers, values consumed via refs + renderNow closure
   useEffect(() => {
     if (!gl || !sourceTexRef.current || !pipelineRef.current) return
-    renderNow()
+    // rAF 合并：同一帧内 pipeline 多次变化只调 renderNow 一次
+    if (renderRafRef.current !== null) return
+    renderRafRef.current = requestAnimationFrame(() => {
+      renderRafRef.current = null
+      renderNow()
+    })
   }, [pipeline, lut.texture, renderNow])
 
   return { canvasRef, status, error, lastDurationMs, needsCpuFallback, histogram }

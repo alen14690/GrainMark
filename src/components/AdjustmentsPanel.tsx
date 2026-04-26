@@ -1,14 +1,18 @@
 /**
  * AdjustmentsPanel — Editor 右栏的手动参数滑块面板
  *
- * 范围（M2）：
+ * 范围（M2 + M3.5 优化）：
  *   - Basic：曝光 / 对比度 / 高光 / 阴影 / 白色 / 黑色
  *   - White Balance：色温 / 色调
  *   - Presence：清晰度 / 饱和度 / 自然饱和度
  *   - Vignette：强度 / 中心 / 圆度 / 羽化
  *
- * 所有修改走 editStore actions；useWebGLPreview 会自动重渲染。
- * HSL / Curves / Color Grading / Grain / Halation 的 UI 留给 M4（需要色环、曲线画布等复杂控件）。
+ * Lightroom 对齐：
+ *   - 标签名可双击复位（Slider 内置支持）
+ *   - 所有滑块采用 ease-center 曲线：中段微调更精细，两端快速达到极端
+ *   - step 值细化：曝光 0.01 EV、其它 0.1..1（Shift 加速 10×，Alt 精细 0.1×）
+ *
+ * 所有修改走 editStore actions；useWebGLPreview 会自动重渲染（rAF 合并节流）
  */
 import { ChevronDown, ChevronRight, RotateCcw } from 'lucide-react'
 import { useState } from 'react'
@@ -31,7 +35,9 @@ function Section({ title, defaultOpen = true, children, onReset }: SectionProps)
         <button
           type="button"
           onClick={() => setOpen(!open)}
-          className="flex items-center gap-1.5 text-xxs font-mono uppercase tracking-wider text-fg-3 hover:text-fg-1 transition-colors"
+          onDoubleClick={() => onReset?.()}
+          title={onReset ? '双击复位本分组' : undefined}
+          className="flex items-center gap-1.5 text-xxs font-mono uppercase tracking-wider text-fg-3 hover:text-fg-1 transition-colors select-none"
         >
           {open ? (
             <ChevronDown className="w-3 h-3" strokeWidth={2} />
@@ -78,7 +84,7 @@ export function AdjustmentsPanel() {
           value={tone?.exposure ?? 0}
           min={-5}
           max={5}
-          step={0.05}
+          step={0.01}
           precision={2}
           suffix=" EV"
           bipolar
@@ -90,8 +96,10 @@ export function AdjustmentsPanel() {
           value={tone?.contrast ?? 0}
           min={-100}
           max={100}
+          step={1}
           bipolar
           compact
+          curve="ease-center"
           onChange={(v) => setTone({ contrast: v })}
         />
         <Slider
@@ -99,8 +107,10 @@ export function AdjustmentsPanel() {
           value={tone?.highlights ?? 0}
           min={-100}
           max={100}
+          step={1}
           bipolar
           compact
+          curve="ease-center"
           onChange={(v) => setTone({ highlights: v })}
         />
         <Slider
@@ -108,8 +118,10 @@ export function AdjustmentsPanel() {
           value={tone?.shadows ?? 0}
           min={-100}
           max={100}
+          step={1}
           bipolar
           compact
+          curve="ease-center"
           onChange={(v) => setTone({ shadows: v })}
         />
         <Slider
@@ -117,8 +129,10 @@ export function AdjustmentsPanel() {
           value={tone?.whites ?? 0}
           min={-100}
           max={100}
+          step={1}
           bipolar
           compact
+          curve="ease-center"
           onChange={(v) => setTone({ whites: v })}
         />
         <Slider
@@ -126,8 +140,10 @@ export function AdjustmentsPanel() {
           value={tone?.blacks ?? 0}
           min={-100}
           max={100}
+          step={1}
           bipolar
           compact
+          curve="ease-center"
           onChange={(v) => setTone({ blacks: v })}
         />
       </Section>
@@ -139,8 +155,10 @@ export function AdjustmentsPanel() {
           value={wb?.temp ?? 0}
           min={-100}
           max={100}
+          step={1}
           bipolar
           compact
+          curve="ease-center"
           onChange={(v) => setWB({ temp: v })}
         />
         <Slider
@@ -148,8 +166,10 @@ export function AdjustmentsPanel() {
           value={wb?.tint ?? 0}
           min={-100}
           max={100}
+          step={1}
           bipolar
           compact
+          curve="ease-center"
           onChange={(v) => setWB({ tint: v })}
         />
       </Section>
@@ -168,8 +188,10 @@ export function AdjustmentsPanel() {
           value={pipeline?.clarity ?? 0}
           min={-100}
           max={100}
+          step={1}
           bipolar
           compact
+          curve="ease-center"
           onChange={setClarity}
         />
         <Slider
@@ -177,8 +199,10 @@ export function AdjustmentsPanel() {
           value={pipeline?.vibrance ?? 0}
           min={-100}
           max={100}
+          step={1}
           bipolar
           compact
+          curve="ease-center"
           onChange={setVibrance}
         />
         <Slider
@@ -186,8 +210,10 @@ export function AdjustmentsPanel() {
           value={pipeline?.saturation ?? 0}
           min={-100}
           max={100}
+          step={1}
           bipolar
           compact
+          curve="ease-center"
           onChange={setSaturation}
         />
       </Section>
@@ -199,8 +225,10 @@ export function AdjustmentsPanel() {
           value={vignette?.amount ?? 0}
           min={-100}
           max={100}
+          step={1}
           bipolar
           compact
+          curve="ease-center"
           onChange={(v) => setVignette({ amount: v })}
         />
         <Slider
@@ -208,6 +236,7 @@ export function AdjustmentsPanel() {
           value={vignette?.midpoint ?? 50}
           min={0}
           max={100}
+          step={1}
           compact
           onChange={(v) => setVignette({ midpoint: v })}
         />
@@ -216,8 +245,10 @@ export function AdjustmentsPanel() {
           value={vignette?.roundness ?? 0}
           min={-100}
           max={100}
+          step={1}
           bipolar
           compact
+          curve="ease-center"
           onChange={(v) => setVignette({ roundness: v })}
         />
         <Slider
@@ -225,6 +256,7 @@ export function AdjustmentsPanel() {
           value={vignette?.feather ?? 50}
           min={0}
           max={100}
+          step={1}
           compact
           onChange={(v) => setVignette({ feather: v })}
         />

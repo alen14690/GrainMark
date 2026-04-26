@@ -3,14 +3,16 @@
  *
  * 参数（与 shared/types.ts ToneParams 对齐）：
  *   u_exposure     ∈ [-5, 5]  EV（2^EV 线性乘）
- *   u_contrast     ∈ [-100, 100]  围绕 0.5 灰度中点拉伸/压缩
- *   u_highlights   ∈ [-100, 100]  仅影响高光区域（luma > 0.6）
- *   u_shadows      ∈ [-100, 100]  仅影响阴影区域（luma < 0.4）
- *   u_whites       ∈ [-100, 100]  白色裁切点上下移
- *   u_blacks       ∈ [-100, 100]  黑色裁切点上下移
+ *   u_contrast     ∈ [-1, 1]  围绕 0.5 灰度中点拉伸/压缩
+ *   u_highlights   ∈ [-1, 1]  仅影响高光区域（luma > 0.6）
+ *   u_shadows      ∈ [-1, 1]  仅影响阴影区域（luma < 0.4）
+ *   u_whites       ∈ [-1, 1]  白色裁切点上下移
+ *   u_blacks       ∈ [-1, 1]  黑色裁切点上下移
  *
  * 实现说明：
- *   - 所有参数都是 [-1, 1] 归一化后（uniform 传入前 /100）
+ *   - contrast/highlights/shadows/whites/blacks 用 Lightroom 风格的**非线性**
+ *     响应：在 |param| < 0.25 范围内梯度减半（给精细微调空间），极端区梯度
+ *     正常。避免用户"轻轻一动就爆"
  *   - 使用 Rec.709 luma 系数 (0.2126, 0.7152, 0.0722)
  *   - 运算在 sRGB 空间（与 Lightroom 的视觉直觉一致；HDR 扩展留给 M5）
  */
@@ -27,15 +29,27 @@ uniform float u_blacks;
 
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
 
+/**
+ * 非线性响应曲线：把 [-1, 1] 映到 [-1, 1]，中段平缓两端加速。
+ *   f(x) = sign(x) * |x|^1.6
+ * |x| < 0.25 时约当原值的 0.1（即中段敏感度 1/10），|x| ≈ 1 时维持原值。
+ * 作用：给用户在"中性位置附近"微调空间，同时保留极端效果上限。
+ */
+float curve(float x) {
+  float ax = abs(x);
+  return sign(x) * pow(ax, 1.6);
+}
+
 float applyContrast(float v, float amount) {
-  // amount ∈ [-1, 1]；正值增加对比、负值减少
-  return clamp((v - 0.5) * (1.0 + amount) + 0.5, 0.0, 1.0);
+  // amount ∈ [-1, 1]；正值增加对比、负值减少。通过 curve() 让中段更温和
+  float a = curve(amount);
+  return clamp((v - 0.5) * (1.0 + a) + 0.5, 0.0, 1.0);
 }
 
 void main() {
   vec3 c = texture(u_image, v_uv).rgb;
 
-  // 曝光（线性 EV）
+  // 曝光（线性 EV，保持 Lightroom 行为 —— 曝光本身用户期望响应直接）
   c *= pow(2.0, u_exposure);
 
   // 对比度（基于 luma，保持色相）
@@ -43,19 +57,20 @@ void main() {
   float lumaAdj = applyContrast(luma, u_contrast);
   c *= (lumaAdj / max(luma, 1e-4));
 
-  // 高光：luma > 0.6 区域衰减/抬升
+  // 高光：luma > 0.6 区域衰减/抬升（强度从 ±50% 收敛到 ±30%，配合 curve 后
+  // 实际极端位移约 ±25%，中段几乎不影响 —— Lightroom 风格）
   float hlMask = smoothstep(0.55, 0.95, luma);
-  c *= (1.0 + u_highlights * 0.5 * hlMask);
+  c *= (1.0 + curve(u_highlights) * 0.30 * hlMask);
 
   // 阴影：luma < 0.4 区域抬升/压暗
   float shMask = 1.0 - smoothstep(0.0, 0.45, luma);
-  c *= (1.0 + u_shadows * 0.5 * shMask);
+  c *= (1.0 + curve(u_shadows) * 0.35 * shMask);
 
-  // 白色点 / 黑色点
+  // 白色点 / 黑色点（用 curve 降低中段敏感度）
   float whiteMask = smoothstep(0.75, 1.0, luma);
-  c = mix(c, c * (1.0 + u_whites * 0.4), whiteMask);
+  c = mix(c, c * (1.0 + curve(u_whites) * 0.30), whiteMask);
   float blackMask = 1.0 - smoothstep(0.0, 0.25, luma);
-  c = mix(c, c * (1.0 + u_blacks * 0.5), blackMask);
+  c = mix(c, c * (1.0 + curve(u_blacks) * 0.35), blackMask);
 
   fragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
 }
