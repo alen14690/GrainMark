@@ -224,7 +224,7 @@ export default function Editor() {
   const canvasStyle = { maxWidth: '100%', maxHeight: 'calc(100vh - 240px)' } as const
 
   return (
-    <div className="h-full flex animate-fade-in">
+    <div className="h-full flex animate-fade-in bg-bg-0">
       {/* Canvas Column */}
       <section className="flex-1 flex flex-col min-w-0 bg-bg-0">
         {/* 顶部工具条 */}

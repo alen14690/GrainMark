@@ -428,7 +428,7 @@ export function useWebGLPreview(
         const res = await fetch(sourceUrl)
         if (!res.ok) throw new Error(`fetch ${sourceUrl}: ${res.status}`)
         const blob = await res.blob()
-        const bitmap = await createImageBitmap(blob, { imageOrientation: 'from-image' })
+        const bitmap = await createImageBitmap(blob, { imageOrientation: 'none' })
         if (cancelled) {
           bitmap.close()
           return

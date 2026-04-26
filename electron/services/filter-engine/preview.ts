@@ -66,8 +66,11 @@ export async function renderPreview(
   const rotationDeg = sourceOrientation !== undefined ? orientationToRotationDegrees(sourceOrientation) : null
 
   // 用 sharp 完成旋转 + resize，输出 JPEG；不做任何滤镜（全部交 GPU）
+  // 关键：rotate(deg) 显式模式不会移除 EXIF orientation tag，
+  //   而渲染端 createImageBitmap 若用 'from-image' 会二次旋转导致倒挂。
+  //   解法双保险：(1) 渲染端用 'none'；(2) 这里 withMetadata({ orientation: 1 }) 强制置正。
   let base = sharp(buffer, { failOn: 'none' })
-  if (rotationDeg !== null) {
+  if (rotationDeg !== null && rotationDeg !== 0) {
     base = base.rotate(rotationDeg)
   } else {
     base = base.rotate() // 非 RAW：读 buffer 自带 EXIF 自动转正
@@ -79,6 +82,7 @@ export async function renderPreview(
       fit: 'inside',
       withoutEnlargement: true,
     })
+    .withMetadata({ orientation: 1 }) // 强制 EXIF orientation=1（正），防二次旋转
     .jpeg({ quality: 85 })
     .toBuffer()
 
