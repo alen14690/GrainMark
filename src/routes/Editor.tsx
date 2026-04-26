@@ -30,6 +30,7 @@ export default function Editor() {
   const photo = useMemo(() => photos.find((p) => p.id === photoId) ?? photos[0], [photos, photoId])
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [previewError, setPreviewError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [showOriginal, setShowOriginal] = useState(false)
   const [rightTab, setRightTab] = useState<RightPanelTab>('filters')
@@ -227,13 +228,24 @@ export default function Editor() {
     if (!photoPath) return
     let alive = true
     setLoading(true)
+    setPreviewError(null)
     // CPU 兜底时传 currentPipeline 作 pipelineOverride，GPU 路径传 undefined
     const override = needsCpuFallback ? (currentPipeline ?? undefined) : undefined
     ipc('preview:render', photoPath, ipcFilterId, override)
       .then((url) => {
-        if (alive) setPreviewUrl(url)
+        if (alive) {
+          setPreviewUrl(url)
+          setPreviewError(null)
+        }
       })
-      .catch((err) => console.error('[preview]', err))
+      .catch((err) => {
+        // 不吞错：卡 "rendering..." 是最差体验。把错误显示到画布上让用户能看到。
+        console.error('[preview]', err)
+        if (alive) {
+          setPreviewUrl(null)
+          setPreviewError((err as Error).message ?? String(err))
+        }
+      })
       .finally(() => {
         if (alive) setLoading(false)
       })
@@ -337,9 +349,18 @@ export default function Editor() {
                 className="max-w-full max-h-[calc(100vh-240px)] object-contain rounded-md shadow-soft-lg"
               />
             )}
-            {!previewUrl && (
+            {!previewUrl && !previewError && (
               <div className="w-[600px] h-[400px] bg-bg-1 rounded-md flex items-center justify-center text-fg-3 text-sm font-mono">
                 rendering…
+              </div>
+            )}
+            {!previewUrl && previewError && (
+              <div className="w-[600px] h-[400px] bg-bg-1 rounded-md flex flex-col items-center justify-center gap-2 p-6 text-center">
+                <div className="text-sem-error text-sm font-medium">预览渲染失败</div>
+                <div className="text-xxs text-fg-3 font-mono break-all max-w-[520px]">{previewError}</div>
+                <div className="text-xxs text-fg-4 mt-2">
+                  请尝试在"图库"中移除并重新导入此照片（重新授权目录访问）。
+                </div>
               </div>
             )}
             {(loading || webgl.status === 'loading') && (

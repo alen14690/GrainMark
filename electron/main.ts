@@ -236,6 +236,34 @@ app.whenReady().then(async () => {
   ])
   await pathGuard.init()
 
+  // Hotfix：从已导入的 photos.json 恢复"用户此前明示授权过的目录"白名单
+  //
+  // 背景：F1（IPC PathGuard 切面）生效后，preview:render / photo:thumb 等
+  //   handler 会对传入路径强制 validate()。但启动时 PathGuard 只含 5 个系统
+  //   默认目录；若用户历史导入的照片在这些目录之外（例如外置硬盘 /Volumes/*
+  //   或自定义素材库），下次启动打开 Editor 会 validate 失败 → UI 卡 rendering。
+  //
+  // 修复契约：每张已存在于 photos.json 的照片，其父目录视为"已授权"——因为
+  //   当初导入时一定走过 dialog:selectFiles / selectDir，获得过用户明示同意。
+  //   重启不应撤销该授权。
+  //
+  // 回归保护：tests/unit/mainStartupContract.test.ts 会对本段代码做静态扫描。
+  try {
+    const photos = getPhotosTable().all()
+    const seenDirs = new Set<string>()
+    for (const p of photos) {
+      if (!p.path) continue
+      const parent = path.dirname(p.path)
+      if (parent && !seenDirs.has(parent)) {
+        seenDirs.add(parent)
+        pathGuard.addAllowed(parent)
+      }
+    }
+    logger.info('pathGuard.rehydrated', { dirs: seenDirs.size })
+  } catch (err) {
+    logger.warn('pathGuard.rehydrate.failed', { err: (err as Error).message })
+  }
+
   try {
     secureVault = new SecureVault(app.getPath('userData'))
   } catch (e) {
