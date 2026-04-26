@@ -1,12 +1,12 @@
 /**
- * pipelineSharp 单测
- * - detectIgnoredChannels：纯函数可直接测
- * - applyPipeline：使用 sharp 生成 100x100 纯色测试图，验证 format / keepExif / resize
+ * pipelineSharp 单测（F2 修复后：CPU 路径支持 9/10 通道，仅 LUT 不支持）
+ * - detectIgnoredChannels：只报 LUT
+ * - applyPipeline：同步测试 format / keepExif / resize / 9 通道效果
  */
 import sharp from 'sharp'
 import { describe, expect, it } from 'vitest'
 import {
-  UNSUPPORTED_CHANNELS_IN_BATCH,
+  UNSUPPORTED_CHANNELS_IN_CPU,
   applyPipeline,
   detectIgnoredChannels,
 } from '../../electron/services/batch/pipelineSharp'
@@ -21,59 +21,48 @@ async function makeTestJpeg(gray = 128): Promise<Buffer> {
     .toBuffer()
 }
 
-describe('detectIgnoredChannels', () => {
+describe('detectIgnoredChannels（F2 修复后：只有 LUT 不支持）', () => {
   it('null pipeline → []', () => {
     expect(detectIgnoredChannels(null)).toEqual([])
   })
   it('pipeline 全空 → []', () => {
     expect(detectIgnoredChannels({})).toEqual([])
   })
-  it('只含 tone 不触发（tone 是支持通道）', () => {
+  it('只含 tone → []（tone 已 CPU 支持）', () => {
     const p: FilterPipeline = {
       tone: { exposure: 10, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0 },
     }
     expect(detectIgnoredChannels(p)).toEqual([])
   })
-  it('含 lut → 列 lut', () => {
+  it('含 lut → 列 lut（唯一不支持项）', () => {
     expect(detectIgnoredChannels({ lut: 'x.cube' })).toEqual(['lut'])
   })
-  it('含 grain amount=5 → 列 grain', () => {
-    expect(detectIgnoredChannels({ grain: { amount: 5, size: 1, roughness: 0.5 } })).toEqual(['grain'])
+  it('grain/halation/hsl/curves/colorGrading 现在 CPU 都支持 → []', () => {
+    const p: FilterPipeline = {
+      grain: { amount: 5, size: 1, roughness: 0.5 },
+      halation: { amount: 20, threshold: 200, radius: 10 },
+      hsl: { red: { h: 10, s: 0, l: 0 } },
+      curves: { rgb: [{ x: 0, y: 10 }] },
+      colorGrading: {
+        shadows: { h: 0, s: 0, l: 10 },
+        midtones: { h: 0, s: 0, l: 0 },
+        highlights: { h: 0, s: 0, l: 0 },
+        blending: 50,
+        balance: 0,
+      },
+    }
+    expect(detectIgnoredChannels(p)).toEqual([])
   })
-  it('含 grain amount=0 → 不列', () => {
-    expect(detectIgnoredChannels({ grain: { amount: 0, size: 1, roughness: 0.5 } })).toEqual([])
-  })
-  it('含 hsl 非空 → 列 hsl', () => {
-    expect(detectIgnoredChannels({ hsl: { red: { h: 10, s: 0, l: 0 } } })).toEqual(['hsl'])
-  })
-  it('含 halation amount=20 → 列 halation', () => {
-    expect(detectIgnoredChannels({ halation: { amount: 20, threshold: 200, radius: 10 } })).toEqual([
-      'halation',
-    ])
-  })
-  it('含 curves 非空 → 列 curves', () => {
-    expect(detectIgnoredChannels({ curves: { rgb: [{ x: 0, y: 10 }] } })).toEqual(['curves'])
-  })
-  it('含 curves 全空数组 → 不列', () => {
-    expect(detectIgnoredChannels({ curves: { rgb: [], r: [] } })).toEqual([])
-  })
-  it('多个忽略通道一起', () => {
+  it('lut + 其他 → 只列 lut', () => {
     const p: FilterPipeline = {
       lut: 'x.cube',
       grain: { amount: 5, size: 1, roughness: 0.5 },
       hsl: { red: { h: 10, s: 0, l: 0 } },
     }
-    expect(detectIgnoredChannels(p).sort()).toEqual(['grain', 'hsl', 'lut'].sort())
+    expect(detectIgnoredChannels(p)).toEqual(['lut'])
   })
-  it('UNSUPPORTED_CHANNELS_IN_BATCH 契约稳定（避免无意删除）', () => {
-    expect(UNSUPPORTED_CHANNELS_IN_BATCH).toEqual([
-      'curves',
-      'hsl',
-      'colorGrading',
-      'grain',
-      'halation',
-      'lut',
-    ])
+  it('UNSUPPORTED_CHANNELS_IN_CPU 契约稳定（F2 修复后只有 lut）', () => {
+    expect(UNSUPPORTED_CHANNELS_IN_CPU).toEqual(['lut'])
   })
 })
 

@@ -4,14 +4,16 @@ import { BrowserWindow, app, dialog, ipcMain, session, shell } from 'electron'
 import { z } from 'zod'
 import { DialogSelectFilesSchema } from '../shared/ipc-schemas.js'
 import { registerAllIpcHandlers } from './ipc/register.js'
+import { setIpcPathGuard } from './ipc/safeRegister.js'
 import { buildAppMenu } from './menu.js'
 import { registerGrainPrivileges, registerGrainProtocol, setPhotoPathResolver } from './protocol/grain.js'
 import { shutdownGpuRenderer } from './services/batch/gpuRenderer.js'
 import { shutdownExiftool } from './services/exif/reader.js'
 import { logger } from './services/logger/logger.js'
 import { PathGuard } from './services/security/pathGuard.js'
+import { setPathGuard } from './services/security/pathGuardRegistry.js'
 import { SecureVault } from './services/security/secureVault.js'
-import { getPhotosTable, initStorage } from './services/storage/init.js'
+import { flushStorage, getPhotosTable, initStorage } from './services/storage/init.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -248,6 +250,11 @@ app.whenReady().then(async () => {
   })
   registerGrainProtocol(pathGuard)
 
+  // F1 修复：把 PathGuard 注入到 IPC 层，所有声明了 pathFields 的 handler 都会强制校验
+  setIpcPathGuard(pathGuard)
+  // F6/F7 修复：把 PathGuard 注入 service 层 registry，让 cubeIO 等做防御深度校验
+  setPathGuard(pathGuard)
+
   // 注册 IPC
   registerDialogHandlers()
   registerAllIpcHandlers()
@@ -286,10 +293,15 @@ app.on('browser-window-created', (_e, bw) => {
   })
 })
 
-// 退出前清理 exiftool 子进程
+// 退出前清理 exiftool 子进程 + 刷盘所有 JsonTable（F11：保证不丢尾包数据）
 app.on('before-quit', async () => {
   try {
     shutdownGpuRenderer()
+  } catch {
+    // ignore
+  }
+  try {
+    await flushStorage()
   } catch {
     // ignore
   }

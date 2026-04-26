@@ -124,6 +124,13 @@ export class Pipeline {
       if (!isLast) input = output!
     }
 
+    // F8：pipeline 结束后统一解绑（一次性，替代每个 pass 都 unbind 的 state churn）
+    const gl = this.ctx.gl
+    if (gl) {
+      gl.bindVertexArray(null)
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    }
+
     return {
       stepCount: steps.length,
       durationMs: performance.now() - start,

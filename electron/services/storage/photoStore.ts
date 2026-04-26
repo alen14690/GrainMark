@@ -62,7 +62,7 @@ export async function importPhotos(paths: string[]): Promise<Photo[]> {
     if (existing) {
       // 已存在的照片：顺手做缩略图/尺寸的懒补（老数据 thumbPath 丢失 / 宽高为 0 等）
       const repaired = await repairPhotoRecord(existing)
-      if (repaired !== existing) table.upsert(repaired)
+      if (repaired !== existing) await table.upsert(repaired)
       results.push(repaired)
       continue
     }
@@ -120,7 +120,9 @@ export async function importPhotos(paths: string[]): Promise<Photo[]> {
       dimsVerified: DIMS_ALGO_VERSION,
     }
 
-    table.upsert(photo)
+    table.upsert(photo).catch((err) => {
+      logger.warn('photo.upsert.failed', { path: p, err: (err as Error).message })
+    })
     results.push(photo)
   }
   return results
@@ -257,9 +259,11 @@ export function removePhotoRecords(ids: string[]): { removed: number; orphanedTh
   const toRemove = table.all().filter((p) => idSet.has(p.id))
   if (toRemove.length === 0) return { removed: 0, orphanedThumbs: 0 }
 
-  // Step 2: 删记录
+  // Step 2: 删记录（F11：delete 现在返回 Promise；批量串行 await 保证顺序）
   for (const p of toRemove) {
-    table.delete(p.id)
+    table.delete(p.id).catch((err) => {
+      logger.warn('photo.delete.failed', { id: p.id, err: (err as Error).message })
+    })
   }
 
   // Step 3: 计算哪些 thumb 成了孤儿（所有引用该 thumbPath 的 photo 都被删了）
@@ -359,7 +363,7 @@ async function repairMissingInBackground(photos: Photo[], limit: number): Promis
       const needsFlag = normalizeDimsVersion(next.dimsVerified) < DIMS_ALGO_VERSION
       const withFlag: Photo = needsFlag ? { ...next, dimsVerified: DIMS_ALGO_VERSION } : next
       if (withFlag !== photo) {
-        table.upsert(withFlag)
+        await table.upsert(withFlag)
         if (next !== photo) repaired++
       }
     } catch {

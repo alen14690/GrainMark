@@ -95,7 +95,8 @@ export function getSettings(): AppSettings {
   const stored = kv.get<AppSettings>(KEY)
   if (!stored) {
     const def = defaultSettings()
-    kv.set(KEY, def)
+    // F11：kv.set 现在返回 Promise；启动时 fire-and-forget，app 退出有 flush 兜底
+    void kv.set(KEY, def)
     return def
   }
   return deepMerge(defaultSettings(), stored as Partial<AppSettings>)
@@ -104,6 +105,6 @@ export function getSettings(): AppSettings {
 export function updateSettings(patch: Partial<AppSettings>): AppSettings {
   const kv = getSettingsKV()
   const next = deepMerge(getSettings(), patch)
-  kv.set(KEY, next)
+  void kv.set(KEY, next)
   return next
 }

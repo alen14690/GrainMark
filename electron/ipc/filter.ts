@@ -12,10 +12,18 @@ export function registerFilterIpc() {
   registerIpc('filter:delete', async (id: unknown) => {
     deleteFilter(id as string)
   })
-  registerIpc('filter:importCube', async (filePath: unknown) => importCubeAsPreset(filePath as string))
-  registerIpc('filter:exportCube', async (id: unknown, outPath: unknown) => {
-    const preset = getFilter(id as string)
-    if (!preset) throw new Error(`Filter not found: ${id}`)
-    await exportPresetToCube(preset, outPath as string)
+  // F1：.cube 文件路径必须过 PathGuard
+  registerIpc('filter:importCube', async (filePath: unknown) => importCubeAsPreset(filePath as string), {
+    pathFields: ['arg'],
   })
+  // F1：id 不是路径但 outPath 是；F6 在 service 层再二次校验（defense-in-depth）
+  registerIpc(
+    'filter:exportCube',
+    async (id: unknown, outPath: unknown) => {
+      const preset = getFilter(id as string)
+      if (!preset) throw new Error(`Filter not found: ${id}`)
+      await exportPresetToCube(preset, outPath as string)
+    },
+    { pathFields: ['args.1'] },
+  )
 }

@@ -17,7 +17,7 @@ export async function connectCloud(provider: CloudProvider): Promise<CloudAccoun
     credentials: {},
     connected: false,
   }
-  table.upsert(account)
+  await table.upsert(account)
   return account
 }
 

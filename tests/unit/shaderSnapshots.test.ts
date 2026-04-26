@@ -3,9 +3,10 @@
  *
  * 10 个 shader × 100×100 baseline PNG（本轮 M4.1 起含 HSL 完整 8 通道）
  *
- * 机制：
+ * 机制（F4 修复后）：
  * - 使用 tests/utils/shaderCpuMirror.ts 的 CPU 镜像函数渲染
- * - 首次运行（无 baseline）自动生成到 tests/baselines/shaders/
+ * - **基线缺失时必须显式 bless（npm run snapshot:update 或设 GRAINMARK_BLESS_BASELINES=1）**
+ *   —— 修复了原来"首次运行自动写基线"导致"损坏态被固化为 baseline"的漏洞
  * - 后续运行比对 diffPercent ≤ 0.5%
  * - 算法语义改动（shader + CPU 镜像未同步）会在这里被抓到
  * - M4.1 更新：tone / whiteBalance / hsl baseline 需重生（GPU shader 引入
@@ -35,15 +36,43 @@ import {
 const W = 100
 const H = 100
 
-/** 断言 actual PNG 匹配 baseline 文件；首次运行自动建立 baseline */
+/** 是否允许写入新 baseline（仅显式 bless 模式） */
+function isBlessMode(): boolean {
+  return (
+    process.env.GRAINMARK_BLESS_BASELINES === '1' ||
+    process.env.UPDATE_SNAPSHOTS === '1' ||
+    process.argv.includes('-u') ||
+    process.argv.includes('--update')
+  )
+}
+
+/**
+ * 断言 actual PNG 匹配 baseline 文件。
+ *
+ * F4 修复：基线缺失不再自动写，必须显式 bless。这样保证首次运行不会把
+ * "当前实现的任意输出"固化成 baseline 形成零防护。
+ */
 function expectMatchBaseline(actual: Buffer, baselineName: string, threshold = 0.005): void {
   const baseline = readBaseline(baselineName)
   if (!baseline) {
-    writeBaseline(baselineName, actual)
-    return // 首次：接受并写入
+    if (isBlessMode()) {
+      writeBaseline(baselineName, actual)
+      // eslint-disable-next-line no-console
+      console.log(`[bless] wrote baseline: ${baselineName}`)
+      return
+    }
+    throw new Error(
+      `Baseline missing: ${baselineName}. Run "GRAINMARK_BLESS_BASELINES=1 npm test" or "npm run snapshot:update" after manual review.`,
+    )
   }
   const { diffPercent, diffPixels, width, height } = comparePNG(actual, baseline, { threshold: 0.1 })
   if (diffPercent > threshold) {
+    if (isBlessMode()) {
+      writeBaseline(baselineName, actual)
+      // eslint-disable-next-line no-console
+      console.log(`[bless] updated baseline: ${baselineName} (was diff ${(diffPercent * 100).toFixed(3)}%)`)
+      return
+    }
     throw new Error(
       `Baseline ${baselineName} diff=${(diffPercent * 100).toFixed(3)}% (${diffPixels}/${width * height}px)`,
     )

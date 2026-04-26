@@ -1,13 +1,15 @@
 /**
- * Pass — 单次全屏渲染
+ * Pass — 单次全屏渲染（F8 修复版）
  *
  * 抽象：一个 Pass 消耗 0..N 个输入纹理 + 若干 uniforms，渲染到一张输出纹理（FBO）
  * 或直接绘制到 canvas（output = null）。
  *
- * 性能：
- *   - 一个 program 对应一个 Pass，program 由 ShaderRegistry 缓存，切换 pass 只 useProgram
- *   - uniform 绑定用 cached location（program 内部 Map）
- *   - 绑定 GLContext 的共享全屏四边形 VAO，零额外拷贝
+ * 性能优化（F8）：
+ *   - uniform location 走 `CompiledProgram.getUniformLocation` 的缓存（per-program Map）
+ *     → 拖滑块时每帧节省 100+ 次 GL 调用
+ *   - 删除 pass 末尾的 `bindVertexArray(null)` / `bindFramebuffer(null)` 冗余清理
+ *     → 减少 state churn；下个 pass 自会 bind 新的
+ *   - Pipeline.run 结束时统一解绑（由调用方负责）
  */
 import type { GLContext } from './GLContext'
 import type { ShaderRegistry } from './ShaderRegistry'
@@ -57,10 +59,11 @@ export function runPass(ctx: GLContext, registry: ShaderRegistry, config: PassCo
   const gl = ctx.gl
   if (!gl) throw new Error('GL not available')
 
-  const program = registry.get(config.vert, config.frag)
-  gl.useProgram(program)
+  // F8：getCompiled 返回带 location 缓存的包装
+  const compiled = registry.getCompiled(config.vert, config.frag)
+  gl.useProgram(compiled.program)
 
-  // 绑定 VAO（全屏四边形）
+  // 绑定 VAO（全屏四边形）—— 全 pipeline 共享同一个，不需要每 pass 解绑
   const { vao } = ctx.getFullscreenQuad()
   gl.bindVertexArray(vao)
 
@@ -69,14 +72,14 @@ export function runPass(ctx: GLContext, registry: ShaderRegistry, config: PassCo
     gl.activeTexture(gl.TEXTURE0 + i)
     const glTarget = input.texture.target === '3D' ? gl.TEXTURE_3D : gl.TEXTURE_2D
     gl.bindTexture(glTarget, input.texture.texture)
-    const loc = gl.getUniformLocation(program, input.name)
+    const loc = compiled.getUniformLocation(input.name)
     if (loc) gl.uniform1i(loc, i)
   })
 
-  // 绑定标量 uniforms
+  // 绑定标量 uniforms（用缓存的 location）
   if (config.uniforms) {
     for (const [name, value] of Object.entries(config.uniforms)) {
-      const loc = gl.getUniformLocation(program, name)
+      const loc = compiled.getUniformLocation(name)
       if (!loc) continue // uniform 被 glsl 优化掉（未使用）是正常的
       bindUniform(gl, loc, value)
     }
@@ -101,9 +104,7 @@ export function runPass(ctx: GLContext, registry: ShaderRegistry, config: PassCo
   // 绘制 —— 两个三角形带 = 4 顶点
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
 
-  // 清理状态（避免泄漏到下一 pass）
-  gl.bindVertexArray(null)
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+  // F8：不在此处清理 VAO / FBO —— 下个 pass 会重新绑定；Pipeline.run 结束时统一解绑
 }
 
 function bindUniform(gl: WebGL2RenderingContext, loc: WebGLUniformLocation, value: UniformValue): void {

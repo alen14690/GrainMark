@@ -9,6 +9,25 @@ import { z } from 'zod'
 // ============ 公用 ============
 const PathSchema = z.string().min(1).max(4096)
 
+/**
+ * LUT 文件名 schema（F7 修复）—— 仅允许安全字符 + `.cube` 后缀。
+ *
+ * 背景：FilterPipeline.lut 原本是 `z.string().max(256)`，攻击者可构造
+ *   `pipeline.lut = "../../../../etc/shadow"` 让 cubeIO 的
+ *   `path.join(getLUTDir(), lut)` 回到 LUT 目录之外读取任意文件。
+ *
+ * 约束：
+ *   - 只允许字母 / 数字 / 下划线 / 短横线 / 点（用于 `.cube`）
+ *   - 禁用 `/` / `\\` / 空字符 / 绝对路径前缀
+ *   - 必须以 `.cube` 结尾（大小写不敏感）
+ *   - 长度上限 128（nanoid(12) + ".cube" + 冗余）
+ */
+export const LutFileNameSchema = z
+  .string()
+  .min(5) // 至少 "a.cube"
+  .max(128)
+  .regex(/^[a-zA-Z0-9_\-]+(\.[cC][uU][bB][eE])$/, 'LUT filename must be <name>.cube with no path separators')
+
 // ============ 滤镜 ============
 export const FilterIdSchema = z
   .string()
@@ -104,7 +123,8 @@ export const FilterPipelineSchema = z.object({
   clarity: z.number().min(-100).max(100).optional(),
   saturation: z.number().min(-100).max(100).optional(),
   vibrance: z.number().min(-100).max(100).optional(),
-  lut: z.string().max(256).nullable().optional(),
+  // F7：LUT 名只接受受控文件名，拒绝路径遍历
+  lut: LutFileNameSchema.nullable().optional(),
   lutIntensity: z.number().min(0).max(100).optional(),
 })
 

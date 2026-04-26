@@ -62,27 +62,31 @@ export function writeDiffArtifact(name: string, diffImg: Buffer): string {
   return p
 }
 
-/** Vitest matcher：像素级比对 */
+/** Vitest matcher：像素级比对（F4 修复：禁止自动写 baseline，必须显式 bless） */
 export const imageMatchers = {
   toMatchImageBaseline(received: Buffer, baselinePath: string, opts: { threshold?: number } = {}) {
-    const update =
-      process.env.UPDATE_SNAPSHOTS === '1' || process.env.CI !== 'true'
-        ? process.argv.includes('-u') || process.argv.includes('--update')
-        : false
+    // F4：只有显式 bless 才允许写 baseline。默认行为：缺失/不一致一律判失败，
+    //     避免"首次运行把任意输出固化成 baseline"这类零防护陷阱。
+    const bless =
+      process.env.GRAINMARK_BLESS_BASELINES === '1' ||
+      process.env.UPDATE_SNAPSHOTS === '1' ||
+      process.argv.includes('-u') ||
+      process.argv.includes('--update')
 
     const baseline = loadBaseline(baselinePath)
 
     if (!baseline) {
-      if (update || !process.env.CI) {
+      if (bless) {
         saveBaseline(baselinePath, received)
         return {
           pass: true,
-          message: () => `Baseline created: ${baselinePath}`,
+          message: () => `Baseline blessed: ${baselinePath}`,
         }
       }
       return {
         pass: false,
-        message: () => `Baseline missing: ${baselinePath}. Run with -u to create.`,
+        message: () =>
+          `Baseline missing: ${baselinePath}. Run "GRAINMARK_BLESS_BASELINES=1 npm test" or "npm run snapshot:update" after manual review.`,
       }
     }
 
@@ -98,6 +102,14 @@ export const imageMatchers = {
 
     const allowedPercent = 0.005 // 默认容忍 0.5%
     if (result.diffPercent > allowedPercent) {
+      if (bless) {
+        saveBaseline(baselinePath, received)
+        return {
+          pass: true,
+          message: () =>
+            `Baseline updated: ${baselinePath} (was diff ${(result.diffPercent * 100).toFixed(3)}%)`,
+        }
+      }
       const diffFile = writeDiffArtifact(baselinePath.replace(/[/\\]/g, '_'), result.diffImage)
       return {
         pass: false,

@@ -32,7 +32,8 @@
     "bench:report": "npm run bench:run && tsx scripts/bench-report.ts",
     "bench:baseline": "npm run bench:run && tsx scripts/bench-report.ts --update-baseline",
     "fixtures:generate": "tsx tests/fixtures/generate.ts",
-    "snapshot:update": "vitest run -u && playwright test --update-snapshots"
+    "snapshot:update": "GRAINMARK_BLESS_BASELINES=1 vitest run -u && playwright test --update-snapshots",
+    "snapshot:bless": "GRAINMARK_BLESS_BASELINES=1 vitest run"
   },
   "dependencies": {
     "exiftool-vendored": "^29.1.0",

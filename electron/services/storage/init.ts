@@ -88,3 +88,17 @@ export async function initStorage(): Promise<void> {
     }
   })()
 }
+
+/**
+ * 关闭 app 前等待所有 JsonTable / JsonKV 把 pending 写盘完成（F11 修复）。
+ * main.ts 在 before-quit 里调。
+ */
+export async function flushStorage(): Promise<void> {
+  const tasks: Promise<void>[] = []
+  if (photosTable) tasks.push(photosTable.flush())
+  if (batchJobsTable) tasks.push(batchJobsTable.flush())
+  if (cloudAccountsTable) tasks.push(cloudAccountsTable.flush())
+  if (trendingTable) tasks.push(trendingTable.flush())
+  if (settingsKV) tasks.push(settingsKV.flush())
+  await Promise.allSettled(tasks)
+}

@@ -7,8 +7,14 @@ export function registerAIIpc() {
   registerIpc('ai:downloadModel', async (modelId: unknown) => {
     await downloadAIModel(modelId as string)
   })
-  registerIpc('ai:run', async (capability: unknown, photoPath: unknown, params: unknown) =>
-    runAI(capability as AICapability, photoPath as string, params as Record<string, unknown>),
+  // F1：photoPath 必须过 PathGuard
+  registerIpc(
+    'ai:run',
+    async (capability: unknown, photoPath: unknown, params: unknown) =>
+      runAI(capability as AICapability, photoPath as string, params as Record<string, unknown>),
+    { pathFields: ['args.1'] },
   )
-  registerIpc('ai:recommend', async (photoPath: unknown) => recommendFilters(photoPath as string))
+  registerIpc('ai:recommend', async (photoPath: unknown) => recommendFilters(photoPath as string), {
+    pathFields: ['arg'],
+  })
 }

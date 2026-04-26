@@ -1,10 +1,11 @@
 /**
- * ShaderRegistry — GLSL 源码 → WebGLProgram 编译缓存
+ * ShaderRegistry — GLSL 源码 → WebGLProgram 编译缓存（F8 修复：加入 uniform location 缓存）
  *
  * 设计要点：
  *   - 相同 (vert, frag, precision) 编译一次，后续 get() 返回缓存 program
  *   - 统一注入 `#version 300 es\nprecision X float;` 头（shader 源码里无需重复）
  *   - 暴露 compileCount 用于测试断言"相同配对不重复编译"
+ *   - **F8：每个 program 自带 `uniformLocation(name)` 缓存**，避免每帧 O(N) 次 getUniformLocation 调用
  *   - dispose() 释放所有 program（context lost / hot reload 时清理）
  */
 import type { GLContext, Precision } from './GLContext'
@@ -36,8 +37,41 @@ export class ShaderCompileError extends Error {
   }
 }
 
+/**
+ * 编译后的 program + 其 uniform location 缓存（F8）。
+ *
+ * getUniformLocation 在 Chrome 下每次调用都要走字符串查找 + CPU→GPU 同步点；
+ * 拖滑块时一帧会经过 8-10 个 pass，每个 pass 有 5-25 个 uniform，
+ * 无缓存时每帧多达 200 次 GL 调用。Runtime 缓存消除该开销。
+ */
+export class CompiledProgram {
+  private _uniformLocations = new Map<string, WebGLUniformLocation | null>()
+
+  constructor(
+    public readonly program: WebGLProgram,
+    private readonly gl: WebGL2RenderingContext,
+  ) {}
+
+  /**
+   * 取 uniform 位置；结果缓存（包括"该 uniform 被 glsl 优化掉" 的 null 状态）。
+   * 返回 null 表示 shader 里没用到（不是 bug，bindUniform 会跳过）。
+   */
+  getUniformLocation(name: string): WebGLUniformLocation | null {
+    const cached = this._uniformLocations.get(name)
+    if (cached !== undefined) return cached
+    const loc = this.gl.getUniformLocation(this.program, name)
+    this._uniformLocations.set(name, loc)
+    return loc
+  }
+
+  /** 清空 location 缓存（program 内部状态没变时一般不需要；dispose 会整体清） */
+  _clearLocationCache(): void {
+    this._uniformLocations.clear()
+  }
+}
+
 export class ShaderRegistry {
-  private _cache = new Map<string, WebGLProgram>()
+  private _cache = new Map<string, CompiledProgram>()
   private _compileCount = 0
 
   constructor(private ctx: GLContext) {}
@@ -52,27 +86,37 @@ export class ShaderRegistry {
   }
 
   /**
-   * 获取或编译 program
-   * vert/frag 源码**不要**自带 `#version`/`precision` 行，Registry 会统一注入
+   * 获取或编译 program（返回带缓存的 CompiledProgram 包装）。
+   *
+   * vert/frag 源码**不要**自带 `#version`/`precision` 行，Registry 会统一注入。
    */
-  get(vert: string, frag: string): WebGLProgram {
+  getCompiled(vert: string, frag: string): CompiledProgram {
     if (!this.ctx.gl) throw new Error('GL not available')
     const key = makeKey(vert, frag, this.ctx.precision)
     const cached = this._cache.get(key)
     if (cached) return cached
     const program = this._compile(vert, frag)
-    this._cache.set(key, program)
+    const wrapped = new CompiledProgram(program, this.ctx.gl)
+    this._cache.set(key, wrapped)
     this._compileCount++
-    return program
+    return wrapped
+  }
+
+  /**
+   * 取裸 WebGLProgram —— 旧 API 兼容（测试 webglEngine.test.ts 会用）
+   */
+  get(vert: string, frag: string): WebGLProgram {
+    return this.getCompiled(vert, frag).program
   }
 
   /** 清理一个 program（调试/特定场景） */
   delete(vert: string, frag: string): boolean {
     if (!this.ctx.gl) return false
     const key = makeKey(vert, frag, this.ctx.precision)
-    const program = this._cache.get(key)
-    if (!program) return false
-    this.ctx.gl.deleteProgram(program)
+    const wrapped = this._cache.get(key)
+    if (!wrapped) return false
+    this.ctx.gl.deleteProgram(wrapped.program)
+    wrapped._clearLocationCache()
     return this._cache.delete(key)
   }
 
@@ -80,7 +124,10 @@ export class ShaderRegistry {
   dispose(): void {
     const gl = this.ctx.gl
     if (gl) {
-      for (const p of this._cache.values()) gl.deleteProgram(p)
+      for (const w of this._cache.values()) {
+        gl.deleteProgram(w.program)
+        w._clearLocationCache()
+      }
     }
     this._cache.clear()
   }

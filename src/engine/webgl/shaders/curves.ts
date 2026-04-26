@@ -71,9 +71,18 @@ export function identityCurveLut(): Float32Array {
 
 /**
  * 把稀疏点 [{x,y},...] 采样为 256 点 LUT（输出 [0,1]）。
- * 使用单调三次样条（Catmull-Rom with monotonic clamp）：
- *   - 端点外推到 x=0 / x=255 以保证 LUT 两端有值
- *   - 若只有 ≤1 个点或所有点都是恒等线（y=x），返回恒等 LUT
+ *
+ * F9 修复：使用**真正的 monotonic cubic Hermite interpolation**。
+ *
+ * 原版问题：
+ *   - 旧代码只算了 h00/h01，丢掉了切线项 h10·m0 / h11·m1，退化为 smoothstep
+ *   - 与注释声称的 "Catmull-Rom with monotonic clamp" 完全不符
+ *
+ * 新实现：
+ *   - 用邻居节点估算每个控制点的切线 m_k = (y_{k+1} - y_{k-1}) / (x_{k+1} - x_{k-1})
+ *   - 单调性 clamp（Fritsch-Carlson 方法）：若相邻段有符号变化，切线强制为 0，
+ *     防止 S 曲线过冲
+ *   - Hermite 基函数 h00/h10/h01/h11 完整使用
  */
 export function curvePointsToLut(points: CurvePoint[] | undefined): Float32Array {
   if (!points || points.length === 0) return identityCurveLut()
@@ -92,25 +101,73 @@ export function curvePointsToLut(points: CurvePoint[] | undefined): Float32Array
     sorted.push({ x: 255, y: sorted[sorted.length - 1]!.y })
   }
 
+  const n = sorted.length
+
+  // 段斜率 delta_k = (y_{k+1} - y_k) / (x_{k+1} - x_k)
+  const delta = new Float32Array(n - 1)
+  for (let k = 0; k < n - 1; k++) {
+    const dx = Math.max(1, sorted[k + 1]!.x - sorted[k]!.x)
+    delta[k] = (sorted[k + 1]!.y - sorted[k]!.y) / dx
+  }
+
+  // 节点切线 m_k：
+  //   端点：直接取邻段斜率
+  //   内点：相邻段斜率平均；若相邻段符号不同（极值点），强制 m=0 保单调
+  const m = new Float32Array(n)
+  m[0] = delta[0] ?? 0
+  m[n - 1] = delta[n - 2] ?? 0
+  for (let k = 1; k < n - 1; k++) {
+    const dPrev = delta[k - 1]!
+    const dNext = delta[k]!
+    // Fritsch-Carlson monotonic clamp：符号不同即为 0
+    if (dPrev * dNext <= 0) {
+      m[k] = 0
+    } else {
+      m[k] = (dPrev + dNext) * 0.5
+    }
+  }
+  // 进一步 monotonic clamp：若 |m_k| > 3·|delta|，裁到 3·delta（经典 Hyman / Fritsch 准则）
+  for (let k = 0; k < n - 1; k++) {
+    const d = delta[k]!
+    if (d === 0) {
+      m[k] = 0
+      m[k + 1] = 0
+    } else {
+      const a = m[k]! / d
+      const b = m[k + 1]! / d
+      const s = a * a + b * b
+      if (s > 9) {
+        const t = 3 / Math.sqrt(s)
+        m[k] = t * a * d
+        m[k + 1] = t * b * d
+      }
+    }
+  }
+
   const lut = new Float32Array(256)
   for (let i = 0; i < 256; i++) {
-    // 找到 i 所在的段 [sorted[j], sorted[j+1]]
+    // 找到 i 所在的段
     let j = 0
-    while (j < sorted.length - 1 && sorted[j + 1]!.x < i) j++
-    if (j >= sorted.length - 1) {
-      lut[i] = sorted[sorted.length - 1]!.y / 255
+    while (j < n - 1 && sorted[j + 1]!.x < i) j++
+    if (j >= n - 1) {
+      lut[i] = sorted[n - 1]!.y / 255
       continue
     }
     const p0 = sorted[j]!
     const p1 = sorted[j + 1]!
     const span = Math.max(1, p1.x - p0.x)
     const t = (i - p0.x) / span
-    // 三次平滑（Hermite，切线取 0 使曲线在端点平缓，避免过冲）
     const t2 = t * t
     const t3 = t2 * t
+
+    // Hermite 基函数（单位区间）：
     const h00 = 2 * t3 - 3 * t2 + 1
+    const h10 = t3 - 2 * t2 + t
     const h01 = -2 * t3 + 3 * t2
-    const y = h00 * p0.y + h01 * p1.y
+    const h11 = t3 - t2
+
+    // 切线要乘以 span（区间宽度），因为基函数定义在 [0,1]
+    const y = h00 * p0.y + h10 * m[j]! * span + h01 * p1.y + h11 * m[j + 1]! * span
     lut[i] = clamp(y / 255, 0, 1)
   }
   return lut
