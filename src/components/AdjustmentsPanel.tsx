@@ -1,7 +1,7 @@
 /**
- * AdjustmentsPanel — Editor 右栏的手动参数滑块面板
+ * AdjustmentsPanel — Editor 右栏的手动参数滑块面板（P0-3 重构）
  *
- * 范围（M2 + M3.5 优化）：
+ * 范围：
  *   - Basic：曝光 / 对比度 / 高光 / 阴影 / 白色 / 黑色
  *   - White Balance：色温 / 色调
  *   - Presence：清晰度 / 饱和度 / 自然饱和度
@@ -12,13 +12,251 @@
  *   - 所有滑块采用 ease-center 曲线：中段微调更精细，两端快速达到极端
  *   - step 值细化：曝光 0.01 EV、其它 0.1..1（Shift 加速 10×，Alt 精细 0.1×）
  *
- * 所有修改走 editStore actions；useWebGLPreview 会自动重渲染（rAF 合并节流）
+ * **P0-3 性能设计（核心）**：
+ *   - 每个滑块是独立 memo 组件，**只订阅自己关心的单字段**（如 `pipeline.tone.exposure`）
+ *   - 这样拖"曝光"滑块时，其它 19 个滑块不会因 currentPipeline 顶层引用变化而重渲染
+ *   - setter 直接从 `useEditStore.getState()` 取（引用稳定，不触发 memo 失效）
+ *   - commitHistory 也从 getState 拿
+ *
+ * 修复前行为（性能审判报告 F8-perf）：
+ *   整个 panel 订阅 `currentPipeline` → immer 每次 set → 顶层对象变 →
+ *   20+ 个 Slider 全量 re-render + 每个 Slider 的 inline onChange 新引用 →
+ *   React fiber 协调 ~5ms/frame
+ *
+ * 修复后行为：
+ *   拖曝光滑块 → 只有"曝光 Slider"和"相关 ValueBadge/顶栏 dirty 标"重渲 → <1ms
  */
 import { ChevronDown, ChevronRight, RotateCcw } from 'lucide-react'
-import { useState } from 'react'
+import { memo, useCallback, useState } from 'react'
 import { cn } from '../design'
 import { Slider } from '../design/components/Slider'
 import { useEditStore } from '../stores/editStore'
+
+// -----------------------------------------------------------------------------
+// store 取 action 的 helper —— 引用稳定（zustand action 在 store 生命周期内恒定）
+// 定义在 module 顶层，让所有 Slider 子组件共享同一个闭包，避免每次重渲染重分配
+// -----------------------------------------------------------------------------
+
+const getSetTone = () => useEditStore.getState().setTone
+const getSetWB = () => useEditStore.getState().setWhiteBalance
+const getSetVignette = () => useEditStore.getState().setVignette
+const getSetClarity = () => useEditStore.getState().setClarity
+const getSetSaturation = () => useEditStore.getState().setSaturation
+const getSetVibrance = () => useEditStore.getState().setVibrance
+const getCommitHistory = () => useEditStore.getState().commitHistory
+
+// -----------------------------------------------------------------------------
+// 子组件：每个 Slider 一个 memo 函数，单字段订阅
+// -----------------------------------------------------------------------------
+
+interface ToneFieldSliderProps {
+  label: string
+  field: 'exposure' | 'contrast' | 'highlights' | 'shadows' | 'whites' | 'blacks'
+  min: number
+  max: number
+  step: number
+  precision?: number
+  suffix?: string
+  curve?: 'linear' | 'ease-center'
+}
+
+const ToneFieldSlider = memo(function ToneFieldSlider({
+  label,
+  field,
+  min,
+  max,
+  step,
+  precision,
+  suffix,
+  curve,
+}: ToneFieldSliderProps) {
+  // 关键：只订阅单字段，不依赖 currentPipeline 顶层
+  const value = useEditStore((s) => s.currentPipeline?.tone?.[field] ?? 0)
+  const onChange = useCallback(
+    (v: number) => {
+      getSetTone()({ [field]: v })
+    },
+    [field],
+  )
+  const onChangeEnd = useCallback(() => {
+    getCommitHistory()(label)
+  }, [label])
+  return (
+    <Slider
+      label={label}
+      value={value}
+      min={min}
+      max={max}
+      step={step}
+      precision={precision}
+      suffix={suffix}
+      bipolar
+      compact
+      curve={curve}
+      onChange={onChange}
+      onChangeEnd={onChangeEnd}
+    />
+  )
+})
+
+const WbTempSlider = memo(function WbTempSlider() {
+  const value = useEditStore((s) => s.currentPipeline?.whiteBalance?.temp ?? 0)
+  const onChange = useCallback((v: number) => {
+    getSetWB()({ temp: v })
+  }, [])
+  const onChangeEnd = useCallback(() => getCommitHistory()('色温'), [])
+  return (
+    <Slider
+      label="色温"
+      value={value}
+      min={-100}
+      max={100}
+      step={1}
+      bipolar
+      compact
+      curve="ease-center"
+      onChange={onChange}
+      onChangeEnd={onChangeEnd}
+    />
+  )
+})
+
+const WbTintSlider = memo(function WbTintSlider() {
+  const value = useEditStore((s) => s.currentPipeline?.whiteBalance?.tint ?? 0)
+  const onChange = useCallback((v: number) => {
+    getSetWB()({ tint: v })
+  }, [])
+  const onChangeEnd = useCallback(() => getCommitHistory()('色调'), [])
+  return (
+    <Slider
+      label="色调"
+      value={value}
+      min={-100}
+      max={100}
+      step={1}
+      bipolar
+      compact
+      curve="ease-center"
+      onChange={onChange}
+      onChangeEnd={onChangeEnd}
+    />
+  )
+})
+
+const ClaritySlider = memo(function ClaritySlider() {
+  const value = useEditStore((s) => s.currentPipeline?.clarity ?? 0)
+  const onChange = useCallback((v: number) => {
+    getSetClarity()(v)
+  }, [])
+  const onChangeEnd = useCallback(() => getCommitHistory()('清晰度'), [])
+  return (
+    <Slider
+      label="清晰度"
+      value={value}
+      min={-100}
+      max={100}
+      step={1}
+      bipolar
+      compact
+      curve="ease-center"
+      onChange={onChange}
+      onChangeEnd={onChangeEnd}
+    />
+  )
+})
+
+const VibranceSlider = memo(function VibranceSlider() {
+  const value = useEditStore((s) => s.currentPipeline?.vibrance ?? 0)
+  const onChange = useCallback((v: number) => {
+    getSetVibrance()(v)
+  }, [])
+  const onChangeEnd = useCallback(() => getCommitHistory()('自然饱和度'), [])
+  return (
+    <Slider
+      label="自然饱和度"
+      value={value}
+      min={-100}
+      max={100}
+      step={1}
+      bipolar
+      compact
+      curve="ease-center"
+      onChange={onChange}
+      onChangeEnd={onChangeEnd}
+    />
+  )
+})
+
+const SaturationSlider = memo(function SaturationSlider() {
+  const value = useEditStore((s) => s.currentPipeline?.saturation ?? 0)
+  const onChange = useCallback((v: number) => {
+    getSetSaturation()(v)
+  }, [])
+  const onChangeEnd = useCallback(() => getCommitHistory()('饱和度'), [])
+  return (
+    <Slider
+      label="饱和度"
+      value={value}
+      min={-100}
+      max={100}
+      step={1}
+      bipolar
+      compact
+      curve="ease-center"
+      onChange={onChange}
+      onChangeEnd={onChangeEnd}
+    />
+  )
+})
+
+interface VignetteFieldSliderProps {
+  label: string
+  field: 'amount' | 'midpoint' | 'roundness' | 'feather'
+  min: number
+  max: number
+  bipolar: boolean
+  curve?: 'linear' | 'ease-center'
+  commitLabel: string
+  defaultValue: number
+}
+
+const VignetteFieldSlider = memo(function VignetteFieldSlider({
+  label,
+  field,
+  min,
+  max,
+  bipolar,
+  curve,
+  commitLabel,
+  defaultValue,
+}: VignetteFieldSliderProps) {
+  const value = useEditStore((s) => s.currentPipeline?.vignette?.[field] ?? defaultValue)
+  const onChange = useCallback(
+    (v: number) => {
+      getSetVignette()({ [field]: v })
+    },
+    [field],
+  )
+  const onChangeEnd = useCallback(() => getCommitHistory()(commitLabel), [commitLabel])
+  return (
+    <Slider
+      label={label}
+      value={value}
+      min={min}
+      max={max}
+      step={1}
+      bipolar={bipolar}
+      compact
+      curve={curve}
+      onChange={onChange}
+      onChangeEnd={onChangeEnd}
+    />
+  )
+})
+
+// -----------------------------------------------------------------------------
+// Section 折叠容器
+// -----------------------------------------------------------------------------
 
 interface SectionProps {
   title: string
@@ -62,240 +300,107 @@ function Section({ title, defaultOpen = true, children, onReset }: SectionProps)
   )
 }
 
+// -----------------------------------------------------------------------------
+// 主面板 —— 不订阅 currentPipeline，只负责 layout + reset actions
+// -----------------------------------------------------------------------------
+
 export function AdjustmentsPanel() {
-  const pipeline = useEditStore((s) => s.currentPipeline)
-  const setTone = useEditStore((s) => s.setTone)
-  const setWB = useEditStore((s) => s.setWhiteBalance)
-  const setVignette = useEditStore((s) => s.setVignette)
-  const setClarity = useEditStore((s) => s.setClarity)
-  const setSaturation = useEditStore((s) => s.setSaturation)
-  const setVibrance = useEditStore((s) => s.setVibrance)
-  const commitHistory = useEditStore((s) => s.commitHistory)
-
-  const tone = pipeline?.tone
-  const wb = pipeline?.whiteBalance
-  const vignette = pipeline?.vignette
-
-  /**
-   * Slider 交互结束（松手 / 键盘 / 双击复位）时把当前状态入栈。
-   * 所有 Slider 共用此 helper：入栈语义对所有参数一致，label 提供 UI 可读性。
-   * 注意：commitHistory 本身幂等去重，同值不会重复入栈。
-   */
-  const commit = (label: string) => () => commitHistory(label)
-
-  /**
-   * Section 分组重置：先 commit 当前态 → 执行重置动作 → 再 commit 重置后的态，
-   * 保证撤销/重做能精确回退到 "重置前" 和 "重置后" 两个状态。
-   */
-  const resetWithHistory = (label: string, action: () => void) => () => {
-    commitHistory(`${label}前`)
-    action()
-    commitHistory(`${label}`)
-  }
+  // Section 的 reset helper：先 commit → 执行重置 → 再 commit
+  const resetBasic = useCallback(() => {
+    const st = useEditStore.getState()
+    st.commitHistory('重置 Basic 前')
+    st.setTone(null)
+    st.commitHistory('重置 Basic')
+  }, [])
+  const resetWB = useCallback(() => {
+    const st = useEditStore.getState()
+    st.commitHistory('重置 WhiteBalance 前')
+    st.setWhiteBalance(null)
+    st.commitHistory('重置 WhiteBalance')
+  }, [])
+  const resetPresence = useCallback(() => {
+    const st = useEditStore.getState()
+    st.commitHistory('重置 Presence 前')
+    st.setClarity(0)
+    st.setSaturation(0)
+    st.setVibrance(0)
+    st.commitHistory('重置 Presence')
+  }, [])
+  const resetVignette = useCallback(() => {
+    const st = useEditStore.getState()
+    st.commitHistory('重置 Vignette 前')
+    st.setVignette(null)
+    st.commitHistory('重置 Vignette')
+  }, [])
 
   return (
     <div className="flex flex-col">
-      {/* ============ Basic（Tone）============ */}
-      <Section title="Basic" onReset={resetWithHistory('重置 Basic', () => setTone(null))}>
-        <Slider
+      <Section title="Basic" onReset={resetBasic}>
+        <ToneFieldSlider
           label="曝光"
-          value={tone?.exposure ?? 0}
+          field="exposure"
           min={-5}
           max={5}
           step={0.01}
           precision={2}
           suffix=" EV"
-          bipolar
-          compact
-          onChange={(v) => setTone({ exposure: v })}
-          onChangeEnd={commit('曝光')}
         />
-        <Slider
-          label="对比度"
-          value={tone?.contrast ?? 0}
-          min={-100}
-          max={100}
-          step={1}
-          bipolar
-          compact
-          curve="ease-center"
-          onChange={(v) => setTone({ contrast: v })}
-          onChangeEnd={commit('对比度')}
-        />
-        <Slider
-          label="高光"
-          value={tone?.highlights ?? 0}
-          min={-100}
-          max={100}
-          step={1}
-          bipolar
-          compact
-          curve="ease-center"
-          onChange={(v) => setTone({ highlights: v })}
-          onChangeEnd={commit('高光')}
-        />
-        <Slider
-          label="阴影"
-          value={tone?.shadows ?? 0}
-          min={-100}
-          max={100}
-          step={1}
-          bipolar
-          compact
-          curve="ease-center"
-          onChange={(v) => setTone({ shadows: v })}
-          onChangeEnd={commit('阴影')}
-        />
-        <Slider
-          label="白色"
-          value={tone?.whites ?? 0}
-          min={-100}
-          max={100}
-          step={1}
-          bipolar
-          compact
-          curve="ease-center"
-          onChange={(v) => setTone({ whites: v })}
-          onChangeEnd={commit('白色')}
-        />
-        <Slider
-          label="黑色"
-          value={tone?.blacks ?? 0}
-          min={-100}
-          max={100}
-          step={1}
-          bipolar
-          compact
-          curve="ease-center"
-          onChange={(v) => setTone({ blacks: v })}
-          onChangeEnd={commit('黑色')}
-        />
+        <ToneFieldSlider label="对比度" field="contrast" min={-100} max={100} step={1} curve="ease-center" />
+        <ToneFieldSlider label="高光" field="highlights" min={-100} max={100} step={1} curve="ease-center" />
+        <ToneFieldSlider label="阴影" field="shadows" min={-100} max={100} step={1} curve="ease-center" />
+        <ToneFieldSlider label="白色" field="whites" min={-100} max={100} step={1} curve="ease-center" />
+        <ToneFieldSlider label="黑色" field="blacks" min={-100} max={100} step={1} curve="ease-center" />
       </Section>
 
-      {/* ============ White Balance ============ */}
-      <Section title="White Balance" onReset={resetWithHistory('重置 White Balance', () => setWB(null))}>
-        <Slider
-          label="色温"
-          value={wb?.temp ?? 0}
-          min={-100}
-          max={100}
-          step={1}
-          bipolar
-          compact
-          curve="ease-center"
-          onChange={(v) => setWB({ temp: v })}
-          onChangeEnd={commit('色温')}
-        />
-        <Slider
-          label="色调"
-          value={wb?.tint ?? 0}
-          min={-100}
-          max={100}
-          step={1}
-          bipolar
-          compact
-          curve="ease-center"
-          onChange={(v) => setWB({ tint: v })}
-          onChangeEnd={commit('色调')}
-        />
+      <Section title="White Balance" onReset={resetWB}>
+        <WbTempSlider />
+        <WbTintSlider />
       </Section>
 
-      {/* ============ Presence ============ */}
-      <Section
-        title="Presence"
-        onReset={resetWithHistory('重置 Presence', () => {
-          setClarity(0)
-          setSaturation(0)
-          setVibrance(0)
-        })}
-      >
-        <Slider
-          label="清晰度"
-          value={pipeline?.clarity ?? 0}
-          min={-100}
-          max={100}
-          step={1}
-          bipolar
-          compact
-          curve="ease-center"
-          onChange={setClarity}
-          onChangeEnd={commit('清晰度')}
-        />
-        <Slider
-          label="自然饱和度"
-          value={pipeline?.vibrance ?? 0}
-          min={-100}
-          max={100}
-          step={1}
-          bipolar
-          compact
-          curve="ease-center"
-          onChange={setVibrance}
-          onChangeEnd={commit('自然饱和度')}
-        />
-        <Slider
-          label="饱和度"
-          value={pipeline?.saturation ?? 0}
-          min={-100}
-          max={100}
-          step={1}
-          bipolar
-          compact
-          curve="ease-center"
-          onChange={setSaturation}
-          onChangeEnd={commit('饱和度')}
-        />
+      <Section title="Presence" onReset={resetPresence}>
+        <ClaritySlider />
+        <VibranceSlider />
+        <SaturationSlider />
       </Section>
 
-      {/* ============ Vignette ============ */}
-      <Section
-        title="Vignette"
-        defaultOpen={false}
-        onReset={resetWithHistory('重置 Vignette', () => setVignette(null))}
-      >
-        <Slider
+      <Section title="Vignette" defaultOpen={false} onReset={resetVignette}>
+        <VignetteFieldSlider
           label="强度"
-          value={vignette?.amount ?? 0}
+          field="amount"
           min={-100}
           max={100}
-          step={1}
           bipolar
-          compact
           curve="ease-center"
-          onChange={(v) => setVignette({ amount: v })}
-          onChangeEnd={commit('暗角强度')}
+          commitLabel="暗角强度"
+          defaultValue={0}
         />
-        <Slider
+        <VignetteFieldSlider
           label="中心"
-          value={vignette?.midpoint ?? 50}
+          field="midpoint"
           min={0}
           max={100}
-          step={1}
-          compact
-          onChange={(v) => setVignette({ midpoint: v })}
-          onChangeEnd={commit('暗角中心')}
+          bipolar={false}
+          commitLabel="暗角中心"
+          defaultValue={50}
         />
-        <Slider
+        <VignetteFieldSlider
           label="圆度"
-          value={vignette?.roundness ?? 0}
+          field="roundness"
           min={-100}
           max={100}
-          step={1}
           bipolar
-          compact
           curve="ease-center"
-          onChange={(v) => setVignette({ roundness: v })}
-          onChangeEnd={commit('暗角圆度')}
+          commitLabel="暗角圆度"
+          defaultValue={0}
         />
-        <Slider
+        <VignetteFieldSlider
           label="羽化"
-          value={vignette?.feather ?? 50}
+          field="feather"
           min={0}
           max={100}
-          step={1}
-          compact
-          onChange={(v) => setVignette({ feather: v })}
-          onChangeEnd={commit('暗角羽化')}
+          bipolar={false}
+          commitLabel="暗角羽化"
+          defaultValue={50}
         />
       </Section>
     </div>

@@ -8,7 +8,7 @@
  *   - 右栏 Tab   : 滤镜列表 | 参数调整（滑块）
  */
 import { Download, Redo2, RotateCcw, Save, Sliders, SplitSquareHorizontal, Undo2, Wand2 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AdjustmentsPanel } from '../components/AdjustmentsPanel'
 import { Histogram, ScoreBar, ValueBadge, cn } from '../design'
@@ -22,12 +22,12 @@ type RightPanelTab = 'filters' | 'adjust'
 
 export default function Editor() {
   const { photoId } = useParams()
-  const photos = useAppStore((s) => s.photos)
+  // P0-6：精准 selector —— 只在"当前这张照片"或"第一张照片"真变时才重渲
+  //   旧实现 useAppStore((s) => s.photos) 会让 Editor 订阅整个数组，
+  //   Library 导入/删除别的照片都会导致 Editor 重渲染
+  const photo = useAppStore((s) => s.photos.find((p) => p.id === photoId) ?? s.photos[0])
   const filters = useAppStore((s) => s.filters)
   const activeFilterId = useAppStore((s) => s.activeFilterId)
-  const setActiveFilter = useAppStore((s) => s.setActiveFilter)
-
-  const photo = useMemo(() => photos.find((p) => p.id === photoId) ?? photos[0], [photos, photoId])
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewError, setPreviewError] = useState<string | null>(null)
@@ -160,7 +160,7 @@ export default function Editor() {
     try {
       await ipc('filter:save', preset)
       await refreshFilters()
-      setActiveFilter(id)
+      useAppStore.getState().setActiveFilter(id)
       // 新滤镜作为新 baseline，历史也重置（切换滤镜的标准行为由 loadFromPreset 承担）
     } catch (err) {
       console.error('[filter:save]', err)
@@ -223,13 +223,17 @@ export default function Editor() {
   //   - GPU 正常路径：override=undefined，主进程只根据 photoPath + filterId 给"基准原图"
   //   - CPU 兜底：override=currentPipeline，主进程烘焙滤镜到 data URL
   //   - currentPipeline / needsCpuFallback 经 debouncedPipelineKey 间接依赖，避免每帧 IPC
+  //
+  // P0-6：切滤镜 / 切照片只拉一次 preview；拖滑块（GPU 正常路径）不会触发本 effect，
+  //   因为 pipelineKey 在 !needsCpuFallback 时恒为 null，debouncedPipelineKey 不变化。
+  //   Guard：显式在 effect 内再检查一次，防御 webgl.status 抖动时的误触发。
   // biome-ignore lint/correctness/useExhaustiveDependencies: currentPipeline/needsCpuFallback 已由 debouncedPipelineKey 代理
   useEffect(() => {
     if (!photoPath) return
     let alive = true
     setLoading(true)
     setPreviewError(null)
-    // CPU 兜底时传 currentPipeline 作 pipelineOverride，GPU 路径传 undefined
+    // 再次确认：GPU 正常路径下不传 pipelineOverride（避免主进程 sharp 重做 pipeline）
     const override = needsCpuFallback ? (currentPipeline ?? undefined) : undefined
     ipc('preview:render', photoPath, ipcFilterId, override)
       .then((url) => {
@@ -393,9 +397,9 @@ export default function Editor() {
                 GL: {webgl.error}
               </div>
             )}
-            {/* Dev 诊断条：webgl 状态 + pipeline 通道数 + 兜底原因；仅 import.meta.env.DEV 显示 */}
+            {/* Dev 诊断条：webgl 状态 + pipeline 通道数 + 兜底原因 + Frame budget；仅 import.meta.env.DEV 显示 */}
             {import.meta.env.DEV && (
-              <div className="absolute top-3 left-3 text-xxs font-mono bg-black/60 text-fg-2 px-2 py-1 rounded pointer-events-none">
+              <div className="absolute top-3 left-3 text-xxs font-mono bg-black/60 text-fg-2 px-2 py-1 rounded pointer-events-none space-y-0.5">
                 <div>
                   gl: {webgl.status}
                   {webgl.error ? ` (${webgl.error.slice(0, 40)})` : ''}
@@ -404,6 +408,12 @@ export default function Editor() {
                   pipeline: {currentPipeline ? countPipelineChannels(currentPipeline) : 0} ch ·{' '}
                   {needsCpuFallback ? 'CPU' : 'GPU'}
                 </div>
+                {webgl.perf && (
+                  <div>
+                    frame: {webgl.perf.totalMs.toFixed(1)}ms · run {webgl.perf.pipelineRunMs.toFixed(1)} · rd{' '}
+                    {webgl.perf.readPixelsMs.toFixed(1)} · hist {webgl.perf.histogramMs.toFixed(1)}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -450,7 +460,7 @@ export default function Editor() {
           {rightTab === 'filters' ? (
             <div className="p-3 space-y-3">
               {/* 原图 —— 永远在最顶部，与分组解耦 */}
-              <FilterRow name="原图" active={!activeFilterId} onClick={() => setActiveFilter(null)} />
+              <FilterRow name="原图" active={!activeFilterId} filterId={null} />
 
               {/* 三层分组（extracted → imported → community），空组隐藏 */}
               {filterGroups
@@ -486,7 +496,7 @@ export default function Editor() {
                             popularity={f.popularity}
                             tags={f.tags}
                             active={f.id === activeFilterId}
-                            onClick={() => setActiveFilter(f.id)}
+                            filterId={f.id}
                           />
                         ))}
                       </div>
@@ -572,23 +582,41 @@ function ExifItem({ label, value }: { label: string; value: string }) {
   )
 }
 
-function FilterRow({
+function FilterRow(props: {
+  name: string
+  popularity?: number
+  tags?: string[]
+  active: boolean
+  filterId: string | null
+}) {
+  return <FilterRowMemo {...props} />
+}
+
+/**
+ * P0-6：memo 稳定列表项，避免拖滑块导致整张 filter 列表重渲
+ * （Editor 订阅 currentPipeline，每次 setTone 都会让 Editor re-render）
+ *
+ * 接口：传 filterId 而不是 onClick，组件内部从 store.getState 拿 setter。
+ * 这样 props 全是稳定值（string/number/boolean/string[]），memo shallow compare 直接剪枝。
+ */
+const FilterRowMemo = memo(function FilterRowInner({
   name,
   popularity,
   tags,
   active,
-  onClick,
+  filterId,
 }: {
   name: string
   popularity?: number
   tags?: string[]
   active: boolean
-  onClick: () => void
+  filterId: string | null
 }) {
+  const handleClick = () => useAppStore.getState().setActiveFilter(filterId)
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={handleClick}
       className={cn(
         'w-full text-left px-3 py-2.5 rounded-md transition-all duration-fast',
         active
@@ -612,4 +640,4 @@ function FilterRow({
       )}
     </button>
   )
-}
+})

@@ -15,7 +15,7 @@
  *   - onChange 每帧至多一次（rAF 合并）
  *   - onChangeEnd（松手 / 键盘操作 / 双击复位）始终触发，用于记录历史栈
  */
-import { type KeyboardEvent, type PointerEvent, useCallback, useEffect, useRef, useState } from 'react'
+import { type KeyboardEvent, type PointerEvent, memo, useCallback, useEffect, useRef, useState } from 'react'
 import { clamp, cn, fmtSigned } from '../utils'
 
 /**
@@ -81,7 +81,17 @@ export function mapValueToRatio(value: number, min: number, max: number, curve: 
   return clamp(d + 0.5, 0, 1)
 }
 
-export function Slider({
+/**
+ * P0-3：用 memo 包一层，使 props 引用稳定时不重渲染。
+ *
+ * 调用方规范（AdjustmentsPanel / 其它面板）：
+ *   - onChange / onChangeEnd 必须用稳定引用（从 store.getState() 取或 useCallback 包）
+ *   - 否则每次父组件 render 都会制造新函数引用 → memo 失效
+ *
+ * 这样当"曝光滑块"的 value 变化时，其它 20+ slider 即便被父组件 re-render 也会在
+ * memo 层被剪枝，只有 value 真正变的那一个 slider 重绘。
+ */
+export const Slider = memo(function SliderInner({
   label,
   value,
   onChange,
@@ -313,4 +323,4 @@ export function Slider({
       </div>
     </div>
   )
-}
+})

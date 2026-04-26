@@ -1,11 +1,16 @@
 /**
- * ShaderRegistry — GLSL 源码 → WebGLProgram 编译缓存（F8 修复：加入 uniform location 缓存）
+ * ShaderRegistry — GLSL 源码 → WebGLProgram 编译缓存（P0-4 优化版）
  *
  * 设计要点：
  *   - 相同 (vert, frag, precision) 编译一次，后续 get() 返回缓存 program
  *   - 统一注入 `#version 300 es\nprecision X float;` 头（shader 源码里无需重复）
  *   - 暴露 compileCount 用于测试断言"相同配对不重复编译"
- *   - **F8：每个 program 自带 `uniformLocation(name)` 缓存**，避免每帧 O(N) 次 getUniformLocation 调用
+ *   - **F8：每个 program 自带 `uniformLocation(name)` 缓存**
+ *   - **P0-4：lookup key 用 `WeakMap<fragString, id>` 对象身份**
+ *     - 原实现每次 runPass 都做 djb2 hash 完整 shader 源码（单次 ~1.7μs × 10 pass = 17μs/frame）
+ *     - shader 源码都是 ES module 的 const string，**字符串身份稳定** —— 用 id 映射代替 hash
+ *     - 字符串不能直接当 WeakMap key（V8 限制），但我们可以先 `Map<string, id>` intern 一次，
+ *       后续用 id（number）组合生成短 key —— 同样是 O(1)，零字符串遍历
  *   - dispose() 释放所有 program（context lost / hot reload 时清理）
  */
 import type { GLContext, Precision } from './GLContext'
@@ -16,14 +21,34 @@ function precisionHeader(p: Precision): string {
   return `precision ${p} float;\nprecision ${p} int;\nprecision ${p} sampler2D;\n`
 }
 
+/**
+ * P0-4：字符串 → 数字 id 的 intern 映射（模块级单例）。
+ *
+ * 每个不同的 shader 源码字符串（import 的 const，身份稳定）在首次出现时
+ * 分配一个递增 id；之后相同字符串同一 id。避免每次 lookup 都 hash 整个源码。
+ */
+const _shaderIdMap = new Map<string, number>()
+let _nextShaderId = 1
+
+function internShaderId(src: string): number {
+  const cached = _shaderIdMap.get(src)
+  if (cached !== undefined) return cached
+  const id = _nextShaderId++
+  _shaderIdMap.set(src, id)
+  return id
+}
+
+/** 测试辅助：清空 intern map（通常不需要） */
+export function _resetShaderIdMapForTest(): void {
+  _shaderIdMap.clear()
+  _nextShaderId = 1
+}
+
 function makeKey(vert: string, frag: string, precision: Precision): string {
-  // djb2 hash — 编译 key 要稳定且短
-  let h = 5381
-  const s = `${precision}::${vert.length}::${frag.length}::${vert}::${frag}`
-  for (let i = 0; i < s.length; i++) {
-    h = ((h << 5) + h + s.charCodeAt(i)) | 0
-  }
-  return h.toString(36)
+  const vid = internShaderId(vert)
+  const fid = internShaderId(frag)
+  // precision 只有 highp/mediump 两种；用单字符前缀足够
+  return `${precision[0]}${vid}:${fid}`
 }
 
 export class ShaderCompileError extends Error {

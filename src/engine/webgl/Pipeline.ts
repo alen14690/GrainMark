@@ -69,9 +69,48 @@ export class Pipeline {
     this.vert = vert
   }
 
-  /** 替换整条 pipeline 步骤（通常在参数变化时调用） */
+  /** 替换整条 pipeline 步骤（结构变化时调用，如通道开/关、LUT 加载完成） */
   setSteps(steps: PipelineStep[]): void {
     this.steps = steps
+  }
+
+  /**
+   * P0-2 快路径：pipeline **结构不变**时只原地更新 uniforms，不重建 step 数组。
+   *
+   * 典型场景：滑块拖动只改 `u_exposure` 数值，step 数量/顺序/shader/extraInputs 都没变。
+   *
+   * @param nextUniforms 新 uniform 数组，length 必须等于当前 steps.length；第 i 项对应 steps[i]
+   * @returns true 表示成功原地更新；false 表示长度不匹配（调用方应走 setSteps 降级）
+   */
+  updateUniforms(nextUniforms: Array<PassConfig['uniforms']>): boolean {
+    if (nextUniforms.length !== this.steps.length) return false
+    for (let i = 0; i < this.steps.length; i++) {
+      this.steps[i]!.uniforms = nextUniforms[i]
+    }
+    return true
+  }
+
+  /**
+   * 生成当前 steps 的结构签名（不含 uniform 数值）。
+   * 签名相同 ⇔ 可以用 updateUniforms 快路径。
+   *
+   * 签名包含：顺序 + id + frag 源码身份（字符串相等 OK，因为 shader 是 import 常量）+
+   *           extraInputs 的 name+texture 身份。
+   */
+  getStructuralKey(): string {
+    if (this.steps.length === 0) return '∅'
+    const parts: string[] = []
+    for (const s of this.steps) {
+      parts.push(s.id)
+      // frag 是 import 的字符串常量，长度足够区分；为安全起见带长度
+      parts.push(String(s.frag.length))
+      if (s.extraInputs && s.extraInputs.length > 0) {
+        for (const inp of s.extraInputs) {
+          parts.push(`${inp.name}#${inp.texture.width}x${inp.texture.height}`)
+        }
+      }
+    }
+    return parts.join('|')
   }
 
   getSteps(): readonly PipelineStep[] {

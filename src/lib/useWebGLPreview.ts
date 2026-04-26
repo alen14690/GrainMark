@@ -7,21 +7,23 @@
  *   - sourceUrl 变化 → fetch → createImageBitmap → 上传 GPU
  *   - pipeline 变化 → setSteps + run (自动 abort 上一次 run)
  *   - LUT 异步加载：useLutTexture 管理，LUT ready 后自动重渲染
- *   - 返回：{ canvasRef, status, error, lastDurationMs, needsCpuFallback }
+ *   - 返回：{ canvasRef, status, error, lastDurationMs, needsCpuFallback, histogram, perf }
+ *
+ * 性能关键设计（P0 优化后）：
+ *   - **preserveDrawingBuffer=false**：浏览器合成器可直接用 swap chain，省每帧 2-5ms blit
+ *   - **直方图同 tick 读**：pipe.run 完成后立刻 readPixels 到预分配 buffer，无 setTimeout
+ *   - **Uint8Array 复用**：按最大 drawing buffer 尺寸预分配，避免每帧 6-8MB GC pressure
+ *   - **跳帧采样**：高频拖动时直方图每 3 帧采一次（而非 120ms debounce 的"等静止"）
+ *   - **perf 分段打点**：setSteps / pipeline.run / readPixels / computeHist 各自计时供 UI 显示
  *
  * 降级：
  *   - WebGL 2 不可用（GLContext.ok=false）→ status='unsupported'
  *   - sourceUrl 载入失败 → status='error' + error.message
  *   - context lost → status='lost'，尝试自动重建
- *   - Pass 3b-2 之后：LUT 解析失败（含 SecurityError 级别）会设 needsCpuFallback=true
- *     这样 Editor 会改走 IPC CPU 路径（虽然 CPU 端现在也没实现 LUT，但至少预览不会卡死）
+ *   - LUT 解析失败（含 SecurityError）会设 needsCpuFallback=true
  *
  * Pipeline 顺序（Lightroom 约定）：
  *   WB → Tone → Curves → HSL → ColorGrading → Adjustments → LUT → Halation → Grain → Vignette
- *
- * 为什么 LUT 在 ColorGrading 之后、Halation/Grain/Vignette 之前？
- *   - LUT 属于"最终色彩查表"，通常是创作者调好色之后再套个 look
- *   - 但颗粒/光晕/暗角是物理模拟（胶片感），必须最后叠加
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FilterPipeline } from '../../shared/types'
@@ -59,10 +61,29 @@ import {
   textureFromBitmap,
 } from '../engine/webgl'
 import type { PipelineStep, Texture } from '../engine/webgl'
-import { type HistogramBins, computeHistogramFromCanvas, emptyHistogram } from './histogram'
+import {
+  type HistogramBins,
+  computeHistogramFromRgba,
+  emptyHistogram,
+  readDrawingBufferToBuffer,
+} from './histogram'
 import { useLutTexture } from './useLutTexture'
 
 export type WebGLPreviewStatus = 'idle' | 'loading' | 'ready' | 'unsupported' | 'lost' | 'error'
+
+/** P0-1 新增：每帧分段耗时（Editor dev 面板显示 Frame budget） */
+export interface FramePerf {
+  /** pipelineToSteps + Pipeline.setSteps */
+  setStepsMs: number
+  /** Pipeline.run（含所有 pass 的 GL 调用） */
+  pipelineRunMs: number
+  /** readPixels（GPU→CPU 同步点；跳帧跳过时为 0） */
+  readPixelsMs: number
+  /** computeHistogramFromRgba（CPU bin 累加） */
+  histogramMs: number
+  /** 整个 renderNow 的 wall-clock */
+  totalMs: number
+}
 
 export interface WebGLPreviewResult {
   canvasRef: React.RefObject<HTMLCanvasElement>
@@ -76,6 +97,8 @@ export interface WebGLPreviewResult {
   needsCpuFallback: boolean
   /** 最近一次渲染后的直方图（256 bins × 4 通道）；未就绪时为 null */
   histogram: HistogramBins | null
+  /** P0-1 新增：最近一次 renderNow 的分段耗时；未渲染时 null */
+  perf: FramePerf | null
 }
 
 /** 构造 pipeline step 时需要的 GPU 资源（LUT 纹理等） */
@@ -196,6 +219,43 @@ export function pipelineToSteps(pipe: FilterPipeline | null, build: BuildContext
   return steps
 }
 
+/**
+ * 仅生成 pipeline 的**结构签名**（哪些通道开、顺序、LUT 是否就绪）。
+ *
+ * P0-2：滑块拖动时 99% 的变化只是 uniform 数值，结构签名不变。Editor 在
+ * pipeline-change useEffect 里用这个签名决定走 setSteps 还是 updateUniforms 快路径。
+ *
+ * 签名设计：只用"是否开启该通道"的布尔 + LUT 尺寸。与 pipelineToSteps 的
+ * identity 判断保持一致，避免两边漂移。
+ */
+export function pipelineStructuralKey(
+  pipe: FilterPipeline | null,
+  lutReady: boolean,
+  lutSize: number,
+): string {
+  if (!pipe) return '∅'
+  const bits: string[] = []
+  if (pipe.whiteBalance && (pipe.whiteBalance.temp !== 0 || pipe.whiteBalance.tint !== 0)) bits.push('wb')
+  if (pipe.tone) bits.push('tone')
+  if (pipe.curves && !isCurvesIdentity(pipe.curves)) bits.push('curves')
+  if (pipe.hsl && !isHslIdentity(pipe.hsl)) bits.push('hsl')
+  if (pipe.colorGrading && !isColorGradingIdentity(pipe.colorGrading)) bits.push('colorGrading')
+  if (!isAdjustmentsIdentity(pipe)) bits.push('adj')
+  if (pipe.lut && lutReady && lutSize >= 2) bits.push(`lut${lutSize}`)
+  if (pipe.halation && !isHalationIdentity(pipe.halation)) bits.push('halation')
+  if (pipe.grain && !isGrainIdentity(pipe.grain)) bits.push('grain')
+  if (pipe.vignette) bits.push('vignette')
+  return bits.join('|')
+}
+
+/**
+ * 直方图跳帧采样策略：高频拖动时每 HISTOGRAM_SAMPLE_EVERY 帧采一次；
+ * 松手后静止态自然会走一次额外渲染（pipeline 引用稳定），那次强制采一次。
+ *
+ * 3 帧 @ 60fps ≈ 50ms 间隔，比旧的 120ms debounce 更跟手。
+ */
+const HISTOGRAM_SAMPLE_EVERY = 3
+
 export function useWebGLPreview(
   sourceUrl: string | null,
   pipeline: FilterPipeline | null,
@@ -206,8 +266,7 @@ export function useWebGLPreview(
   const [lastDurationMs, setLastDurationMs] = useState<number | undefined>(undefined)
   const [gl, setGl] = useState<GLContext | null>(null)
   const [histogram, setHistogram] = useState<HistogramBins | null>(null)
-  // 直方图节流：滑块高频拖动时跳过中间帧，只对稳定态采样
-  const histogramTimerRef = useRef<number | null>(null)
+  const [perf, setPerf] = useState<FramePerf | null>(null)
 
   // 长期持有的 GL 对象（跨 render）
   const pipelineRef = useRef<Pipeline | null>(null)
@@ -218,6 +277,11 @@ export function useWebGLPreview(
   useEffect(() => {
     latestPipelineRef.current = pipeline
   }, [pipeline])
+
+  // P0-5：预分配的 readPixels 缓冲；按已见过的最大 drawing buffer 尺寸扩容
+  const histogramBufferRef = useRef<Uint8Array | null>(null)
+  // 跳帧计数：每 HISTOGRAM_SAMPLE_EVERY 帧采一次直方图
+  const histogramFrameCounterRef = useRef<number>(0)
 
   // LUT 纹理加载（异步）
   const lut = useLutTexture(gl, pipeline?.lut ?? null)
@@ -235,6 +299,10 @@ export function useWebGLPreview(
     abortRef.current?.abort()
     const ctrl = new AbortController()
     abortRef.current = ctrl
+
+    const tStart = performance.now()
+
+    // 1) setSteps
     const resolution: [number, number] = [source.width, source.height]
     pipe.setSteps(
       pipelineToSteps(latestPipelineRef.current, {
@@ -243,28 +311,60 @@ export function useWebGLPreview(
         lutSize: lut.size,
       }),
     )
+    const tAfterSetSteps = performance.now()
+
     try {
+      // 2) pipeline.run（所有 GL 调用同步派发，await 等 microtask）
       const stats = await pipe.run({ source, signal: ctrl.signal })
       if (stats.aborted) return
+      const tAfterRun = performance.now()
+
       setLastDurationMs(stats.durationMs)
       setStatus('ready')
-      // 渲染后节流采样直方图：大分辨率 canvas 的 readPixels 可达 5-15ms，
-      // 拖动滑块高频触发时会堆积。保留 120ms debounce，稳定态才真正 readPixels。
-      // preserveDrawingBuffer=true 保证跨帧仍可读 drawing buffer
-      const canvas = canvasRef.current
-      if (canvas) {
-        if (histogramTimerRef.current !== null) {
-          window.clearTimeout(histogramTimerRef.current)
-        }
-        histogramTimerRef.current = window.setTimeout(() => {
-          histogramTimerRef.current = null
-          try {
-            setHistogram(computeHistogramFromCanvas(canvas))
-          } catch {
+
+      // 3) 直方图：同 tick readPixels + 复用 buffer + 跳帧
+      //    P0-1：preserveDrawingBuffer=false，但 draw 和 readPixels 都在同一个
+      //    event-loop tick 内（无 setTimeout 介入），drawing buffer 还活着
+      //    P0-5：Uint8Array 按"已见过的最大尺寸"预分配复用，避免每帧 6-8MB alloc
+      let readPixelsMs = 0
+      let histogramMs = 0
+      const rawGl = gl.gl
+      const shouldSample = rawGl !== null && histogramFrameCounterRef.current++ % HISTOGRAM_SAMPLE_EVERY === 0
+      if (shouldSample && rawGl) {
+        const w = rawGl.drawingBufferWidth
+        const h = rawGl.drawingBufferHeight
+        const need = w * h * 4
+        if (need > 0) {
+          let buf = histogramBufferRef.current
+          if (!buf || buf.length < need) {
+            // 扩容到当前需求（不再缩小，避免频繁重分配）
+            buf = new Uint8Array(need)
+            histogramBufferRef.current = buf
+          }
+          const tReadStart = performance.now()
+          const read = readDrawingBufferToBuffer(rawGl, buf)
+          readPixelsMs = performance.now() - tReadStart
+          if (read > 0) {
+            const TARGET_SAMPLES = 65536
+            const stride = Math.max(1, Math.round(read / TARGET_SAMPLES))
+            const tHistStart = performance.now()
+            const hist = computeHistogramFromRgba(buf, stride, read)
+            histogramMs = performance.now() - tHistStart
+            setHistogram(hist)
+          } else {
             setHistogram(emptyHistogram())
           }
-        }, 120)
+        }
       }
+
+      const tEnd = performance.now()
+      setPerf({
+        setStepsMs: tAfterSetSteps - tStart,
+        pipelineRunMs: tAfterRun - tAfterSetSteps,
+        readPixelsMs,
+        histogramMs,
+        totalMs: tEnd - tStart,
+      })
     } catch (e) {
       setStatus('error')
       setError((e as Error).message)
@@ -274,7 +374,9 @@ export function useWebGLPreview(
   // 初始化 GLContext —— 仅在 mount 时一次
   useEffect(() => {
     if (!canvasRef.current) return
-    const ctx = new GLContext(canvasRef.current, { preserveDrawingBuffer: true })
+    // P0-1：preserveDrawingBuffer=false —— 让合成器走 swap chain 快路径，
+    //       省每帧 2-5ms blit。readPixels 改为在 draw 后同 tick 读，不需要保留
+    const ctx = new GLContext(canvasRef.current, { preserveDrawingBuffer: false })
     if (!ctx.ok) {
       setStatus('unsupported')
       return
@@ -292,16 +394,14 @@ export function useWebGLPreview(
       offLost()
       offRestored()
       abortRef.current?.abort()
-      if (histogramTimerRef.current !== null) {
-        window.clearTimeout(histogramTimerRef.current)
-        histogramTimerRef.current = null
-      }
       sourceTexRef.current?.dispose()
       pipelineObj.dispose()
       registry.dispose()
       ctx.dispose()
       pipelineRef.current = null
       sourceTexRef.current = null
+      histogramBufferRef.current = null
+      histogramFrameCounterRef.current = 0
       setGl(null)
     }
   }, [])
@@ -337,6 +437,8 @@ export function useWebGLPreview(
         })
         bitmap.close()
 
+        // 换图必然重采一次直方图（重置计数器让第一帧强制采样）
+        histogramFrameCounterRef.current = 0
         await renderNow()
       } catch (e) {
         if (cancelled) return
@@ -373,5 +475,5 @@ export function useWebGLPreview(
     })
   }, [pipeline, lut.texture, renderNow])
 
-  return { canvasRef, status, error, lastDurationMs, needsCpuFallback, histogram }
+  return { canvasRef, status, error, lastDurationMs, needsCpuFallback, histogram, perf }
 }
