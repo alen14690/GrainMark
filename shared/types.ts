@@ -416,6 +416,49 @@ export interface IpcApi {
     multi?: boolean
   }) => Promise<string[]>
   'dialog:selectDir': () => Promise<string | null>
+
+  // LLM 云 AI 顾问（M5-LLM-A · 可选能力，需用户主动配置 apiKey）
+  'llm:getConfig': () => Promise<LLMConfigPublic>
+  'llm:setConfig': (patch: LLMConfigInput) => Promise<LLMConfigPublic>
+  'llm:clearConfig': () => Promise<LLMConfigPublic>
+  'llm:testConnection': () => Promise<LLMTestResult>
+}
+
+// ============ LLM 配置（M5-LLM-A） ============
+
+/**
+ * 支持的 LLM 提供商。
+ * 当前仅支持 OpenRouter（一家代理覆盖 GPT-4o / Gemini / Claude / Llama 等）。
+ * 添加新提供商 = 扩充此 enum + 新增 adapter，UI 自动驱动。
+ */
+export type LLMProvider = 'openrouter'
+
+/** 公开视图：绝不含 apiKey 明文，仅 hasApiKey 布尔 + masked 预览 */
+export interface LLMConfigPublic {
+  provider: LLMProvider | null
+  model: string | null // 例如 'openai/gpt-4o-mini' / 'google/gemini-2.0-flash-exp'
+  hasApiKey: boolean
+  apiKeyMasked: string | null // 例如 'sk-or-...abcd'（仅后 4 位明文）
+  optInUploadImages: boolean // 用户是否明确同意上传图片给该提供商
+  updatedAt: number | null
+}
+
+/** 写入视图：可选字段——只传要改的。apiKey 为空串 = 保留原值，null = 清空 */
+export interface LLMConfigInput {
+  provider?: LLMProvider
+  model?: string
+  apiKey?: string | null
+  optInUploadImages?: boolean
+}
+
+/** 连通性测试结果 */
+export interface LLMTestResult {
+  ok: boolean
+  latencyMs: number
+  /** 成功时：返回可用模型数量或示例；失败时：失败原因（已脱敏） */
+  message: string
+  /** 失败分类：用于 UI 显示友好文案 */
+  errorKind?: 'no-config' | 'invalid-key' | 'network' | 'rate-limit' | 'unknown'
 }
 
 export type IpcChannel = keyof IpcApi

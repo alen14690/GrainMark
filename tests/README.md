@@ -96,6 +96,9 @@
 | `grainUrl.test.ts` | grain:// 协议 URL 生成 + cache-bust 版本号映射 | WebContents cache 绕开 |
 | `photoCardAspect.test.ts` | clampAspect（超宽/超竖/NaN/负数/Infinity） | 图库网格不崩 |
 | `ipcSchemas.test.ts` | Zod schema 越界 + DoS + 类型拒绝 | **IPC 边界总哨** |
+| `llmIpcSchemas.test.ts` | LLM 配置 schema：apiKey CRLF 注入 / 长度 / 提供商白名单 / strict 未知字段 | **LLM 配置安全边界** |
+| `llmConfigStore.test.ts` | apiKey 绝不泄漏公开视图 + patch 合并语义（null 清空 / undefined 保留）+ vault 不可用抛错 | **apiKey 凭证安全红线** |
+| `preloadChannelPattern.test.ts` | preload 白名单正则契约副本，新增 prefix 时同步回归 | IPC 通道注入防御 |
 
 ### 🧰 通用工具（3 文件 · ~15 例 · 精简后）
 

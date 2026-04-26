@@ -9,6 +9,7 @@ import { buildAppMenu } from './menu.js'
 import { registerGrainPrivileges, registerGrainProtocol, setPhotoPathResolver } from './protocol/grain.js'
 import { shutdownGpuRenderer } from './services/batch/gpuRenderer.js'
 import { shutdownExiftool } from './services/exif/reader.js'
+import { setLLMVault } from './services/llm/configStore.js'
 import { logger } from './services/logger/logger.js'
 import { PathGuard } from './services/security/pathGuard.js'
 import { setPathGuard } from './services/security/pathGuardRegistry.js'
@@ -269,6 +270,9 @@ app.whenReady().then(async () => {
   } catch (e) {
     logger.warn('vault.unavailable', { reason: (e as Error).message })
   }
+
+  // 注入到 LLM 配置层（SecureVault 可能 null，configStore 内部会做降级处理）
+  setLLMVault(secureVault)
 
   // 注册 grain:// 协议
   const table = getPhotosTable()

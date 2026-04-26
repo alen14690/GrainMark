@@ -13,6 +13,7 @@ import { useState } from 'react'
 import type { AppSettings } from '../../shared/types'
 import { ipc } from '../lib/ipc'
 import { useAppStore } from '../stores/appStore'
+import { LLMConfigCard } from './settings/LLMConfigCard'
 
 type TabId =
   | 'general'
@@ -317,10 +318,11 @@ export default function Settings() {
                 />
               </Row>
               <div className="text-[11px] text-fg-3 leading-relaxed pt-3 border-t border-bg-1">
-                🔒 首发版本 AI 能力全部本地运行，照片永不离开你的电脑。
+                🔒 本地 AI 能力（降噪 / 超分 / 抠图等）完全运行在你的电脑上，照片不会离开硬盘。
                 <br />
-                未来版本将支持可选的云端加速（需用户自主配置 API Key）。
+                如需使用「AI 摄影顾问」等云端能力，请在下方配置 OpenRouter。
               </div>
+              <LLMConfigCard />
             </Section>
           )}
 

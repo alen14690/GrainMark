@@ -264,6 +264,46 @@ export const SettingsPatchSchema = z
     { message: 'Unknown settings key' },
   )
 
+// ============ LLM 配置（M5-LLM-A） ============
+
+/** 提供商白名单。新增提供商必须同步更新 shared/types.ts 的 LLMProvider + adapter 实现 */
+export const LLMProviderSchema = z.enum(['openrouter'])
+
+/**
+ * OpenRouter 的 model id 允许 `vendor/model[-suffix][:tag]`，
+ * 例：openai/gpt-4o-mini、google/gemini-2.0-flash-exp、anthropic/claude-3.5-sonnet:beta。
+ * 约束：只允许字母数字、斜杠、短横线、下划线、点、冒号；长度 ≤ 128（防 DoS）。
+ */
+export const LLMModelIdSchema = z
+  .string()
+  .min(3)
+  .max(128)
+  .regex(/^[a-zA-Z0-9](?:[a-zA-Z0-9._:\-/]*[a-zA-Z0-9])?$/, 'Invalid model id')
+
+/**
+ * apiKey schema：OpenRouter 实际以 `sk-or-v1-` 前缀开头，但考虑到未来提供商差异
+ * 以及用户 token 形式（`sk-...` / 纯字母数字），此处只做最小防御：
+ *   - 长度 16..256（防空键与超长注入）
+ *   - 只允许可打印 ASCII（拒绝 CRLF 注入 HTTP 头）
+ *   - 不含前后空白（前端要 trim）
+ */
+export const LLMApiKeySchema = z
+  .string()
+  .min(16)
+  .max(256)
+  .regex(/^[\x21-\x7E]+$/, 'apiKey contains illegal characters')
+  .refine((s) => s === s.trim(), 'apiKey must be trimmed')
+
+export const LLMConfigInputSchema = z
+  .object({
+    provider: LLMProviderSchema.optional(),
+    model: LLMModelIdSchema.optional(),
+    // null → 清空凭证；undefined → 保留原值；string → 新值（必过 LLMApiKeySchema）
+    apiKey: z.union([LLMApiKeySchema, z.null()]).optional(),
+    optInUploadImages: z.boolean().optional(),
+  })
+  .strict() // 禁止多余字段，防未来 schema 变更时前端偷偷塞进去
+
 // ============ 对话框 ============
 export const DialogSelectFilesSchema = z
   .object({
@@ -319,6 +359,11 @@ export const IPC_SCHEMAS = {
 
   'settings:get': null,
   'settings:update': SettingsPatchSchema,
+
+  'llm:getConfig': null,
+  'llm:setConfig': LLMConfigInputSchema,
+  'llm:clearConfig': null,
+  'llm:testConnection': null,
 
   'dialog:selectFiles': DialogSelectFilesSchema,
   'dialog:selectDir': null,

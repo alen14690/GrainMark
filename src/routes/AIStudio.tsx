@@ -62,8 +62,8 @@ export default function AIStudio() {
           <div className="flex-1">
             <div className="text-[14px] font-semibold">本地 AI 推理</div>
             <div className="text-[11.5px] text-fg-2 mt-0.5">
-              所有 AI 能力均在你的电脑本地运行（ONNX
-              Runtime），照片不上传任何服务器；未来版本将增加可选云端加速。
+              降噪 / 超分 / 抠图等本地 AI 能力在 ONNX Runtime 里运行，照片不会上传。 「AI 摄影顾问」需在
+              Settings → AI 中配置 OpenRouter apiKey 后启用；未配置时仅启用本地能力。
             </div>
           </div>
         </div>
