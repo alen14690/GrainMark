@@ -1,9 +1,9 @@
 /**
- * editStore 单测 — per-channel patch + 脏检测
+ * editStore 单测 — per-channel patch + 脏检测 + 历史栈（M4.2）
  */
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { FilterPreset } from '../../shared/types'
-import { hasDirtyEdits, useEditStore } from '../../src/stores/editStore'
+import { HISTORY_LIMIT, canRedo, canUndo, hasDirtyEdits, useEditStore } from '../../src/stores/editStore'
 
 function makePreset(overrides: Partial<FilterPreset> = {}): FilterPreset {
   return {
@@ -169,5 +169,191 @@ describe('hasDirtyEdits', () => {
   it('一个有通道一个没有 → true', () => {
     expect(hasDirtyEdits({ saturation: 10 }, null)).toBe(true)
     expect(hasDirtyEdits(null, { saturation: 10 })).toBe(true)
+  })
+})
+
+describe('editStore · 历史栈（M4.2）', () => {
+  it('初始：history/future 都是空数组', () => {
+    const s = useEditStore.getState()
+    expect(s.history).toEqual([])
+    expect(s.future).toEqual([])
+    expect(canUndo(s.history)).toBe(false)
+    expect(canRedo(s.future)).toBe(false)
+  })
+
+  it('commitHistory 推入当前快照', () => {
+    const { setTone, commitHistory } = useEditStore.getState()
+    setTone({ exposure: 1 })
+    commitHistory('曝光调整')
+    const s = useEditStore.getState()
+    expect(s.history.length).toBe(1)
+    expect(s.history[0]!.pipeline?.tone?.exposure).toBe(1)
+    expect(s.history[0]!.label).toBe('曝光调整')
+    expect(typeof s.history[0]!.timestamp).toBe('number')
+  })
+
+  it('commitHistory 幂等去重：相同值不重复入栈', () => {
+    const { setTone, commitHistory } = useEditStore.getState()
+    setTone({ exposure: 1 })
+    commitHistory()
+    commitHistory() // 第二次 —— 值未变
+    expect(useEditStore.getState().history.length).toBe(1)
+  })
+
+  it('commitHistory 深相等判定：深拷贝后值相等也视为同一步', () => {
+    const { setTone, commitHistory } = useEditStore.getState()
+    setTone({ exposure: 1, contrast: 0 })
+    commitHistory()
+    // 等价再设一次（合并无变化）
+    setTone({ exposure: 1 })
+    commitHistory()
+    expect(useEditStore.getState().history.length).toBe(1)
+  })
+
+  it('commitHistory 新变化清空 future', () => {
+    const { setTone, commitHistory, undo } = useEditStore.getState()
+    setTone({ exposure: 1 })
+    commitHistory()
+    setTone({ exposure: 2 })
+    commitHistory()
+    undo()
+    expect(useEditStore.getState().future.length).toBe(1)
+    // 新改动 + commit 应清空 future
+    useEditStore.getState().setTone({ exposure: 3 })
+    useEditStore.getState().commitHistory()
+    expect(useEditStore.getState().future.length).toBe(0)
+  })
+
+  it('undo：history 栈顶 → current，原 current → future', () => {
+    const { setTone, commitHistory, undo } = useEditStore.getState()
+    setTone({ exposure: 1 })
+    commitHistory()
+    setTone({ exposure: 2 })
+    // 当前 current=2, history=[{exposure:1}]
+    undo()
+    const s = useEditStore.getState()
+    expect(s.currentPipeline?.tone?.exposure).toBe(1) // current 回到 1
+    expect(s.future.length).toBe(1)
+    expect(s.future[0]!.pipeline?.tone?.exposure).toBe(2)
+    expect(s.history.length).toBe(0)
+  })
+
+  it('redo：future 栈顶 → current，原 current → history', () => {
+    const { setTone, commitHistory, undo, redo } = useEditStore.getState()
+    setTone({ exposure: 1 })
+    commitHistory()
+    setTone({ exposure: 2 })
+    undo()
+    // 状态：current=1, future=[{2}], history=[]
+    redo()
+    const s = useEditStore.getState()
+    expect(s.currentPipeline?.tone?.exposure).toBe(2)
+    expect(s.future.length).toBe(0)
+    expect(s.history.length).toBe(1)
+    expect(s.history[0]!.pipeline?.tone?.exposure).toBe(1)
+  })
+
+  it('连续多步 undo/redo 正确', () => {
+    const { setTone, commitHistory, undo, redo } = useEditStore.getState()
+    setTone({ exposure: 1 })
+    commitHistory()
+    setTone({ exposure: 2 })
+    commitHistory()
+    setTone({ exposure: 3 })
+    // history=[1, 2], current=3
+    undo()
+    expect(useEditStore.getState().currentPipeline?.tone?.exposure).toBe(2)
+    undo()
+    expect(useEditStore.getState().currentPipeline?.tone?.exposure).toBe(1)
+    redo()
+    expect(useEditStore.getState().currentPipeline?.tone?.exposure).toBe(2)
+    redo()
+    expect(useEditStore.getState().currentPipeline?.tone?.exposure).toBe(3)
+  })
+
+  it('undo 栈空时是 no-op', () => {
+    const { undo } = useEditStore.getState()
+    undo()
+    undo()
+    const s = useEditStore.getState()
+    expect(s.history).toEqual([])
+    expect(s.future).toEqual([])
+  })
+
+  it('redo 栈空时是 no-op', () => {
+    const { setTone, commitHistory, redo } = useEditStore.getState()
+    setTone({ exposure: 1 })
+    commitHistory()
+    redo()
+    const s = useEditStore.getState()
+    expect(s.future).toEqual([])
+  })
+
+  it('历史栈超过 HISTORY_LIMIT 从栈底切，保留最新', () => {
+    const { setTone, commitHistory } = useEditStore.getState()
+    const TOTAL = HISTORY_LIMIT + 5
+    for (let i = 0; i < TOTAL; i++) {
+      setTone({ exposure: i / 100 })
+      commitHistory(`step-${i}`)
+    }
+    const s = useEditStore.getState()
+    expect(s.history.length).toBe(HISTORY_LIMIT)
+    // 最新应该是 step-(TOTAL-1)
+    expect(s.history[HISTORY_LIMIT - 1]!.label).toBe(`step-${TOTAL - 1}`)
+    // 最老的：TOTAL - HISTORY_LIMIT 起步
+    expect(s.history[0]!.label).toBe(`step-${TOTAL - HISTORY_LIMIT}`)
+  })
+
+  it('loadFromPreset 清空历史', () => {
+    const { setTone, commitHistory, loadFromPreset } = useEditStore.getState()
+    setTone({ exposure: 1 })
+    commitHistory()
+    const preset: FilterPreset = {
+      id: 'p1',
+      name: 'Test',
+      category: 'custom',
+      author: 'me',
+      version: '1',
+      popularity: 0,
+      source: 'builtin',
+      pipeline: {},
+      createdAt: 0,
+      updatedAt: 0,
+    }
+    loadFromPreset(preset)
+    const s = useEditStore.getState()
+    expect(s.history).toEqual([])
+    expect(s.future).toEqual([])
+  })
+
+  it('clear 清空历史', () => {
+    const { setTone, commitHistory, clear } = useEditStore.getState()
+    setTone({ exposure: 1 })
+    commitHistory()
+    clear()
+    const s = useEditStore.getState()
+    expect(s.history).toEqual([])
+    expect(s.future).toEqual([])
+  })
+
+  it('历史快照独立：修改 current 不影响已入栈的 snapshot', () => {
+    const { setTone, commitHistory } = useEditStore.getState()
+    setTone({ exposure: 1 })
+    commitHistory()
+    setTone({ exposure: 5 })
+    // 栈里的那个应该还是 1，不应该被拖到 5
+    expect(useEditStore.getState().history[0]!.pipeline?.tone?.exposure).toBe(1)
+  })
+
+  it('canUndo / canRedo 返回状态', () => {
+    expect(canUndo([])).toBe(false)
+    expect(canRedo([])).toBe(false)
+    const { setTone, commitHistory, undo } = useEditStore.getState()
+    setTone({ exposure: 1 })
+    commitHistory()
+    setTone({ exposure: 2 })
+    expect(canUndo(useEditStore.getState().history)).toBe(true)
+    undo()
+    expect(canRedo(useEditStore.getState().future)).toBe(true)
   })
 })

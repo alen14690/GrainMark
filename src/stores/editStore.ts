@@ -1,15 +1,23 @@
 /**
- * editStore — 当前编辑态
+ * editStore — 当前编辑态 + 历史栈
  *
  * 职责：
  *   - 承载 Editor 正在修改的 pipeline（以某个 preset 为起点，用户手动叠加调整）
  *   - currentPhotoId 切换 / activeFilterId 切换时重置为"滤镜预设 pipeline"
- *   - 每次 Slider 拖动只改本 store，不落盘（撤销栈留给 M4）
+ *   - 维护撤销/重做历史栈（最多 50 步，commit 模式：交互结束时才入栈）
  *
  * 设计要点：
  *   - patch 粒度到单通道（setTone / setWhiteBalance / setVignette / setClarity 等）
  *   - 合并策略：per-channel shallow merge；传 null 表示"移除该通道"
  *   - hasDirtyEdits：当前 pipeline 与 baselinePreset 是否有差异（用于 UI 提示"有未保存修改"）
+ *
+ * 历史栈（M4.2 引入）：
+ *   - 每个 set* action 只改 currentPipeline，不立即入栈
+ *   - 交互结束时（Slider onChangeEnd / 键盘 / 双击复位）调 commitHistory() 入栈
+ *   - commit 幂等去重：若新值与栈顶值深相等，不重复推入
+ *   - 新 commit 清空 future（经典 undo/redo）
+ *   - loadFromPreset / clear 会清空历史
+ *   - 栈容量 50；超出从栈底切（保留最新 50 步）
  */
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
@@ -26,6 +34,19 @@ import type {
   WhiteBalanceParams,
 } from '../../shared/types'
 
+/** 历史栈条目 */
+export interface HistoryEntry {
+  /** pipeline 的深拷贝快照（独立对象，不会被后续修改污染） */
+  pipeline: FilterPipeline | null
+  /** commit 时间戳（ms） */
+  timestamp: number
+  /** 可选：用于 UI 显示（如 "曝光调整"） */
+  label?: string
+}
+
+/** 历史栈上限（AGENTS: 50 步，约等于 Lightroom 默认） */
+export const HISTORY_LIMIT = 50
+
 interface EditState {
   /** 当前编辑 pipeline；null 表示"显示原图" */
   currentPipeline: FilterPipeline | null
@@ -34,15 +55,20 @@ interface EditState {
   /** 基准 preset id；切换时同步更新 */
   baselineFilterId: string | null
 
+  /** 过去的栈（最旧在前，最新在后；不含当前 pipeline） */
+  history: HistoryEntry[]
+  /** 重做栈（撤销时被推入） */
+  future: HistoryEntry[]
+
   // ---- actions ----
-  /** 初始化：从 preset 加载基准；传 null 表示"原图" */
+  /** 初始化：从 preset 加载基准；传 null 表示"原图"。同时清空历史 */
   loadFromPreset: (preset: FilterPreset | null) => void
-  /** 重置：currentPipeline = baselinePipeline 的深拷贝 */
+  /** 重置：currentPipeline = baselinePipeline 的深拷贝（不自动入栈，由调用方决定） */
   resetToBaseline: () => void
   /** 清空编辑态（卸载 Editor 时调用） */
   clear: () => void
 
-  // per-channel patch
+  // per-channel patch（只改 current，不入栈）
   setTone: (patch: Partial<ToneParams> | null) => void
   setWhiteBalance: (patch: Partial<WhiteBalanceParams> | null) => void
   setVignette: (patch: Partial<VignetteParams> | null) => void
@@ -55,6 +81,21 @@ interface EditState {
   setSaturation: (v: number) => void
   setVibrance: (v: number) => void
   setLut: (lut: string | null, intensity?: number) => void
+
+  // ---- 历史栈 actions（M4.2）----
+  /**
+   * 把当前 pipeline 快照推入 history。
+   *   - 幂等去重：若深相等于栈顶 → no-op
+   *   - 清空 future（新改动后"重做"应失效）
+   *   - 超过 HISTORY_LIMIT 则从栈底切
+   *   - 调用时机：Slider onChangeEnd / 键盘操作 / 双击复位 / resetToBaseline 等
+   *     "一次交互完成"的边界
+   */
+  commitHistory: (label?: string) => void
+  /** 撤销：history 栈顶 → current，原 current 推入 future */
+  undo: () => void
+  /** 重做：future 栈顶 → current，原 current 推入 history */
+  redo: () => void
 }
 
 function deepClonePipeline(p: FilterPipeline | null | undefined): FilterPipeline | null {
@@ -63,6 +104,17 @@ function deepClonePipeline(p: FilterPipeline | null | undefined): FilterPipeline
   // structuredClone 对 Proxy 会报 DataCloneError。pipeline 是纯 JSON 结构（数字/字符串/数组/对象），
   // JSON 克隆安全且成本可忽略。
   return JSON.parse(JSON.stringify(p)) as FilterPipeline
+}
+
+/** 深相等（结构化 JSON 比较；pipeline 是纯数据） */
+function pipelineEquals(a: FilterPipeline | null, b: FilterPipeline | null): boolean {
+  if (a === b) return true
+  if (a === null || b === null) return false
+  try {
+    return JSON.stringify(a) === JSON.stringify(b)
+  } catch {
+    return false
+  }
 }
 
 /** 判断是否与基准有差异（引用或值不同）——用于 UI 脏提示 */
@@ -76,6 +128,16 @@ export function hasDirtyEdits(current: FilterPipeline | null, baseline: FilterPi
   }
 }
 
+/** 历史栈可撤销（无状态查询，使用时从 store state 传入） */
+export function canUndo(history: readonly HistoryEntry[]): boolean {
+  return history.length > 0
+}
+
+/** 历史栈可重做 */
+export function canRedo(future: readonly HistoryEntry[]): boolean {
+  return future.length > 0
+}
+
 /** 确保 currentPipeline 为对象（null → {}），返回可变引用 */
 function ensurePipe(s: EditState): FilterPipeline {
   if (!s.currentPipeline) s.currentPipeline = {}
@@ -87,12 +149,17 @@ export const useEditStore = create<EditState>()(
     currentPipeline: null,
     baselinePipeline: null,
     baselineFilterId: null,
+    history: [],
+    future: [],
 
     loadFromPreset(preset) {
       set((s) => {
         s.baselineFilterId = preset?.id ?? null
         s.baselinePipeline = preset ? deepClonePipeline(preset.pipeline) : null
         s.currentPipeline = preset ? deepClonePipeline(preset.pipeline) : null
+        // 切滤镜时清空历史（不跨滤镜撤销）
+        s.history = []
+        s.future = []
       })
     },
 
@@ -107,6 +174,8 @@ export const useEditStore = create<EditState>()(
         s.currentPipeline = null
         s.baselinePipeline = null
         s.baselineFilterId = null
+        s.history = []
+        s.future = []
       })
     },
 
@@ -256,6 +325,59 @@ export const useEditStore = create<EditState>()(
         } else {
           pipe.lut = lut
           if (intensity !== undefined) pipe.lutIntensity = intensity
+        }
+      })
+    },
+
+    // ---- 历史栈 ----
+
+    commitHistory(label) {
+      set((s) => {
+        const snap = deepClonePipeline(s.currentPipeline)
+        const top = s.history[s.history.length - 1]
+        // 幂等：值未变不入栈
+        if (top && pipelineEquals(top.pipeline, snap)) return
+        s.history.push({
+          pipeline: snap,
+          timestamp: Date.now(),
+          label,
+        })
+        // 超上限 → 从栈底切
+        if (s.history.length > HISTORY_LIMIT) {
+          s.history = s.history.slice(s.history.length - HISTORY_LIMIT)
+        }
+        // 新改动清空 redo
+        s.future = []
+      })
+    },
+
+    undo() {
+      set((s) => {
+        if (s.history.length === 0) return
+        // 栈顶是当前 pipeline 的"前一步"快照；把它弹出变成 current
+        const prev = s.history.pop()!
+        // 把当前 pipeline 推入 future 以便 redo
+        s.future.push({
+          pipeline: deepClonePipeline(s.currentPipeline),
+          timestamp: Date.now(),
+        })
+        s.currentPipeline = deepClonePipeline(prev.pipeline)
+      })
+    },
+
+    redo() {
+      set((s) => {
+        if (s.future.length === 0) return
+        const next = s.future.pop()!
+        // 把当前 pipeline 推入 history
+        s.history.push({
+          pipeline: deepClonePipeline(s.currentPipeline),
+          timestamp: Date.now(),
+        })
+        s.currentPipeline = deepClonePipeline(next.pipeline)
+        // 同样守住上限
+        if (s.history.length > HISTORY_LIMIT) {
+          s.history = s.history.slice(s.history.length - HISTORY_LIMIT)
         }
       })
     },
