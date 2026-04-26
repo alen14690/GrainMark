@@ -422,6 +422,7 @@ export interface IpcApi {
   'llm:setConfig': (patch: LLMConfigInput) => Promise<LLMConfigPublic>
   'llm:clearConfig': () => Promise<LLMConfigPublic>
   'llm:testConnection': () => Promise<LLMTestResult>
+  'llm:listModels': () => Promise<LLMModelCatalog>
 }
 
 // ============ LLM 配置（M5-LLM-A） ============
@@ -459,6 +460,49 @@ export interface LLMTestResult {
   message: string
   /** 失败分类：用于 UI 显示友好文案 */
   errorKind?: 'no-config' | 'invalid-key' | 'network' | 'rate-limit' | 'unknown'
+}
+
+/**
+ * 单个 LLM 模型条目（从 OpenRouter /models 精简而来）
+ *
+ * 我们只保留做"vision 能力筛选 + 价格排序 + UI 展示"必需的字段，
+ * 舍弃 description / top_provider / per_request_limits 等体积大且当前用不到的字段。
+ */
+export interface LLMModelEntry {
+  id: string
+  name: string
+  contextLength: number
+  /** 输入百万 token 的美元价格（把 OpenRouter 返回的每 token 美元价 ×1e6 做展示） */
+  pricePromptPerMTok: number
+  /** 输出百万 token 的美元价格 */
+  priceCompletionPerMTok: number
+  /** 是否支持图片输入（input_modalities 包含 'image'） */
+  supportsVision: boolean
+  /** 是否为免费模型（promptPrice === 0 && completionPrice === 0） */
+  isFree: boolean
+  /** 发布时间（unix 秒），可能缺失 */
+  createdAt: number | null
+}
+
+/** 模型目录 + 智能推荐列表 */
+export interface LLMModelCatalog {
+  /** API 拉取时间戳（ms）；null 表示用的是兜底默认值 */
+  fetchedAt: number | null
+  /** 全部支持图片输入的模型，按 createdAt 降序（最新在前） */
+  models: LLMModelEntry[]
+  /**
+   * 智能推荐：按"质量/价格"场景挑选的 3~5 条。
+   * - 'flagship'：旗舰最强（贵）
+   * - 'balanced'：质量/价格平衡
+   * - 'cheap'：最便宜的可用 vision 模型
+   */
+  recommended: Array<{
+    tier: 'flagship' | 'balanced' | 'cheap'
+    model: LLMModelEntry
+    reason: string // 例如 "2026 最新旗舰，10 亿 token 上下文"
+  }>
+  /** 失败分类（API 拉不通时前端要知道，用于展示"当前是兜底列表"的提示） */
+  fallback?: 'no-config' | 'invalid-key' | 'network' | 'rate-limit' | 'unknown'
 }
 
 export type IpcChannel = keyof IpcApi

@@ -364,6 +364,7 @@ export const IPC_SCHEMAS = {
   'llm:setConfig': LLMConfigInputSchema,
   'llm:clearConfig': null,
   'llm:testConnection': null,
+  'llm:listModels': null,
 
   'dialog:selectFiles': DialogSelectFilesSchema,
   'dialog:selectDir': null,

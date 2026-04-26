@@ -4,36 +4,60 @@
  * Settings → AI 标签页的子组件，承担：
  *   1. OpenRouter apiKey 配置（存 SecureVault）
  *   2. 图像上传 opt-in 同意（默认 false —— 不配 = 不上传）
- *   3. 连通性测试（打 /models 端点）
+ *   3. 从 OpenRouter /models 端点实时拉取 vision 模型目录 + 三档推荐
+ *   4. 连通性测试
  *
  * 设计约束：
  *   - 不显示 apiKey 明文；已保存时只显示 masked 前 4 位 + 后 4 位
  *   - 用户未勾选 optIn 时，所有走网络的 LLM 能力将在后续 IPC 层被拒绝
- *   - 输入框是 type="password" + autocomplete="off"，防浏览器/扩展记忆
+ *   - 不硬编码任何模型名 —— 全部从 IPC 拉取；拉不通才用后端兜底
+ *   - 支持"下拉选择最新模型"和"手动输入自定义 ID"双通道
  */
-import { AlertTriangle, CheckCircle2, Loader2, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Loader2, RefreshCw, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import type { LLMConfigInput, LLMConfigPublic, LLMTestResult } from '../../../shared/types'
+import type {
+  LLMConfigInput,
+  LLMConfigPublic,
+  LLMModelCatalog,
+  LLMModelEntry,
+  LLMTestResult,
+} from '../../../shared/types'
 import { ipc } from '../../lib/ipc'
 
 type TestState = { status: 'idle' } | { status: 'running' } | { status: 'done'; result: LLMTestResult }
 
 export function LLMConfigCard(): JSX.Element {
   const [cfg, setCfg] = useState<LLMConfigPublic | null>(null)
+  const [catalog, setCatalog] = useState<LLMModelCatalog | null>(null)
+  const [loadingCatalog, setLoadingCatalog] = useState(false)
   const [apiKeyDraft, setApiKeyDraft] = useState<string>('')
   const [modelDraft, setModelDraft] = useState<string>('')
+  const [manualMode, setManualMode] = useState<boolean>(false) // true=手动输入，false=下拉选择
   const [optInDraft, setOptInDraft] = useState<boolean>(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [testState, setTestState] = useState<TestState>({ status: 'idle' })
 
   useEffect(() => {
-    ipc('llm:getConfig').then((c) => {
+    void (async () => {
+      const c = await ipc('llm:getConfig')
       setCfg(c)
       setModelDraft(c.model ?? '')
       setOptInDraft(c.optInUploadImages)
-    })
+      // 首次挂载若已配 apiKey，自动拉一次目录
+      if (c.hasApiKey) void refreshCatalog()
+    })()
   }, [])
+
+  const refreshCatalog = async () => {
+    setLoadingCatalog(true)
+    try {
+      const cat = await ipc('llm:listModels')
+      setCatalog(cat)
+    } finally {
+      setLoadingCatalog(false)
+    }
+  }
 
   const applyPatch = async (patch: LLMConfigInput) => {
     setSaving(true)
@@ -44,6 +68,8 @@ export function LLMConfigCard(): JSX.Element {
       setApiKeyDraft('') // 清空输入框（已写入 vault）
       setModelDraft(next.model ?? '')
       setOptInDraft(next.optInUploadImages)
+      // 保存 apiKey 后自动刷新目录（可能此前一直是兜底）
+      if (patch.apiKey !== undefined && next.hasApiKey) void refreshCatalog()
     } catch (err) {
       setSaveError((err as Error).message.replace(/^\[llm:setConfig]\s*/, ''))
     } finally {
@@ -79,6 +105,7 @@ export function LLMConfigCard(): JSX.Element {
       setModelDraft('')
       setOptInDraft(false)
       setTestState({ status: 'idle' })
+      setCatalog(null)
     } finally {
       setSaving(false)
     }
@@ -119,20 +146,16 @@ export function LLMConfigCard(): JSX.Element {
         <label className="text-[11.5px] text-fg-2" htmlFor="or-apikey">
           OpenRouter apiKey
         </label>
-        <div className="flex gap-2">
-          <input
-            id="or-apikey"
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            className="input flex-1 font-mono text-[12px]"
-            placeholder={
-              hasConfig ? `已保存：${cfg.apiKeyMasked ?? '****'}（输入新值以替换）` : 'sk-or-v1-...'
-            }
-            value={apiKeyDraft}
-            onChange={(e) => setApiKeyDraft(e.target.value)}
-          />
-        </div>
+        <input
+          id="or-apikey"
+          type="password"
+          autoComplete="off"
+          spellCheck={false}
+          className="input w-full font-mono text-[12px]"
+          placeholder={hasConfig ? `已保存：${cfg.apiKeyMasked ?? '****'}（输入新值以替换）` : 'sk-or-v1-...'}
+          value={apiKeyDraft}
+          onChange={(e) => setApiKeyDraft(e.target.value)}
+        />
         <div className="text-[10.5px] text-fg-3">
           来源：
           <a
@@ -147,26 +170,17 @@ export function LLMConfigCard(): JSX.Element {
         </div>
       </div>
 
-      {/* model */}
-      <div className="space-y-1.5">
-        <label className="text-[11.5px] text-fg-2" htmlFor="or-model">
-          默认模型
-        </label>
-        <input
-          id="or-model"
-          type="text"
-          autoComplete="off"
-          spellCheck={false}
-          className="input font-mono text-[12px]"
-          placeholder="google/gemini-2.0-flash-exp"
-          value={modelDraft}
-          onChange={(e) => setModelDraft(e.target.value)}
-        />
-        <div className="text-[10.5px] text-fg-3">
-          推荐：<code className="text-fg-2">google/gemini-2.0-flash-exp</code>（多模态 / 低成本） ·
-          <code className="text-fg-2 ml-1">openai/gpt-4o-mini</code>（质量稳定）
-        </div>
-      </div>
+      {/* model 选择（下拉 + 手动切换） */}
+      <ModelPicker
+        hasApiKey={hasConfig}
+        catalog={catalog}
+        loading={loadingCatalog}
+        current={modelDraft}
+        manualMode={manualMode}
+        onToggleManual={() => setManualMode((v) => !v)}
+        onPick={setModelDraft}
+        onRefresh={refreshCatalog}
+      />
 
       {/* opt-in */}
       <label className="flex items-start gap-2.5 cursor-pointer select-none">
@@ -241,6 +255,153 @@ export function LLMConfigCard(): JSX.Element {
     </div>
   )
 }
+
+// ==================== ModelPicker 子组件 ====================
+
+interface ModelPickerProps {
+  hasApiKey: boolean
+  catalog: LLMModelCatalog | null
+  loading: boolean
+  current: string
+  manualMode: boolean
+  onToggleManual: () => void
+  onPick: (id: string) => void
+  onRefresh: () => void
+}
+
+function ModelPicker({
+  hasApiKey,
+  catalog,
+  loading,
+  current,
+  manualMode,
+  onToggleManual,
+  onPick,
+  onRefresh,
+}: ModelPickerProps): JSX.Element {
+  const showFallbackHint = !!catalog?.fallback
+  const usingLiveCatalog = !!catalog && !catalog.fallback && catalog.fetchedAt !== null
+  const models = catalog?.models ?? []
+  const recommended = catalog?.recommended ?? []
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <label className="text-[11.5px] text-fg-2">默认模型</label>
+        <div className="flex items-center gap-2 text-[10.5px]">
+          <button
+            type="button"
+            className="text-fg-3 hover:text-fg-1 flex items-center gap-1"
+            onClick={onRefresh}
+            disabled={!hasApiKey || loading}
+            title={hasApiKey ? '从 OpenRouter 刷新模型目录' : '请先保存 apiKey'}
+          >
+            {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+            刷新目录
+          </button>
+          <span className="text-fg-3">·</span>
+          <button type="button" className="text-fg-3 hover:text-fg-1" onClick={onToggleManual}>
+            {manualMode ? '下拉选择' : '手动输入 ID'}
+          </button>
+        </div>
+      </div>
+
+      {/* 推荐三档快速选择（未进手动模式时显示） */}
+      {!manualMode && recommended.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5 mb-1">
+          {recommended.map((r) => {
+            const active = r.model.id === current
+            return (
+              <button
+                key={r.tier}
+                type="button"
+                onClick={() => onPick(r.model.id)}
+                className={`px-2 py-1 rounded text-[10.5px] border transition-all ${
+                  active
+                    ? 'border-brand-amber/60 bg-brand-amber/10 text-brand-amber'
+                    : 'border-bg-1 hover:border-bg-2 text-fg-2'
+                }`}
+                title={r.reason}
+              >
+                <span className="font-medium">{tierLabel(r.tier)}</span>
+                <span className="text-fg-3 ml-1">· {r.model.id}</span>
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
+
+      {/* 主控件：下拉 or 手动输入 */}
+      {manualMode ? (
+        <input
+          type="text"
+          autoComplete="off"
+          spellCheck={false}
+          className="input w-full font-mono text-[12px]"
+          placeholder="anthropic/claude-opus-4.7"
+          value={current}
+          onChange={(e) => onPick(e.target.value)}
+        />
+      ) : (
+        <select className="input w-full text-[12px]" value={current} onChange={(e) => onPick(e.target.value)}>
+          <option value="">— 选择模型 —</option>
+          {models.map((m) => (
+            <option key={m.id} value={m.id}>
+              {renderModelOption(m)}
+            </option>
+          ))}
+          {/* 若当前保存的模型不在目录里（可能是用户手动输入过），仍要保留展示 */}
+          {current && !models.some((m) => m.id === current) ? (
+            <option value={current}>{current}（自定义）</option>
+          ) : null}
+        </select>
+      )}
+
+      <div className="text-[10.5px] text-fg-3">
+        {!hasApiKey ? (
+          <>先保存 apiKey 后才能从 OpenRouter 拉取实时模型目录</>
+        ) : showFallbackHint ? (
+          <span className="text-amber-400">
+            ⚠ 目录拉取失败（{fallbackHint(catalog!.fallback!)}），当前为内置兜底列表（可能已过时） ·
+            稍后点击「刷新目录」重试
+          </span>
+        ) : usingLiveCatalog ? (
+          <>
+            实时目录 · 共 {models.length} 个支持图像输入的模型 · 最后刷新{' '}
+            {new Date(catalog!.fetchedAt!).toLocaleTimeString()}
+          </>
+        ) : (
+          <>准备就绪，点击「刷新目录」拉取模型</>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function tierLabel(tier: 'flagship' | 'balanced' | 'cheap'): string {
+  if (tier === 'flagship') return '旗舰'
+  if (tier === 'balanced') return '推荐'
+  return '经济'
+}
+
+function renderModelOption(m: LLMModelEntry): string {
+  const price = m.isFree ? '免费' : `$${m.pricePromptPerMTok.toFixed(m.pricePromptPerMTok < 1 ? 2 : 1)}/M`
+  const ctx =
+    m.contextLength >= 1_000_000
+      ? `${(m.contextLength / 1_000_000).toFixed(1)}M ctx`
+      : `${Math.round(m.contextLength / 1000)}K ctx`
+  return `${m.name} · ${ctx} · ${price}`
+}
+
+function fallbackHint(kind: NonNullable<LLMModelCatalog['fallback']>): string {
+  if (kind === 'no-config') return '未配置 apiKey'
+  if (kind === 'invalid-key') return 'apiKey 无效'
+  if (kind === 'rate-limit') return '速率限制'
+  if (kind === 'network') return '网络错误'
+  return '未知错误'
+}
+
+// ==================== TestResultBadge 子组件 ====================
 
 function TestResultBadge({ r }: { r: LLMTestResult }): JSX.Element {
   if (r.ok) {
