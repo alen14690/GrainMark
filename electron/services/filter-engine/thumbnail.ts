@@ -28,8 +28,14 @@ const THUMB_ALGO_VERSION = 2
  * 缓存：key = md5(filePath : size : mtime : algoVersion)。
  * - algoVersion 保证改了 orientation 算法后老缓存失效
  * - mtime 保证用户替换文件后缩略图跟着更新
+ *
+ * **P0 优化**：支持 `knownOrientation` 避免重复调用 exiftool（导入时已读好存到 photo 记录）。
  */
-export async function makeThumbnail(filePath: string, size: number): Promise<string> {
+export async function makeThumbnail(
+  filePath: string,
+  size: number,
+  knownOrientation?: number,
+): Promise<string> {
   // mtime/size 让替换源文件后 thumb 自动重建；algoVersion 让算法升级强制 rebuild 全量老数据
   let keySuffix = ''
   try {
@@ -53,7 +59,7 @@ export async function makeThumbnail(filePath: string, size: number): Promise<str
     }
   }
 
-  const { buffer, source, sourceOrientation } = await resolvePreviewBuffer(filePath)
+  const { buffer, source, sourceOrientation } = await resolvePreviewBuffer(filePath, knownOrientation)
   logger.debug('thumb.source', { path: filePath, source, orientation: sourceOrientation })
 
   // 关键：RAW 必须用 sourceOrientation 显式旋转（内嵌 JPEG 的 EXIF 不可靠，Sony ARW 尤甚）

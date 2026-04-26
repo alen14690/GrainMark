@@ -17,6 +17,7 @@ import { ipc } from '../lib/ipc'
 import { useWebGLPreview } from '../lib/useWebGLPreview'
 import { useAppStore } from '../stores/appStore'
 import { hasDirtyEdits, useEditStore } from '../stores/editStore'
+import { usePerfStore } from '../stores/perfStore'
 
 type RightPanelTab = 'filters' | 'adjust'
 
@@ -377,11 +378,7 @@ export default function Editor() {
                 <ValueBadge value="ORIGINAL" variant="amber" size="sm" />
               </div>
             )}
-            {webgl.status === 'ready' && webgl.lastDurationMs !== undefined && !needsCpuFallback && (
-              <div className="absolute bottom-3 right-3">
-                <ValueBadge value={`GPU · ${webgl.lastDurationMs.toFixed(1)}ms`} variant="muted" size="sm" />
-              </div>
-            )}
+            {webgl.status === 'ready' && !needsCpuFallback && <GpuBadge />}
             {needsCpuFallback && (
               <div className="absolute bottom-3 right-3">
                 <ValueBadge value="CPU" variant="muted" size="sm" />
@@ -399,22 +396,12 @@ export default function Editor() {
             )}
             {/* Dev 诊断条：webgl 状态 + pipeline 通道数 + 兜底原因 + Frame budget；仅 import.meta.env.DEV 显示 */}
             {import.meta.env.DEV && (
-              <div className="absolute top-3 left-3 text-xxs font-mono bg-black/60 text-fg-2 px-2 py-1 rounded pointer-events-none space-y-0.5">
-                <div>
-                  gl: {webgl.status}
-                  {webgl.error ? ` (${webgl.error.slice(0, 40)})` : ''}
-                </div>
-                <div>
-                  pipeline: {currentPipeline ? countPipelineChannels(currentPipeline) : 0} ch ·{' '}
-                  {needsCpuFallback ? 'CPU' : 'GPU'}
-                </div>
-                {webgl.perf && (
-                  <div>
-                    frame: {webgl.perf.totalMs.toFixed(1)}ms · run {webgl.perf.pipelineRunMs.toFixed(1)} · rd{' '}
-                    {webgl.perf.readPixelsMs.toFixed(1)} · hist {webgl.perf.histogramMs.toFixed(1)}
-                  </div>
-                )}
-              </div>
+              <DevDiagnosticOverlay
+                status={webgl.status}
+                error={webgl.error}
+                channelCount={currentPipeline ? countPipelineChannels(currentPipeline) : 0}
+                needsCpuFallback={needsCpuFallback}
+              />
             )}
           </div>
         </div>
@@ -509,16 +496,8 @@ export default function Editor() {
           )}
         </div>
 
-        {/* Histogram — 实时从 WebGL readPixels 采样 */}
-        <div className="p-3 border-t border-fg-4/50">
-          <div className="flex items-center justify-between mb-1.5">
-            <div className="text-xxs text-fg-3 uppercase tracking-wider font-mono">Histogram</div>
-            {webgl.histogram && (
-              <div className="text-xxs text-fg-3 font-mono">{webgl.histogram.total.toLocaleString()} px</div>
-            )}
-          </div>
-          <Histogram data={webgl.histogram} width={288} height={64} />
-        </div>
+        {/* Histogram — 实时从 WebGL readPixels 采样（独立订阅 perfStore，不让 Editor 每帧重渲） */}
+        <HistogramPanel />
       </aside>
     </div>
   )
@@ -539,6 +518,78 @@ function countPipelineChannels(p: import('../../shared/types').FilterPipeline): 
   if (p.vignette) n++
   return n
 }
+
+// ============================================================================
+// P0-1 修复的修复：从 perfStore 订阅的独立组件，避免让 Editor 每帧重渲
+// ============================================================================
+
+/**
+ * GPU 耗时 badge —— 独立订阅 perfStore.perf，Editor 主体零感知。
+ * renderNow 每帧 writePerf → 本组件重绘（只有文字变，DOM 开销极小）。
+ */
+const GpuBadge = memo(function GpuBadge() {
+  const perf = usePerfStore((s) => s.perf)
+  if (!perf) return null
+  return (
+    <div className="absolute bottom-3 right-3">
+      <ValueBadge value={`GPU · ${perf.pipelineRunMs.toFixed(1)}ms`} variant="muted" size="sm" />
+    </div>
+  )
+})
+
+/**
+ * Dev 诊断 overlay —— 订阅 perfStore 的 Frame budget；其它字段走 props。
+ * 拖滑块时只这个组件重绘，不影响 Editor 主体。
+ */
+const DevDiagnosticOverlay = memo(function DevDiagnosticOverlay({
+  status,
+  error,
+  channelCount,
+  needsCpuFallback,
+}: {
+  status: string
+  error?: string
+  channelCount: number
+  needsCpuFallback: boolean
+}) {
+  const perf = usePerfStore((s) => s.perf)
+  return (
+    <div className="absolute top-3 left-3 text-xxs font-mono bg-black/60 text-fg-2 px-2 py-1 rounded pointer-events-none space-y-0.5">
+      <div>
+        gl: {status}
+        {error ? ` (${error.slice(0, 40)})` : ''}
+      </div>
+      <div>
+        pipeline: {channelCount} ch · {needsCpuFallback ? 'CPU' : 'GPU'}
+      </div>
+      {perf && (
+        <div>
+          frame: {perf.totalMs.toFixed(1)}ms · run {perf.pipelineRunMs.toFixed(1)} · rd{' '}
+          {perf.readPixelsMs.toFixed(1)} · hist {perf.histogramMs.toFixed(1)}
+        </div>
+      )}
+    </div>
+  )
+})
+
+/**
+ * 直方图面板 —— 独立订阅 perfStore.histogram。
+ * 跳帧采样 ~20Hz，更新时只重绘本组件。
+ */
+const HistogramPanel = memo(function HistogramPanel() {
+  const histogram = usePerfStore((s) => s.histogram)
+  return (
+    <div className="p-3 border-t border-fg-4/50">
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="text-xxs text-fg-3 uppercase tracking-wider font-mono">Histogram</div>
+        {histogram && (
+          <div className="text-xxs text-fg-3 font-mono">{histogram.total.toLocaleString()} px</div>
+        )}
+      </div>
+      <Histogram data={histogram} width={288} height={64} />
+    </div>
+  )
+})
 
 function TabButton({
   active,

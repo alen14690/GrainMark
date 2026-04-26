@@ -65,7 +65,7 @@ describe('FALLBACK_MODELS · 内置兜底列表质量', () => {
     const fallback = catalog._getFallbackModelsForTest()
     expect(fallback.length).toBeGreaterThanOrEqual(3)
     for (const m of fallback) {
-      expect(m.id, `missing id`).toMatch(/^[a-z0-9][a-z0-9._:/\-]+$/)
+      expect(m.id, 'missing id').toMatch(/^[a-z0-9][a-z0-9._:/\-]+$/)
       expect(m.supportsVision, `${m.id} 必须支持 vision`).toBe(true)
       expect(m.contextLength, `${m.id} contextLength 必须 > 0`).toBeGreaterThan(0)
       // 兜底列表都是付费模型（我们不把免费模型放兜底，避免限速延迟）
@@ -102,6 +102,21 @@ describe('listModels · 未配置 apiKey 时快速返回兜底，不发起网络
     expect(cat.models.length).toBeGreaterThan(0) // 兜底非空
     expect(cat.recommended.length).toBeGreaterThan(0)
     fetchSpy.mockRestore()
+  })
+
+  // UI 契约（2026-04-26 视觉 bug 修复回归）：
+  // LLMConfigCard 挂载时无条件调用 listModels；此时绝大多数用户还未保存 apiKey。
+  // 若返回的 models 为空，下拉框就是空的 —— 正是截图里的 bug 表现。
+  // 本测试锁死"首次访问（无 apiKey）也必须有可选模型"，防止退化。
+  it('挂载首次调用契约：即便 no-config 也必须返回至少 3 个 vision 模型供下拉展示', async () => {
+    const cat = await catalog.listModels()
+    expect(cat.models.length).toBeGreaterThanOrEqual(3)
+    // 每一个兜底模型都必须支持 vision（否则 UI 下拉显示了也没意义）
+    for (const m of cat.models) {
+      expect(m.supportsVision, `${m.id} must support vision`).toBe(true)
+    }
+    // 推荐三档至少有 2 条（flagship + cheap 必出现）
+    expect(cat.recommended.length).toBeGreaterThanOrEqual(2)
   })
 })
 

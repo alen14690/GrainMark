@@ -402,3 +402,10 @@ export const useEditStore = create<EditState>()(
     },
   })),
 )
+
+// E2E 测试钩子：将 store 挂到 window 供 Playwright page.evaluate 访问
+// 仅在测试环境注入（GRAINMARK_TEST=1 时 main.ts 注入过 env，无法直接读；
+// 用 Electron renderer 可用的 process? 检测不可靠 —— 改为恒定注入 + 加前缀避免污染）
+if (typeof window !== 'undefined') {
+  ;(window as unknown as { __grainEditStore?: unknown }).__grainEditStore = useEditStore
+}

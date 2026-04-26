@@ -63,10 +63,17 @@ export function orientationToRotationDegrees(orientation?: number): number {
  *   2. 未命中 → extractEmbeddedJpeg → 写入 cache → 返回
  *   3. 抽取失败 → 抛出 UnsupportedRawError，调用方自行决定降级（显示占位图/跳过 etc.）
  *
+ * **P0 热路径优化**：支持 `knownOrientation` 参数——导入时已读到 orientation 并存入
+ *   photo.exif.orientation，preview:render / thumbnail 无需再次调用 readExif
+ *   （每次省 30-80ms exiftool 子进程 RPC）
+ *
  * @throws Error 读取原文件失败
  * @throws UnsupportedRawError RAW 无内嵌 JPEG（M7 前无法渲染）
  */
-export async function resolvePreviewBuffer(filePath: string): Promise<ResolvedPreview> {
+export async function resolvePreviewBuffer(
+  filePath: string,
+  knownOrientation?: number,
+): Promise<ResolvedPreview> {
   const absPath = path.resolve(filePath)
   if (!isRawFormat(absPath)) {
     const buffer = await fsp.readFile(absPath)
@@ -77,9 +84,8 @@ export async function resolvePreviewBuffer(filePath: string): Promise<ResolvedPr
   const stat = await fsp.stat(absPath)
   const key = makeCacheKey(absPath, stat.mtimeMs, stat.size)
 
-  // 先把原文件 orientation 拿到（用于后续显式旋转）
-  // readExif 对 RAW 耗时 ~30-80ms，但 exiftool 复用进程，后续很快
-  const orientation = await readRawOrientation(absPath)
+  // P0 优化：若调用方已经从 photo 记录拿到了 orientation，直接用，不再调 exiftool
+  const orientation = knownOrientation !== undefined ? knownOrientation : await readRawOrientation(absPath)
 
   const cached = await getCached(key)
   if (cached) {

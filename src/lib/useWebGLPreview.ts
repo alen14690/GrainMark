@@ -61,44 +61,31 @@ import {
   textureFromBitmap,
 } from '../engine/webgl'
 import type { PipelineStep, Texture } from '../engine/webgl'
-import {
-  type HistogramBins,
-  computeHistogramFromRgba,
-  emptyHistogram,
-  readDrawingBufferToBuffer,
-} from './histogram'
+import { writeHistogram, writePerf } from '../stores/perfStore'
+import { computeHistogramFromRgba, emptyHistogram, readDrawingBufferToBuffer } from './histogram'
 import { useLutTexture } from './useLutTexture'
 
 export type WebGLPreviewStatus = 'idle' | 'loading' | 'ready' | 'unsupported' | 'lost' | 'error'
 
-/** P0-1 新增：每帧分段耗时（Editor dev 面板显示 Frame budget） */
-export interface FramePerf {
-  /** pipelineToSteps + Pipeline.setSteps */
-  setStepsMs: number
-  /** Pipeline.run（含所有 pass 的 GL 调用） */
-  pipelineRunMs: number
-  /** readPixels（GPU→CPU 同步点；跳帧跳过时为 0） */
-  readPixelsMs: number
-  /** computeHistogramFromRgba（CPU bin 累加） */
-  histogramMs: number
-  /** 整个 renderNow 的 wall-clock */
-  totalMs: number
-}
+/**
+ * P0-1 修复的修复：FramePerf 从 useWebGLPreview 返回值中**移除**，
+ * 改为写入外部 `perfStore`。Editor 主体不订阅 perfStore → 拖滑块时
+ * Editor 零 re-render；仅 Dev 诊断面板是独立 memo 组件订阅 perfStore
+ * 自行重绘。
+ *
+ * 导出类型供 perfStore 复用。
+ */
+export type { FramePerf } from '../stores/perfStore'
 
 export interface WebGLPreviewResult {
   canvasRef: React.RefObject<HTMLCanvasElement>
   status: WebGLPreviewStatus
   error?: string
-  lastDurationMs?: number
   /**
    * 仅当 LUT 加载/解析失败时为 true（极少数情况，例如 .cube 文件被破坏）。
    * 所有 pipeline 通道都已 GPU 化，正常情况下恒为 false。
    */
   needsCpuFallback: boolean
-  /** 最近一次渲染后的直方图（256 bins × 4 通道）；未就绪时为 null */
-  histogram: HistogramBins | null
-  /** P0-1 新增：最近一次 renderNow 的分段耗时；未渲染时 null */
-  perf: FramePerf | null
 }
 
 /** 构造 pipeline step 时需要的 GPU 资源（LUT 纹理等） */
@@ -263,10 +250,7 @@ export function useWebGLPreview(
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [status, setStatus] = useState<WebGLPreviewStatus>('idle')
   const [error, setError] = useState<string | undefined>(undefined)
-  const [lastDurationMs, setLastDurationMs] = useState<number | undefined>(undefined)
   const [gl, setGl] = useState<GLContext | null>(null)
-  const [histogram, setHistogram] = useState<HistogramBins | null>(null)
-  const [perf, setPerf] = useState<FramePerf | null>(null)
 
   // 长期持有的 GL 对象（跨 render）
   const pipelineRef = useRef<Pipeline | null>(null)
@@ -319,7 +303,6 @@ export function useWebGLPreview(
       if (stats.aborted) return
       const tAfterRun = performance.now()
 
-      setLastDurationMs(stats.durationMs)
       setStatus('ready')
 
       // 3) 直方图：同 tick readPixels + 复用 buffer + 跳帧
@@ -350,15 +333,16 @@ export function useWebGLPreview(
             const tHistStart = performance.now()
             const hist = computeHistogramFromRgba(buf, stride, read)
             histogramMs = performance.now() - tHistStart
-            setHistogram(hist)
+            writeHistogram(hist)
           } else {
-            setHistogram(emptyHistogram())
+            writeHistogram(emptyHistogram())
           }
         }
       }
 
       const tEnd = performance.now()
-      setPerf({
+      // 写到外部 perfStore（不触发 Editor re-render；只有 Dev 面板订阅者重绘）
+      writePerf({
         setStepsMs: tAfterSetSteps - tStart,
         pipelineRunMs: tAfterRun - tAfterSetSteps,
         readPixelsMs,
@@ -475,5 +459,5 @@ export function useWebGLPreview(
     })
   }, [pipeline, lut.texture, renderNow])
 
-  return { canvasRef, status, error, lastDurationMs, needsCpuFallback, histogram, perf }
+  return { canvasRef, status, error, needsCpuFallback }
 }

@@ -26,7 +26,7 @@ import type { FilterPipeline } from '../../../shared/types.js'
 import { logger } from '../logger/logger.js'
 import { orientationToRotationDegrees, resolvePreviewBuffer } from '../raw/index.js'
 import { getFilter } from '../storage/filterStore.js'
-import { getPreviewCacheDir } from '../storage/init.js'
+import { getPhotosTable, getPreviewCacheDir } from '../storage/init.js'
 import { applyPipelineToRGBA, detectCpuOnlyLimitations } from './cpuPipeline.js'
 
 const PREVIEW_MAX_DIM = 1600
@@ -55,7 +55,20 @@ export async function renderPreview(
     pipeline = preset?.pipeline
   }
 
-  const { buffer, sourceOrientation } = await resolvePreviewBuffer(photoPath)
+  // P0 热路径优化：从 photo 记录拿预先读好的 orientation，省掉 readExif 30-80ms
+  //   导入时就已经读取并存入 photo.exif.orientation（photoStore.importPhotos）
+  //   这里只在 photo 记录中没有 orientation 时才让 resolvePreviewBuffer 去读
+  //   防御：storage 未初始化（测试环境或早期启动）时 try/catch 静默降级
+  let knownOrientation: number | undefined
+  try {
+    knownOrientation = getPhotosTable()
+      .all()
+      .find((p) => p.path === photoPath)?.exif?.orientation
+  } catch {
+    // storage 未初始化 — 走旧路径让 resolvePreviewBuffer 自己 readExif
+  }
+
+  const { buffer, sourceOrientation } = await resolvePreviewBuffer(photoPath, knownOrientation)
   const rotationDeg = sourceOrientation !== undefined ? orientationToRotationDegrees(sourceOrientation) : null
 
   // Step 1：用 sharp 完成旋转 + resize，得到标准 RGB raw buffer
