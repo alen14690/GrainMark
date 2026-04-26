@@ -119,7 +119,11 @@ export default function Library() {
               selected={selected.includes(photo.id)}
               cameraLabel={cameraLabel}
               dimensions={photo.width ? `${photo.width}×${photo.height}` : undefined}
-              aspectRatio={photo.width && photo.height ? photo.width / photo.height : undefined}
+              // Lightroom grid 风格：所有卡片统一方形（aspectRatio=1），
+              // 图片走 object-cover 居中裁切铺满 —— 整个网格像书架一样对齐
+              // 不再按 photo.width/height 设置每卡独立比例（那会让竖图和横图卡尺寸不同）
+              fit="cover"
+              aspectRatio={1}
               onClick={() => toggleSelect(photo.id)}
               onDoubleClick={() => navigate(`/editor/${photo.id}`)}
             />
