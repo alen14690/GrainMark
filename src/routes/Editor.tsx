@@ -50,6 +50,14 @@ export default function Editor() {
   const loadFromPreset = useEditStore((s) => s.loadFromPreset)
   const resetToBaseline = useEditStore((s) => s.resetToBaseline)
   const clearEdits = useEditStore((s) => s.clear)
+  // 历史栈 actions & 可用状态（M4.3）
+  const history = useEditStore((s) => s.history)
+  const future = useEditStore((s) => s.future)
+  const commitHistory = useEditStore((s) => s.commitHistory)
+  const undo = useEditStore((s) => s.undo)
+  const redo = useEditStore((s) => s.redo)
+  const canUndoNow = history.length > 0
+  const canRedoNow = future.length > 0
 
   // 切换 filter → 重置编辑态
   useEffect(() => {
@@ -63,7 +71,44 @@ export default function Editor() {
     }
   }, [clearEdits])
 
+  // ⌘Z / ⌘⇧Z 快捷键（window-level capture，避免 Slider 等子组件 preventDefault 吞掉）
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const grainPlatform = typeof window !== 'undefined' ? window.grain?.platform : undefined
+      const isMac =
+        grainPlatform !== undefined
+          ? grainPlatform === 'darwin'
+          : typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
+      const isCmdOrCtrl = isMac ? e.metaKey : e.ctrlKey
+      if (!isCmdOrCtrl) return
+      // 避开输入框（专业工具中 ⌘Z 在 input 里应该撤销输入，而非 Editor 操作）
+      const target = e.target as HTMLElement | null
+      if (target) {
+        const tag = target.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) return
+      }
+      if (e.key === 'z' || e.key === 'Z') {
+        e.preventDefault()
+        e.stopPropagation()
+        if (e.shiftKey) {
+          redo()
+        } else {
+          undo()
+        }
+      }
+    }
+    window.addEventListener('keydown', handler, { capture: true })
+    return () => window.removeEventListener('keydown', handler, { capture: true })
+  }, [undo, redo])
+
   const dirty = hasDirtyEdits(currentPipeline, baselinePipeline)
+
+  /** 重置到滤镜预设：先 commit 当前状态为历史（能撤回）再 reset，再 commit reset 后的状态 */
+  const handleResetToBaseline = () => {
+    commitHistory('重置前')
+    resetToBaseline()
+    commitHistory('重置到滤镜预设')
+  }
 
   // ---- WebGL 预览：按 showOriginal 短路 pipeline ----
   const renderPipeline = showOriginal ? null : currentPipeline
@@ -158,10 +203,22 @@ export default function Editor() {
         <div className="h-12 border-b border-fg-4/50 flex items-center px-4 gap-2">
           <div className="text-sm font-medium truncate flex-1 text-fg-1">{photo.name}</div>
           {dirty && <ValueBadge value="EDITED" variant="amber" size="sm" className="!ml-0 shrink-0" />}
-          <button type="button" className="btn-ghost btn-xs" title="撤销 (⌘Z)">
+          <button
+            type="button"
+            onClick={undo}
+            disabled={!canUndoNow}
+            className={cn('btn-ghost btn-xs', !canUndoNow && 'opacity-30 cursor-not-allowed')}
+            title={`撤销 (⌘Z) · ${history.length} 步可撤`}
+          >
             <Undo2 className="w-3.5 h-3.5" />
           </button>
-          <button type="button" className="btn-ghost btn-xs" title="重做">
+          <button
+            type="button"
+            onClick={redo}
+            disabled={!canRedoNow}
+            className={cn('btn-ghost btn-xs', !canRedoNow && 'opacity-30 cursor-not-allowed')}
+            title={`重做 (⌘⇧Z) · ${future.length} 步可重做`}
+          >
             <Redo2 className="w-3.5 h-3.5" />
           </button>
           <button
@@ -177,7 +234,7 @@ export default function Editor() {
           {dirty && (
             <button
               type="button"
-              onClick={resetToBaseline}
+              onClick={handleResetToBaseline}
               className="btn-ghost btn-xs"
               title="重置到滤镜预设"
             >

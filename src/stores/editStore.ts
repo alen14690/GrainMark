@@ -354,14 +354,30 @@ export const useEditStore = create<EditState>()(
     undo() {
       set((s) => {
         if (s.history.length === 0) return
-        // 栈顶是当前 pipeline 的"前一步"快照；把它弹出变成 current
-        const prev = s.history.pop()!
-        // 把当前 pipeline 推入 future 以便 redo
-        s.future.push({
-          pipeline: deepClonePipeline(s.currentPipeline),
-          timestamp: Date.now(),
-        })
-        s.currentPipeline = deepClonePipeline(prev.pipeline)
+        const top = s.history[s.history.length - 1]!
+        // 场景 A：current 与栈顶已对齐（常规情况，刚 commit 完）
+        //   → pop 栈顶入 future，current 回到新栈顶（没有时回到 null）
+        // 场景 B：current 领先栈顶（用户 commit 后又 setTone 未 commit）
+        //   → 不 pop，只把 current 回退到栈顶（丢弃未 commit 的变化）
+        //     同时把 "current 的那份未 commit 变化" 推入 future 以便 redo 恢复
+        if (pipelineEquals(s.currentPipeline, top.pipeline)) {
+          // 场景 A
+          const popped = s.history.pop()!
+          s.future.push({
+            pipeline: deepClonePipeline(popped.pipeline),
+            timestamp: Date.now(),
+            label: popped.label,
+          })
+          const newTop = s.history[s.history.length - 1]
+          s.currentPipeline = newTop ? deepClonePipeline(newTop.pipeline) : null
+        } else {
+          // 场景 B：把未 commit 的变化推入 future，current 回到 top
+          s.future.push({
+            pipeline: deepClonePipeline(s.currentPipeline),
+            timestamp: Date.now(),
+          })
+          s.currentPipeline = deepClonePipeline(top.pipeline)
+        }
       })
     },
 
@@ -369,13 +385,16 @@ export const useEditStore = create<EditState>()(
       set((s) => {
         if (s.future.length === 0) return
         const next = s.future.pop()!
-        // 把当前 pipeline 推入 history
+        // redo：future 顶推入 history（恢复为最新 commit）+ current 设为它
+        // 注意：这会让 "刚才推入 future 的未 commit 变化" 变成新的栈顶 commit。
+        // 这是刻意的：一旦 redo，相当于用户明确接受那次变化作为 commit
         s.history.push({
-          pipeline: deepClonePipeline(s.currentPipeline),
+          pipeline: deepClonePipeline(next.pipeline),
           timestamp: Date.now(),
+          label: next.label,
         })
         s.currentPipeline = deepClonePipeline(next.pipeline)
-        // 同样守住上限
+        // 守住上限
         if (s.history.length > HISTORY_LIMIT) {
           s.history = s.history.slice(s.history.length - HISTORY_LIMIT)
         }

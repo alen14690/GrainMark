@@ -224,33 +224,49 @@ describe('editStore · 历史栈（M4.2）', () => {
     expect(useEditStore.getState().future.length).toBe(0)
   })
 
-  it('undo：history 栈顶 → current，原 current → future', () => {
+  it('undo：常规情况 — 栈顶 pop 到 future，current 回到新栈顶', () => {
     const { setTone, commitHistory, undo } = useEditStore.getState()
     setTone({ exposure: 1 })
-    commitHistory()
+    commitHistory() // history=[{1}], current=1
     setTone({ exposure: 2 })
-    // 当前 current=2, history=[{exposure:1}]
+    commitHistory() // history=[{1}, {2}], current=2
     undo()
     const s = useEditStore.getState()
-    expect(s.currentPipeline?.tone?.exposure).toBe(1) // current 回到 1
+    expect(s.currentPipeline?.tone?.exposure).toBe(1) // current 回到新栈顶 {1}
     expect(s.future.length).toBe(1)
     expect(s.future[0]!.pipeline?.tone?.exposure).toBe(2)
-    expect(s.history.length).toBe(0)
+    expect(s.history.length).toBe(1)
   })
 
-  it('redo：future 栈顶 → current，原 current → history', () => {
+  it('undo：未 commit 场景 — current 领先栈顶时，回到栈顶并把差异存到 future', () => {
+    const { setTone, commitHistory, undo } = useEditStore.getState()
+    setTone({ exposure: 1 })
+    commitHistory() // history=[{1}], current=1
+    setTone({ exposure: 2 }) // current=2（未 commit）
+    undo()
+    const s = useEditStore.getState()
+    // current 回到 commit 栈顶 1
+    expect(s.currentPipeline?.tone?.exposure).toBe(1)
+    // 未 commit 的 2 存入 future 以便 redo
+    expect(s.future.length).toBe(1)
+    expect(s.future[0]!.pipeline?.tone?.exposure).toBe(2)
+    // history 未被 pop（因为 current 未对齐栈顶时是场景 B）
+    expect(s.history.length).toBe(1)
+  })
+
+  it('redo：future 栈顶推回 history，current 设为它', () => {
     const { setTone, commitHistory, undo, redo } = useEditStore.getState()
     setTone({ exposure: 1 })
-    commitHistory()
+    commitHistory() // history=[{1}]
     setTone({ exposure: 2 })
-    undo()
-    // 状态：current=1, future=[{2}], history=[]
+    commitHistory() // history=[{1}, {2}]
+    undo() // history=[{1}], future=[{2}], current=1
     redo()
     const s = useEditStore.getState()
     expect(s.currentPipeline?.tone?.exposure).toBe(2)
     expect(s.future.length).toBe(0)
-    expect(s.history.length).toBe(1)
-    expect(s.history[0]!.pipeline?.tone?.exposure).toBe(1)
+    expect(s.history.length).toBe(2) // {2} 回到 history 栈顶
+    expect(s.history[1]!.pipeline?.tone?.exposure).toBe(2)
   })
 
   it('连续多步 undo/redo 正确', () => {

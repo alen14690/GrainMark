@@ -70,15 +70,33 @@ export function AdjustmentsPanel() {
   const setClarity = useEditStore((s) => s.setClarity)
   const setSaturation = useEditStore((s) => s.setSaturation)
   const setVibrance = useEditStore((s) => s.setVibrance)
+  const commitHistory = useEditStore((s) => s.commitHistory)
 
   const tone = pipeline?.tone
   const wb = pipeline?.whiteBalance
   const vignette = pipeline?.vignette
 
+  /**
+   * Slider 交互结束（松手 / 键盘 / 双击复位）时把当前状态入栈。
+   * 所有 Slider 共用此 helper：入栈语义对所有参数一致，label 提供 UI 可读性。
+   * 注意：commitHistory 本身幂等去重，同值不会重复入栈。
+   */
+  const commit = (label: string) => () => commitHistory(label)
+
+  /**
+   * Section 分组重置：先 commit 当前态 → 执行重置动作 → 再 commit 重置后的态，
+   * 保证撤销/重做能精确回退到 "重置前" 和 "重置后" 两个状态。
+   */
+  const resetWithHistory = (label: string, action: () => void) => () => {
+    commitHistory(`${label}前`)
+    action()
+    commitHistory(`${label}`)
+  }
+
   return (
     <div className="flex flex-col">
       {/* ============ Basic（Tone）============ */}
-      <Section title="Basic" onReset={() => setTone(null)}>
+      <Section title="Basic" onReset={resetWithHistory('重置 Basic', () => setTone(null))}>
         <Slider
           label="曝光"
           value={tone?.exposure ?? 0}
@@ -90,6 +108,7 @@ export function AdjustmentsPanel() {
           bipolar
           compact
           onChange={(v) => setTone({ exposure: v })}
+          onChangeEnd={commit('曝光')}
         />
         <Slider
           label="对比度"
@@ -101,6 +120,7 @@ export function AdjustmentsPanel() {
           compact
           curve="ease-center"
           onChange={(v) => setTone({ contrast: v })}
+          onChangeEnd={commit('对比度')}
         />
         <Slider
           label="高光"
@@ -112,6 +132,7 @@ export function AdjustmentsPanel() {
           compact
           curve="ease-center"
           onChange={(v) => setTone({ highlights: v })}
+          onChangeEnd={commit('高光')}
         />
         <Slider
           label="阴影"
@@ -123,6 +144,7 @@ export function AdjustmentsPanel() {
           compact
           curve="ease-center"
           onChange={(v) => setTone({ shadows: v })}
+          onChangeEnd={commit('阴影')}
         />
         <Slider
           label="白色"
@@ -134,6 +156,7 @@ export function AdjustmentsPanel() {
           compact
           curve="ease-center"
           onChange={(v) => setTone({ whites: v })}
+          onChangeEnd={commit('白色')}
         />
         <Slider
           label="黑色"
@@ -145,11 +168,12 @@ export function AdjustmentsPanel() {
           compact
           curve="ease-center"
           onChange={(v) => setTone({ blacks: v })}
+          onChangeEnd={commit('黑色')}
         />
       </Section>
 
       {/* ============ White Balance ============ */}
-      <Section title="White Balance" onReset={() => setWB(null)}>
+      <Section title="White Balance" onReset={resetWithHistory('重置 White Balance', () => setWB(null))}>
         <Slider
           label="色温"
           value={wb?.temp ?? 0}
@@ -160,6 +184,7 @@ export function AdjustmentsPanel() {
           compact
           curve="ease-center"
           onChange={(v) => setWB({ temp: v })}
+          onChangeEnd={commit('色温')}
         />
         <Slider
           label="色调"
@@ -171,17 +196,18 @@ export function AdjustmentsPanel() {
           compact
           curve="ease-center"
           onChange={(v) => setWB({ tint: v })}
+          onChangeEnd={commit('色调')}
         />
       </Section>
 
       {/* ============ Presence ============ */}
       <Section
         title="Presence"
-        onReset={() => {
+        onReset={resetWithHistory('重置 Presence', () => {
           setClarity(0)
           setSaturation(0)
           setVibrance(0)
-        }}
+        })}
       >
         <Slider
           label="清晰度"
@@ -193,6 +219,7 @@ export function AdjustmentsPanel() {
           compact
           curve="ease-center"
           onChange={setClarity}
+          onChangeEnd={commit('清晰度')}
         />
         <Slider
           label="自然饱和度"
@@ -204,6 +231,7 @@ export function AdjustmentsPanel() {
           compact
           curve="ease-center"
           onChange={setVibrance}
+          onChangeEnd={commit('自然饱和度')}
         />
         <Slider
           label="饱和度"
@@ -215,11 +243,16 @@ export function AdjustmentsPanel() {
           compact
           curve="ease-center"
           onChange={setSaturation}
+          onChangeEnd={commit('饱和度')}
         />
       </Section>
 
       {/* ============ Vignette ============ */}
-      <Section title="Vignette" defaultOpen={false} onReset={() => setVignette(null)}>
+      <Section
+        title="Vignette"
+        defaultOpen={false}
+        onReset={resetWithHistory('重置 Vignette', () => setVignette(null))}
+      >
         <Slider
           label="强度"
           value={vignette?.amount ?? 0}
@@ -230,6 +263,7 @@ export function AdjustmentsPanel() {
           compact
           curve="ease-center"
           onChange={(v) => setVignette({ amount: v })}
+          onChangeEnd={commit('暗角强度')}
         />
         <Slider
           label="中心"
@@ -239,6 +273,7 @@ export function AdjustmentsPanel() {
           step={1}
           compact
           onChange={(v) => setVignette({ midpoint: v })}
+          onChangeEnd={commit('暗角中心')}
         />
         <Slider
           label="圆度"
@@ -250,6 +285,7 @@ export function AdjustmentsPanel() {
           compact
           curve="ease-center"
           onChange={(v) => setVignette({ roundness: v })}
+          onChangeEnd={commit('暗角圆度')}
         />
         <Slider
           label="羽化"
@@ -259,6 +295,7 @@ export function AdjustmentsPanel() {
           step={1}
           compact
           onChange={(v) => setVignette({ feather: v })}
+          onChangeEnd={commit('暗角羽化')}
         />
       </Section>
     </div>
