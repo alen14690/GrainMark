@@ -93,6 +93,17 @@ export function normalizeColorGradingParams(p: {
   }
 }
 
+/**
+ * Identity 判断：只看 l（lift 强度）。
+ *
+ * 设计契约（务必保持）：
+ *   shader 里 sOff = hueToRgb(h, s) * l。l=0 ⇒ 每个 zone 偏移向量恒为 (0,0,0)，
+ *   shader 输出恒等于输入，此时跳过该 pass 是 100% 数学安全的优化。
+ *   h 和 s 只是"方向+饱和度"参数，没有 l 这个总开关打开时不会产生任何效果。
+ *
+ * 若将来给 colorGrading 接入 UI 滑块，务必让用户在 UI 上先设置 l（如"阴影强度 50"），
+ * 否则无论怎么调色轮 h/s，画面都不会动——这是一个"UI 不暴露但 shader 隐含"的约束。
+ */
 export function isColorGradingIdentity(p: {
   shadows?: { l?: number }
   midtones?: { l?: number }

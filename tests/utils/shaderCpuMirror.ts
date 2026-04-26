@@ -86,14 +86,17 @@ export function luma(r: number, g: number, b: number): number {
 /**
  * tone shader 镜像（shaders/tone.ts）
  *
- * 与 GPU shader 算法等价（M3.5 `4b9e797` 引入 ease-center 响应）：
- *   - exposure：直接按 UI EV（UI 值 /100 * 2，保持 CPU 镜像的 UI 契约）
- *   - 其它通道经 curve(x) = sign(x) * |x|^1.6 降敏
- *   - 最大强度系数与 GPU 一致：highlights 0.30、shadows 0.35、whites 0.30、blacks 0.35
+ * 与 GPU shader 算法严格等价（**M4.5 前置整改**：移除 curve() 降敏、放宽蒙版、提系数）：
+ *   - exposure：**直接收 UI 值当 EV**（与 GPU normalizeToneParams 一致），范围 [-5, 5]
+ *     → 修正了原版 `(ui/100)*2` 的错误语义（把 UI 范围误当作 -100..100 映射到 ±2 EV）
+ *   - contrast / highlights / shadows / whites / blacks：UI /100，线性响应，不再过 curve()
+ *   - highlights 蒙版：smoothstep(0.35, 0.85)（原 0.55/0.95）
+ *   - shadows    蒙版：smoothstep(0.15, 0.65) 反向（原 0.0/0.45）
+ *   - whites     蒙版：smoothstep(0.60, 0.98)（原 0.75/1.0）
+ *   - blacks     蒙版：smoothstep(0.02, 0.40) 反向（原 0.0/0.25）
+ *   - 强度系数：highlights/whites 0.55（原 0.30）、shadows/blacks 0.65（原 0.35）
  *
- * 顺序：exposure（线性乘）→ contrast（中点 0.5）→ highlights / shadows（smoothstep 蒙版）→
- *       whites / blacks（端点提亮 / 压暗）
- * UI 范围 -100..100；exposure UI 值 /100 * 2 映射到 EV -2..2
+ * 顺序：exposure → contrast → highlights → shadows → whites(mix) → blacks(mix)
  */
 export interface ToneParams {
   exposure?: number
@@ -104,7 +107,11 @@ export interface ToneParams {
   blacks?: number
 }
 
-/** 与 GPU shader 的 curve() 一致：sign(x) * |x|^1.6 */
+/**
+ * @deprecated M4.5 起 shader 已移除内部 curve() 降敏。仅为老测试不破坏保留此导出；
+ *   新代码不应再依赖"中段压扁"的非线性曲线——中段敏感度由 UI Slider 的 ease-center 负责。
+ *   将在 M5 清理阶段移除。
+ */
 export function curveEaseCenter(x: number): number {
   const ax = Math.abs(x)
   return Math.sign(x) * ax ** 1.6
@@ -112,54 +119,62 @@ export function curveEaseCenter(x: number): number {
 
 export function applyToneCpu(src: RGBA, w: number, h: number, p: ToneParams): RGBA {
   const out = createCanvas(w, h)
-  const ev = ((p.exposure ?? 0) / 100) * 2
+  // 与 GPU normalizeToneParams 一致：exposure 直接是 EV，其他 /100
+  const ev = Math.max(-5, Math.min(5, p.exposure ?? 0))
   const exp = 2 ** ev
-  // 所有非曝光参数经 curve() 降敏后再用
-  const contrastAmt = curveEaseCenter((p.contrast ?? 0) / 100)
-  const hi = curveEaseCenter((p.highlights ?? 0) / 100)
-  const sh = curveEaseCenter((p.shadows ?? 0) / 100)
-  const wh = curveEaseCenter((p.whites ?? 0) / 100)
-  const bk = curveEaseCenter((p.blacks ?? 0) / 100)
+  const contrastAmt = Math.max(-1, Math.min(1, (p.contrast ?? 0) / 100))
+  const hi = Math.max(-1, Math.min(1, (p.highlights ?? 0) / 100))
+  const sh = Math.max(-1, Math.min(1, (p.shadows ?? 0) / 100))
+  const wh = Math.max(-1, Math.min(1, (p.whites ?? 0) / 100))
+  const bk = Math.max(-1, Math.min(1, (p.blacks ?? 0) / 100))
 
   for (let i = 0; i < src.length; i += 4) {
     let r = (src[i]! / 255) * exp
     let g = (src[i + 1]! / 255) * exp
     let b = (src[i + 2]! / 255) * exp
 
-    // contrast: (x - 0.5) * (1 + c) + 0.5
+    // contrast: (x - 0.5) * (1 + c) + 0.5 —— 基于 luma，保持色相
+    // GPU shader 先 clamp applyContrast 到 [0,1] 再按 lumaAdj/luma 比例乘；
+    // CPU 镜像忠实还原
+    const L0 = luma(r, g, b)
     const cm = 1 + contrastAmt
-    r = (r - 0.5) * cm + 0.5
-    g = (g - 0.5) * cm + 0.5
-    b = (b - 0.5) * cm + 0.5
+    const lumaAdj = clamp01((L0 - 0.5) * cm + 0.5)
+    const scaleContrast = lumaAdj / Math.max(L0, 1e-4)
+    r *= scaleContrast
+    g *= scaleContrast
+    b *= scaleContrast
 
-    // highlights mask（smoothstep(0.55, 0.95, luma)）
-    const L = luma(r, g, b)
-    const hiMaskT = clamp01((L - 0.55) / 0.4)
+    // highlights mask（smoothstep(0.35, 0.85, luma)）
+    const L1 = luma(r, g, b)
+    const hiMaskT = clamp01((L1 - 0.35) / 0.5)
     const hiS = hiMaskT * hiMaskT * (3 - 2 * hiMaskT)
-    const hlFactor = 1 + hi * 0.3 * hiS
+    const hlFactor = 1 + hi * 0.55 * hiS
     r *= hlFactor
     g *= hlFactor
     b *= hlFactor
 
-    // shadows mask（smoothstep 反向，阈值 0.0..0.45）
-    const shMaskT = clamp01(1 - L / 0.45)
-    const shS = shMaskT * shMaskT * (3 - 2 * shMaskT)
-    const shFactor = 1 + sh * 0.35 * shS
+    // shadows mask（smoothstep 反向，阈值 0.15..0.65）
+    const L2 = luma(r, g, b)
+    const shMaskT = clamp01((L2 - 0.15) / 0.5)
+    const shS = 1 - shMaskT * shMaskT * (3 - 2 * shMaskT)
+    const shFactor = 1 + sh * 0.65 * shS
     r *= shFactor
     g *= shFactor
     b *= shFactor
 
     // whites / blacks：mix(c, c * (1 + param * coeff), mask)
-    const whMaskT = clamp01((L - 0.75) / 0.25)
+    const L3 = luma(r, g, b)
+    const whMaskT = clamp01((L3 - 0.6) / 0.38)
     const whS = whMaskT * whMaskT * (3 - 2 * whMaskT)
-    const whF = 1 + wh * 0.3
+    const whF = 1 + wh * 0.55
     r = r * (1 - whS) + r * whF * whS
     g = g * (1 - whS) + g * whF * whS
     b = b * (1 - whS) + b * whF * whS
 
-    const bkMaskT = clamp01(1 - L / 0.25)
-    const bkS = bkMaskT * bkMaskT * (3 - 2 * bkMaskT)
-    const bkF = 1 + bk * 0.35
+    const L4 = luma(r, g, b)
+    const bkMaskT = clamp01((L4 - 0.02) / 0.38)
+    const bkS = 1 - bkMaskT * bkMaskT * (3 - 2 * bkMaskT)
+    const bkF = 1 + bk * 0.65
     r = r * (1 - bkS) + r * bkF * bkS
     g = g * (1 - bkS) + g * bkF * bkS
     b = b * (1 - bkS) + b * bkF * bkS
@@ -226,10 +241,10 @@ export function applyVignetteCpu(src: RGBA, w: number, h: number, p: VignettePar
 /**
  * whiteBalance shader 镜像：temp 偏移 R/B，tint 偏移 G/M
  *
- * 与 GPU shader 算法等价（M3.5 引入 curve 降敏）：
- *   - temp / tint 均经 curve(x) = sign(x) * |x|^1.6 过一遍再乘系数
- *   - temp：R *= 1 + 0.3·curve(temp) · B *= 1 - 0.3·curve(temp)
- *   - tint：G *= 1 - 0.3·curve(tint) · R *= 1 + 0.1·curve(tint) · B *= 1 + 0.1·curve(tint)
+ * **M4.5 前置整改**：移除 curve() 降敏，改线性响应（与 GPU shader 同步）：
+ *   - temp / tint 均 UI /100 后直接用
+ *   - temp：R *= 1 + 0.3·temp · B *= 1 - 0.3·temp
+ *   - tint：G *= 1 - 0.3·tint · R *= 1 + 0.1·tint · B *= 1 + 0.1·tint
  */
 export interface WBParams {
   temp?: number
@@ -238,8 +253,8 @@ export interface WBParams {
 
 export function applyWhiteBalanceCpu(src: RGBA, w: number, h: number, p: WBParams): RGBA {
   const out = createCanvas(w, h)
-  const temp = curveEaseCenter((p.temp ?? 0) / 100)
-  const tint = curveEaseCenter((p.tint ?? 0) / 100)
+  const temp = Math.max(-1, Math.min(1, (p.temp ?? 0) / 100))
+  const tint = Math.max(-1, Math.min(1, (p.tint ?? 0) / 100))
 
   for (let i = 0; i < src.length; i += 4) {
     let r = src[i]! / 255

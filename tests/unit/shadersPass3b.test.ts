@@ -144,6 +144,20 @@ describe('isColorGradingIdentity', () => {
   it('任一 l 非零 → false', () => {
     expect(isColorGradingIdentity({ shadows: { l: 5 } })).toBe(false)
   })
+  // 设计契约断言（M4.5 前置整改）：
+  // shader 中 sOff = hueToRgb(h, s) * l，l=0 时输出恒等于输入。
+  // 因此"只有 h/s 非零、l=0"也必须被视为 identity（否则白白占用一个 pass）。
+  // 若未来改了 shader 使 l=0 时 h/s 仍有效果，这条测试必须同步调整。
+  it('l=0 但 h/s 任意值 → true（符合 shader 数学契约）', () => {
+    expect(
+      isColorGradingIdentity({
+        shadows: { l: 0 },
+        midtones: { l: 0 },
+        highlights: { l: 0 },
+        // 下面两个字段不被函数读取，但测试意图要表达出来：即便有它们也 true
+      } as Parameters<typeof isColorGradingIdentity>[0]),
+    ).toBe(true)
+  })
 })
 
 // ========== curvePointsToLut / isCurvesIdentity ==========
