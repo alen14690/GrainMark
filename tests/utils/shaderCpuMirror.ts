@@ -354,6 +354,60 @@ export function applyClarityCpu(src: RGBA, w: number, h: number, amount: number)
   return out
 }
 
+/**
+ * adjustments shader 镜像（shaders/adjustments.ts 的 saturation + vibrance 部分）
+ *
+ * 与 GPU ADJUSTMENTS_FRAG 严格等价（clarity 因依赖相邻像素，单像素测试不适合，
+ * 此函数仅覆盖 saturation + vibrance；clarity 的单测仍走 applyClarityCpu）。
+ *
+ * saturation：mix(gray, c, 1 + u_saturation)
+ * vibrance  ：factor = u_vibrance * (1 - smoothstep(0.1, 0.6, currentSat))
+ *             mix(gray, c, 1 + factor)
+ */
+export interface AdjustmentsPassParams {
+  saturation?: number // UI -100..100
+  vibrance?: number
+}
+
+export function applyAdjustmentsPass(src: RGBA, w: number, h: number, p: AdjustmentsPassParams): RGBA {
+  const out = createCanvas(w, h)
+  const sat = Math.max(-1, Math.min(1, (p.saturation ?? 0) / 100))
+  const vib = Math.max(-1, Math.min(1, (p.vibrance ?? 0) / 100))
+
+  for (let i = 0; i < src.length; i += 4) {
+    let r = src[i]! / 255
+    let g = src[i + 1]! / 255
+    let b = src[i + 2]! / 255
+    const gray = luma(r, g, b)
+
+    if (Math.abs(sat) > 1e-4) {
+      const m = 1 + sat
+      r = gray + (r - gray) * m
+      g = gray + (g - gray) * m
+      b = gray + (b - gray) * m
+    }
+
+    if (Math.abs(vib) > 1e-4) {
+      const maxC = Math.max(r, g, b)
+      const minC = Math.min(r, g, b)
+      const curSat = maxC - minC
+      const t = Math.max(0, Math.min(1, (curSat - 0.1) / 0.5))
+      const smooth = t * t * (3 - 2 * t)
+      const factor = vib * (1 - smooth)
+      const m = 1 + factor
+      r = gray + (r - gray) * m
+      g = gray + (g - gray) * m
+      b = gray + (b - gray) * m
+    }
+
+    out[i] = Math.round(clamp01(r) * 255)
+    out[i + 1] = Math.round(clamp01(g) * 255)
+    out[i + 2] = Math.round(clamp01(b) * 255)
+    out[i + 3] = src[i + 3]!
+  }
+  return out
+}
+
 /** 简单 RGB 曲线（只处理 rgb 通道，不单独 r/g/b），LUT 线性插值 */
 export function applyCurvesRgbCpu(src: RGBA, w: number, h: number, lut: number[]): RGBA {
   const out = createCanvas(w, h)
