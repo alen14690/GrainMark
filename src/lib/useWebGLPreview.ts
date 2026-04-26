@@ -452,6 +452,18 @@ export function useWebGLPreview(
         await renderNow()
       } catch (e) {
         if (cancelled) return
+        // 关键错误记录到 console（诊断 "GL: Failed to fetch" 类问题）：
+        //   - sourceUrl 前缀（判断是 data:/grain:/file:/...）
+        //   - URL 长度（data URL 过大 Chromium 会拒）
+        //   - 完整错误
+        const urlPrefix = typeof sourceUrl === 'string' ? sourceUrl.slice(0, 50) : String(sourceUrl)
+        const urlLen = typeof sourceUrl === 'string' ? sourceUrl.length : -1
+        console.error('[useWebGLPreview] fetch/decode failed', {
+          urlPrefix,
+          urlLen,
+          error: (e as Error).message,
+          stack: (e as Error).stack?.split('\n').slice(0, 3).join(' | '),
+        })
         setStatus('error')
         setError((e as Error).message)
       }

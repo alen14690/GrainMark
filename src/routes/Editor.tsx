@@ -300,13 +300,18 @@ export default function Editor() {
               className={cn('rounded-md shadow-soft-lg object-contain', useWebglCanvas ? 'block' : 'hidden')}
               style={canvasStyle}
             />
-            {/* IPC base64 兜底（WebGL 初始化前 / 不可用时 / CPU 路径） */}
+            {/* WebGL 不可用时显示原图占位（未调色），必须叠加醒目提示避免用户误以为"调色生效了" */}
             {showImgFallback && (
-              <img
-                src={previewUrl!}
-                alt="preview"
-                className="max-w-full max-h-[calc(100vh-240px)] object-contain rounded-md shadow-soft-lg"
-              />
+              <div className="relative">
+                <img
+                  src={previewUrl!}
+                  alt="preview"
+                  className="max-w-full max-h-[calc(100vh-240px)] object-contain rounded-md shadow-soft-lg"
+                />
+                <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-sem-error/90 text-white text-xs font-medium px-3 py-1.5 rounded shadow-soft-md backdrop-blur-sm">
+                  ⚠ WebGL 不可用 · 当前显示原图，调色暂不生效
+                </div>
+              </div>
             )}
             {!previewUrl && !previewError && (
               <div className="w-[600px] h-[400px] bg-bg-1 rounded-md flex items-center justify-center text-fg-3 text-sm font-mono">
