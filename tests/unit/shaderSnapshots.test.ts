@@ -1,13 +1,15 @@
 /**
  * Shader 像素级 Snapshot 测试（AGENTS.md 测试金字塔 Image Snapshot 层）
  *
- * 10 个 shader × 100×100 baseline PNG
+ * 10 个 shader × 100×100 baseline PNG（本轮 M4.1 起含 HSL 完整 8 通道）
  *
  * 机制：
  * - 使用 tests/utils/shaderCpuMirror.ts 的 CPU 镜像函数渲染
  * - 首次运行（无 baseline）自动生成到 tests/baselines/shaders/
  * - 后续运行比对 diffPercent ≤ 0.5%
  * - 算法语义改动（shader + CPU 镜像未同步）会在这里被抓到
+ * - M4.1 更新：tone / whiteBalance / hsl baseline 需重生（GPU shader 引入
+ *   ease-center curve 后 CPU 镜像同步）
  */
 import { describe, it } from 'vitest'
 import { comparePNG } from '../utils/imageMatcher'
@@ -17,6 +19,7 @@ import {
   applyCurvesRgbCpu,
   applyGrainCpu,
   applyHalationCpu,
+  applyHslFullCpu,
   applyHslSimpleCpu,
   applyLut3dCpu,
   applySaturationCpu,
@@ -115,7 +118,29 @@ describe('shader snapshots · 10 shader × 100×100', () => {
     expectMatchBaseline(toPNG(out, W, H), 'colorGrading-teal-orange.png')
   })
 
-  it('hsl · red 通道饱和 -50（去红）', () => {
+  it('hsl · red 通道饱和 -50（去红）— 走 full 完整版', () => {
+    const out = applyHslFullCpu(src, W, H, { red: { h: 0, s: -50, l: 0 } })
+    expectMatchBaseline(toPNG(out, W, H), 'hsl-red-desat50.png')
+  })
+
+  it('hsl · full 8 通道多色同时调整（覆盖 shader 的加权融合）', () => {
+    const out = applyHslFullCpu(src, W, H, {
+      red: { h: 10, s: -30, l: 0 },
+      green: { h: 0, s: 40, l: 10 },
+      blue: { h: -20, s: 20, l: -10 },
+      orange: { h: 0, s: -20, l: 0 },
+    })
+    expectMatchBaseline(toPNG(out, W, H), 'hsl-full-multi-channel.png')
+  })
+
+  it('hsl · full satGate 行为：灰度带不应被染色', () => {
+    // red h+50 s+80：标准输入第 0 带是灰度，satGate 应让该带几乎不变
+    const out = applyHslFullCpu(src, W, H, { red: { h: 50, s: 80, l: 0 } })
+    expectMatchBaseline(toPNG(out, W, H), 'hsl-full-satgate-red.png')
+  })
+
+  it('hsl · simple（deprecated wrapper）仍与 full 等价（迁移期契约）', () => {
+    // applyHslSimpleCpu 是 applyHslFullCpu 的薄包装，应产出与直接调 full 等价的结果
     const out = applyHslSimpleCpu(src, W, H, 'red', 0, -50, 0)
     expectMatchBaseline(toPNG(out, W, H), 'hsl-red-desat50.png')
   })

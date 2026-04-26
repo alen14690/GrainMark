@@ -85,9 +85,15 @@ export function luma(r: number, g: number, b: number): number {
 
 /**
  * tone shader 镜像（shaders/tone.ts）
+ *
+ * 与 GPU shader 算法等价（M3.5 `4b9e797` 引入 ease-center 响应）：
+ *   - exposure：直接按 UI EV（UI 值 /100 * 2，保持 CPU 镜像的 UI 契约）
+ *   - 其它通道经 curve(x) = sign(x) * |x|^1.6 降敏
+ *   - 最大强度系数与 GPU 一致：highlights 0.30、shadows 0.35、whites 0.30、blacks 0.35
+ *
  * 顺序：exposure（线性乘）→ contrast（中点 0.5）→ highlights / shadows（smoothstep 蒙版）→
  *       whites / blacks（端点提亮 / 压暗）
- * UI 范围 -100..100；exposure 映射到 EV -2..2
+ * UI 范围 -100..100；exposure UI 值 /100 * 2 映射到 EV -2..2
  */
 export interface ToneParams {
   exposure?: number
@@ -98,15 +104,22 @@ export interface ToneParams {
   blacks?: number
 }
 
+/** 与 GPU shader 的 curve() 一致：sign(x) * |x|^1.6 */
+export function curveEaseCenter(x: number): number {
+  const ax = Math.abs(x)
+  return Math.sign(x) * ax ** 1.6
+}
+
 export function applyToneCpu(src: RGBA, w: number, h: number, p: ToneParams): RGBA {
   const out = createCanvas(w, h)
   const ev = ((p.exposure ?? 0) / 100) * 2
   const exp = 2 ** ev
-  const contrastAmt = (p.contrast ?? 0) / 100
-  const hi = (p.highlights ?? 0) / 100
-  const sh = (p.shadows ?? 0) / 100
-  const wh = (p.whites ?? 0) / 100
-  const bk = (p.blacks ?? 0) / 100
+  // 所有非曝光参数经 curve() 降敏后再用
+  const contrastAmt = curveEaseCenter((p.contrast ?? 0) / 100)
+  const hi = curveEaseCenter((p.highlights ?? 0) / 100)
+  const sh = curveEaseCenter((p.shadows ?? 0) / 100)
+  const wh = curveEaseCenter((p.whites ?? 0) / 100)
+  const bk = curveEaseCenter((p.blacks ?? 0) / 100)
 
   for (let i = 0; i < src.length; i += 4) {
     let r = (src[i]! / 255) * exp
@@ -119,25 +132,37 @@ export function applyToneCpu(src: RGBA, w: number, h: number, p: ToneParams): RG
     g = (g - 0.5) * cm + 0.5
     b = (b - 0.5) * cm + 0.5
 
-    // highlights mask（smoothstep(0.5, 1.0, luma)）
+    // highlights mask（smoothstep(0.55, 0.95, luma)）
     const L = luma(r, g, b)
-    const hiMask = clamp01((L - 0.5) / 0.5)
-    const hiS = hiMask * hiMask * (3 - 2 * hiMask)
-    r += hi * hiS * 0.3
-    g += hi * hiS * 0.3
-    b += hi * hiS * 0.3
+    const hiMaskT = clamp01((L - 0.55) / 0.4)
+    const hiS = hiMaskT * hiMaskT * (3 - 2 * hiMaskT)
+    const hlFactor = 1 + hi * 0.3 * hiS
+    r *= hlFactor
+    g *= hlFactor
+    b *= hlFactor
 
-    // shadows mask（smoothstep(0.5, 0.0, luma) 反向）
-    const shMask = clamp01((0.5 - L) / 0.5)
-    const shS = shMask * shMask * (3 - 2 * shMask)
-    r += sh * shS * 0.3
-    g += sh * shS * 0.3
-    b += sh * shS * 0.3
+    // shadows mask（smoothstep 反向，阈值 0.0..0.45）
+    const shMaskT = clamp01(1 - L / 0.45)
+    const shS = shMaskT * shMaskT * (3 - 2 * shMaskT)
+    const shFactor = 1 + sh * 0.35 * shS
+    r *= shFactor
+    g *= shFactor
+    b *= shFactor
 
-    // whites / blacks 线性端点
-    r += wh * 0.15 * clamp01(L * 2 - 1) + bk * 0.15 * clamp01(1 - L * 2)
-    g += wh * 0.15 * clamp01(L * 2 - 1) + bk * 0.15 * clamp01(1 - L * 2)
-    b += wh * 0.15 * clamp01(L * 2 - 1) + bk * 0.15 * clamp01(1 - L * 2)
+    // whites / blacks：mix(c, c * (1 + param * coeff), mask)
+    const whMaskT = clamp01((L - 0.75) / 0.25)
+    const whS = whMaskT * whMaskT * (3 - 2 * whMaskT)
+    const whF = 1 + wh * 0.3
+    r = r * (1 - whS) + r * whF * whS
+    g = g * (1 - whS) + g * whF * whS
+    b = b * (1 - whS) + b * whF * whS
+
+    const bkMaskT = clamp01(1 - L / 0.25)
+    const bkS = bkMaskT * bkMaskT * (3 - 2 * bkMaskT)
+    const bkF = 1 + bk * 0.35
+    r = r * (1 - bkS) + r * bkF * bkS
+    g = g * (1 - bkS) + g * bkF * bkS
+    b = b * (1 - bkS) + b * bkF * bkS
 
     out[i] = Math.round(clamp01(r) * 255)
     out[i + 1] = Math.round(clamp01(g) * 255)
@@ -198,7 +223,14 @@ export function applyVignetteCpu(src: RGBA, w: number, h: number, p: VignettePar
   return out
 }
 
-/** whiteBalance shader 镜像：temp 偏移 R/B，tint 偏移 G/M */
+/**
+ * whiteBalance shader 镜像：temp 偏移 R/B，tint 偏移 G/M
+ *
+ * 与 GPU shader 算法等价（M3.5 引入 curve 降敏）：
+ *   - temp / tint 均经 curve(x) = sign(x) * |x|^1.6 过一遍再乘系数
+ *   - temp：R *= 1 + 0.3·curve(temp) · B *= 1 - 0.3·curve(temp)
+ *   - tint：G *= 1 - 0.3·curve(tint) · R *= 1 + 0.1·curve(tint) · B *= 1 + 0.1·curve(tint)
+ */
 export interface WBParams {
   temp?: number
   tint?: number
@@ -206,17 +238,20 @@ export interface WBParams {
 
 export function applyWhiteBalanceCpu(src: RGBA, w: number, h: number, p: WBParams): RGBA {
   const out = createCanvas(w, h)
-  const temp = (p.temp ?? 0) / 100 // -1..1
-  const tint = (p.tint ?? 0) / 100
-  const tempR = 1 + temp * 0.3
-  const tempB = 1 - temp * 0.3
-  const tintG = 1 - tint * 0.3
-  const tintM = 1 + tint * 0.3 // 影响 R 和 B 反向补偿
+  const temp = curveEaseCenter((p.temp ?? 0) / 100)
+  const tint = curveEaseCenter((p.tint ?? 0) / 100)
 
   for (let i = 0; i < src.length; i += 4) {
-    const r = (src[i]! / 255) * tempR * Math.sqrt(tintM)
-    const g = (src[i + 1]! / 255) * tintG
-    const b = (src[i + 2]! / 255) * tempB * Math.sqrt(tintM)
+    let r = src[i]! / 255
+    let g = src[i + 1]! / 255
+    let b = src[i + 2]! / 255
+
+    r *= 1 + temp * 0.3
+    b *= 1 - temp * 0.3
+    g *= 1 - tint * 0.3
+    r *= 1 + tint * 0.1
+    b *= 1 + tint * 0.1
+
     out[i] = Math.round(clamp01(r) * 255)
     out[i + 1] = Math.round(clamp01(g) * 255)
     out[i + 2] = Math.round(clamp01(b) * 255)
@@ -584,57 +619,164 @@ export function applyLut3dCpu(
   return out
 }
 
-/** HSL 镜像（仅 red / orange 简化；8 通道完整版太冗长，保留为 TODO） */
-export function applyHslSimpleCpu(
-  src: RGBA,
-  w: number,
-  h: number,
-  channel: 'red' | 'green' | 'blue',
-  hShift: number, // -180..180
-  sMul: number, // -100..100
-  lMul: number, // -100..100
-): RGBA {
+/**
+ * HSL shader 镜像（完整 8 通道版），与 shaders/hsl.ts 算法等价。
+ *
+ * 通道固定 8 个（与 shader CHANNEL_HUES 对齐）：
+ *   red(0) · orange(30) · yellow(60) · green(120) · aqua(180) · blue(240) · purple(270) · magenta(300)
+ *
+ * 流程：
+ *   1. RGB → HSL
+ *   2. 计算当前 hue 到 8 通道中心的高斯权重（σ=30°，非归一化后再归一化到总权重）
+ *   3. 加权累加每个通道的 H/S/L 修正：
+ *      dH += weight_i * (h_i / 100) * 30°
+ *      dS += weight_i * (s_i / 100)
+ *      dL += weight_i * (l_i / 100) * 0.5
+ *   4. satGate = smoothstep(0.05, 0.25, hsl.s)，灰度区弱化 H/S 修正（保留 L）
+ *   5. HSL → RGB
+ *
+ * 注意：h/s/l 参数语义与 shader 一致 —— UI 值 -100..100
+ */
+export const HSL_CHANNELS = ['red', 'orange', 'yellow', 'green', 'aqua', 'blue', 'purple', 'magenta'] as const
+export type HSLChannelName = (typeof HSL_CHANNELS)[number]
+
+/** 各通道中心色相（度），与 shader CHANNEL_HUES 严格对齐 */
+const HSL_HUES: Record<HSLChannelName, number> = {
+  red: 0,
+  orange: 30,
+  yellow: 60,
+  green: 120,
+  aqua: 180,
+  blue: 240,
+  purple: 270,
+  magenta: 300,
+}
+
+/** HSL 每通道修正（UI 值 -100..100） */
+export interface HSLChannelParams {
+  h?: number
+  s?: number
+  l?: number
+}
+
+/** HSL 参数整体（可能只传部分通道，缺省通道视为 0） */
+export type HSLParams = Partial<Record<HSLChannelName, HSLChannelParams>>
+
+/** 循环色相差：返回 [0, 180] */
+function hueDist(a: number, b: number): number {
+  const d = Math.abs(a - b)
+  return Math.min(d, 360 - d)
+}
+
+/** RGB (0..1) → HSL (h: 0..360, s: 0..1, l: 0..1) */
+function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
+  const maxc = Math.max(r, g, b)
+  const minc = Math.min(r, g, b)
+  const l = (maxc + minc) * 0.5
+  const d = maxc - minc
+  if (d < 1e-5) return [0, 0, l]
+  const s = l > 0.5 ? d / (2 - maxc - minc) : d / (maxc + minc)
+  let h = 0
+  if (maxc === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60
+  else if (maxc === g) h = ((b - r) / d + 2) * 60
+  else h = ((r - g) / d + 4) * 60
+  return [h, s, l]
+}
+
+/**
+ * HSL 完整 8 通道 CPU 镜像
+ * @param src 输入 RGBA 0..255
+ * @param p 8 通道参数（缺省通道不影响）
+ */
+export function applyHslFullCpu(src: RGBA, w: number, h: number, p: HSLParams): RGBA {
   const out = createCanvas(w, h)
-  const centerHue = channel === 'red' ? 0 : channel === 'green' ? 120 : 240
-  const sigma = 30
+  // 预归一化每个通道的 [h, s, l] 到 -1..1
+  const ch: Array<{ h: number; s: number; l: number }> = HSL_CHANNELS.map((name) => {
+    const v = p[name]
+    return {
+      h: clamp01Signed((v?.h ?? 0) / 100),
+      s: clamp01Signed((v?.s ?? 0) / 100),
+      l: clamp01Signed((v?.l ?? 0) / 100),
+    }
+  })
+  const hues = HSL_CHANNELS.map((name) => HSL_HUES[name])
+  const SIGMA2 = 1800 // 2 * 30 * 30
 
   for (let i = 0; i < src.length; i += 4) {
     const r = src[i]! / 255
     const g = src[i + 1]! / 255
     const b = src[i + 2]! / 255
-    const maxC = Math.max(r, g, b)
-    const minC = Math.min(r, g, b)
-    const L = (maxC + minC) / 2
-    const d = maxC - minC
-    let hue = 0
-    let sat = 0
-    if (d === 0) {
-      hue = 0
-      sat = 0
-    } else {
-      sat = L > 0.5 ? d / (2 - maxC - minC) : d / (maxC + minC)
-      if (maxC === r) hue = ((g - b) / d + (g < b ? 6 : 0)) * 60
-      else if (maxC === g) hue = ((b - r) / d + 2) * 60
-      else hue = ((r - g) / d + 4) * 60
+    const [hue, sat, lum] = rgbToHsl(r, g, b)
+
+    // 8 通道权重（归一化）
+    let total = 0
+    const weights: number[] = new Array(8)
+    for (let k = 0; k < 8; k++) {
+      const d = hueDist(hue, hues[k]!)
+      const w2 = Math.exp((-d * d) / SIGMA2)
+      weights[k] = w2
+      total += w2
+    }
+    const inv = 1 / Math.max(total, 1e-4)
+
+    let dH = 0
+    let dS = 0
+    let dL = 0
+    for (let k = 0; k < 8; k++) {
+      const wk = weights[k]! * inv
+      dH += wk * ch[k]!.h * 30 // ±1 → ±30°
+      dS += wk * ch[k]!.s
+      dL += wk * ch[k]!.l * 0.5
     }
 
-    // 高斯权重
-    let dh = Math.abs(hue - centerHue)
-    if (dh > 180) dh = 360 - dh
-    const weight = Math.exp(-(dh * dh) / (2 * sigma * sigma))
+    // satGate：低饱和区（灰/近白/近黑）不染色
+    const satGate = smoothstep(0.05, 0.25, sat)
+    dH *= satGate
+    dS *= satGate
 
-    hue += hShift * weight
-    sat = clamp01(sat * (1 + (sMul / 100) * weight))
-    const newL = clamp01(L + (lMul / 100) * weight * 0.3)
+    let newHue = (((hue + dH) % 360) + 360) % 360
+    if (newHue >= 360) newHue -= 360
+    const newSat = clamp01(sat * (1 + dS))
+    // L 朝中性方向衰减（接近 0 或 1 时影响减弱，与 shader 一致）
+    const newL = clamp01(lum + dL * (1 - Math.abs(lum - 0.5) * 2))
 
-    // HSL → RGB
-    const [nr, ng, nb] = hslToRgb((hue + 360) % 360, sat, newL)
+    const [nr, ng, nb] = hslToRgb(newHue, newSat, newL)
     out[i] = Math.round(clamp01(nr) * 255)
     out[i + 1] = Math.round(clamp01(ng) * 255)
     out[i + 2] = Math.round(clamp01(nb) * 255)
     out[i + 3] = src[i + 3]!
   }
   return out
+}
+
+function clamp01Signed(v: number): number {
+  return v < -1 ? -1 : v > 1 ? 1 : v
+}
+
+function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = clamp01((x - edge0) / (edge1 - edge0))
+  return t * t * (3 - 2 * t)
+}
+
+/**
+ * @deprecated 过渡期保留：只支持 red/green/blue 三通道的简化版。
+ *   新代码请用 applyHslFullCpu。老 snapshot 测试仍引用；将在下一轮清理
+ */
+export function applyHslSimpleCpu(
+  src: RGBA,
+  w: number,
+  h: number,
+  channel: 'red' | 'green' | 'blue',
+  hShift: number,
+  sMul: number,
+  lMul: number,
+): RGBA {
+  // 映射到 applyHslFullCpu：只修对应通道
+  const params: HSLParams = {}
+  if (channel === 'red') params.red = { h: hShift, s: sMul, l: lMul }
+  else if (channel === 'green') params.green = { h: hShift, s: sMul, l: lMul }
+  else params.blue = { h: hShift, s: sMul, l: lMul }
+  return applyHslFullCpu(src, w, h, params)
 }
 
 // ========== Baseline IO ==========
