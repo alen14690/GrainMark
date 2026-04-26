@@ -84,6 +84,42 @@ Commit body 模板（中文）：
 - 单测: N/N 通过，覆盖率 X%
 ```
 
+### 7. 用户视角自测（UI/渲染类改动专属）
+
+**触发条件（三者任一即强制执行）**：
+- 涉及渲染管线任一 shader 源码（`src/engine/webgl/shaders/**`）
+- 涉及滑块/手势/快捷键等 UI 交互入口（`src/components/**`、`src/routes/**`）
+- 涉及 editStore / filterStore / appStore 的 setter 行为
+
+**必做证据（两者至少取其一）**：
+
+**证据 A：可感知性单测**（推荐，最稳定）
+- 凡新增/修改的滑块、shader 参数、管线通道，**必须在 `tests/unit/perceptibility.test.ts` 里有对应"用户可感知变化"断言**（Δ ≥ 人眼阈值）
+- 凡新增/修改 UI→store→pipeline 的映射路径，**必须在 `tests/unit/sliderPipelineChain.test.ts` 里有对应链路断言**
+- 缺失即视为未完成
+
+**证据 B：真实运行时像素变化**（UI 集成改动必做）
+- 通过 `scripts/verify-sliders-runtime.mjs` 运行诊断或在 Electron dev 模式下实测
+- 在 commit body「验证结果」段落附上关键像素的前后 Δ 数据
+- 示例：`高光 +50 在高光像素 Δ=35（修复前 Δ=19）`
+
+**蓝军 mutation 验证（高风险改动推荐）**：
+- 对新增的"可感知性/链路"断言，手工注入一次反向 mutation（例如把 `isXxxIdentity` 改成永真、shader 系数改小），确认断言会**真的红**
+- mutation 后的失败项数量与修复前诊断脚本识别出的问题点应当对得上
+- 验证后立刻回滚，**不允许带着 mutation 提交**
+
+**形式化测试零容忍清单**（触发任一即不能声明完成）：
+- ❌ "全量单测通过"却没跑过诊断脚本
+- ❌ 改了 shader 但 CPU 镜像没同步（GPU 和 CPU 数学语义脱节）
+- ❌ 删/改了老 baseline 却没蓝军验证新 baseline 真的有防护力
+- ❌ 同一类型问题（如"滑块不生效/参数未生效"）第二次出现还走局部补丁，不做架构复盘
+- ❌ 只跑 `vitest` 声明绿色，不跑 `tsc --noEmit` / `biome check .`
+
+**惯例**：
+- 同类问题出现 **2 次** 以上，下次 commit 前必须在 `.codebuddy/brain/<conv-id>/` 或
+  `artifact/` 写一份架构复盘，**不允许再打补丁**
+- 用户反馈"X 不生效"时，第一反应应该是跑诊断脚本**用数据说话**，不是改代码
+
 ---
 
 ## 📝 交付回复的强制结构
@@ -98,6 +134,7 @@ Commit body 模板（中文）：
 - **静态检查零回归**：tsc --noEmit [0/N] 错误 · biome [0/N] 警告
 - **单元测试同步更新并全绿**：vitest [N/N] 通过 · 覆盖率 [X%]
 - **可运行自测**：[具体验证了什么流程]
+- **用户视角自测**：[若触发第 7 条 · 附 perceptibility / sliderPipelineChain 断言覆盖 或 诊断脚本 Δ 数据 · 其他情况写 "N/A（非 UI/渲染改动）"]
 - **Git 提交与推送**：commit [hash] · message 含「变更内容/变更动机/备选方案」三段中文说明 · 已推送至 [branch]
 ```
 
