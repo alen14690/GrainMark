@@ -84,9 +84,12 @@ describe('F1 回归：IPC handler 必须消费 PathGuard', () => {
         /\bpath\b/i.test(src) || /Path[A-Z]/.test(src) || /filePath|outPath|photoPath/.test(src)
       const hasRegisterIpc = /registerIpc\(/.test(src)
       const hasPathFields = /pathFields\s*:/.test(src)
+      // 免检标记：handler 文件在注释里出现 `ipc-no-path-params`（JSDoc 或 // 均可），
+      //   说明已经人工确认该 IPC 没有路径参数（例如 perf:log 只收诊断数据）
+      const hasOptOut = /ipc-no-path-params\b/.test(src)
       // 某些文件（如 sync.ts / trending.ts / settings.ts）确实不含路径
       // —— 用"文件内必须显式声明 noPathParams 或包含 pathFields" 的粗略约束
-      if (hasRegisterIpc && hasPathHint && !hasPathFields) {
+      if (hasRegisterIpc && hasPathHint && !hasPathFields && !hasOptOut) {
         offenders.push(f)
       }
     }

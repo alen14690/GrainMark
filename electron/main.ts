@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { BrowserWindow, app, dialog, ipcMain, session, shell } from 'electron'
 import { z } from 'zod'
 import { DialogSelectFilesSchema } from '../shared/ipc-schemas.js'
+import { shutdownPerfSink } from './ipc/perf.js'
 import { registerAllIpcHandlers } from './ipc/register.js'
 import { setIpcPathGuard } from './ipc/safeRegister.js'
 import { buildAppMenu } from './menu.js'
@@ -14,7 +15,7 @@ import { logger } from './services/logger/logger.js'
 import { PathGuard } from './services/security/pathGuard.js'
 import { setPathGuard } from './services/security/pathGuardRegistry.js'
 import { SecureVault } from './services/security/secureVault.js'
-import { flushStorage, getPhotosTable, initStorage } from './services/storage/init.js'
+import { flushStorage, getLogsDir, getPhotosTable, initStorage } from './services/storage/init.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -226,6 +227,15 @@ app.whenReady().then(async () => {
   // 初始化存储
   await initStorage()
 
+  // 初始化日志磁盘沉淀（必须在 initStorage 之后，因为用 userData/logs）
+  logger.initFileSink(getLogsDir())
+  logger.info('app.started', {
+    platform: process.platform,
+    arch: process.arch,
+    pid: process.pid,
+    electronVersion: process.versions.electron,
+  })
+
   // 初始化安全组件
   const home = app.getPath('home')
   pathGuard = new PathGuard([
@@ -339,6 +349,11 @@ app.on('before-quit', async () => {
   }
   try {
     await shutdownExiftool()
+  } catch {
+    // ignore
+  }
+  try {
+    shutdownPerfSink()
   } catch {
     // ignore
   }

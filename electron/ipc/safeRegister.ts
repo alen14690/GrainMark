@@ -182,7 +182,14 @@ export function registerIpc(
 
       const result = await handler(...safeArgs)
       const dt = Date.now() - t0
-      if (dt > 500) logger.warn('ipc.slow', { channel, durationMs: dt })
+      // P0 可观测性（2026-04-26）：所有 IPC 调用耗时都落盘（不只是 > 500ms）
+      //   这样用户操作卡顿时我能直接 grep userData/logs/main.ndjson 看哪个慢
+      //   debug 级不污染控制台，但 fileSink 会写到磁盘供事后分析
+      if (dt > 500) {
+        logger.warn('ipc.slow', { channel, durationMs: dt })
+      } else {
+        logger.debug('ipc.call', { channel, durationMs: dt })
+      }
       return result
     } catch (err) {
       const info = serializeError(err)

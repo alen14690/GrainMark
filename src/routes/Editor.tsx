@@ -173,70 +173,21 @@ export default function Editor() {
   const renderPipeline = showOriginal ? null : currentPipeline
   const webgl = useWebGLPreview(previewUrl, renderPipeline)
 
-  // CPU 兜底：下面情况都走 IPC 主进程应用 pipeline（data URL 回来已烘焙滤镜）：
-  //   1. webgl.needsCpuFallback：LUT 纹理解析失败（历史兜底）
-  //   2. webgl.status === 'error'：WebGL 初始化 / 纹理上传 / 着色器编译任一阶段挂掉
-  //   3. webgl.status === 'lost'：GPU context lost 尚未恢复
-  //   4. webgl.status === 'unsupported'：老机器 / 驱动不支持 WebGL 2
-  // 'idle' 是瞬时态（WebGL 初始化到 sourceUrl 载入触发 loading 之间的窗口，通常 < 100ms），
-  // 为避免"idle CPU → ready GPU"瞬切带来的像素跳变，idle 不触发兜底；
-  // 'loading' 同理（canvas 已显示上一次的结果，短暂 loading 期间用户看到旧帧是可接受的）
-  const webglBroken = webgl.status === 'error' || webgl.status === 'lost' || webgl.status === 'unsupported'
-  const needsCpuFallback = !showOriginal && (webgl.needsCpuFallback || webglBroken)
-  const ipcFilterId = showOriginal ? null : needsCpuFallback ? activeFilterId : null
-
+  // GPU-only 策略（2026-04-26 起）：
+  //   架构决策：不再做 CPU 兜底。编辑路径只走 WebGL 实时渲染
+  //   GPU 异常的正解：context lost 自动 restore；LUT 失败 skip 该通道；
+  //   WebGL2 不支持 → 直接提示不兼容，不假装能工作
+  const webglFatal = webgl.status === 'error' || webgl.status === 'unsupported'
   const photoPath = photo?.path
 
-  /**
-   * CPU 兜底路径下 IPC pipelineOverride 的 debounce key。
-   *
-   * 背景：
-   *   - GPU 路径（webgl.status='ready' 且无 needsCpuFallback）：previewUrl 只是原图的
-   *     基准 JPEG，滤镜/滑块由 WebGL 实时叠加 → pipelineOverride 无需传
-   *   - CPU 兜底路径（webgl 挂 / lost / LUT 失败）：previewUrl 需要是"已烘焙 pipeline"
-   *     的成图，拖滑块时必须带上 currentPipeline 让主进程重新 sharp 处理
-   *
-   * 高频调用保护：滑块拖动每帧触发 setTone → currentPipeline 每帧新引用 → 若直接
-   *   把 currentPipeline 放进 useEffect deps，会每帧发 IPC（sharp 24MP 处理 400ms+）
-   *   → 完全卡死。
-   *   → 改用 JSON.stringify 哈希作 key + 150ms debounce：滑块松手后才重拉一次，
-   *     拖动过程用上一次的 previewUrl 先顶着（视觉上接受"松手后更新"延迟）
-   */
-  const pipelineKey = useMemo(() => {
-    if (!needsCpuFallback) return null
-    // CPU 兜底：使用 currentPipeline 作 key；JSON.stringify 对纯数据结构稳定
-    try {
-      return JSON.stringify(currentPipeline ?? null)
-    } catch {
-      return null
-    }
-  }, [needsCpuFallback, currentPipeline])
-
-  // debounce pipelineKey 150ms，只在静止态触发 IPC 重拉
-  const [debouncedPipelineKey, setDebouncedPipelineKey] = useState<string | null>(null)
-  useEffect(() => {
-    if (pipelineKey === debouncedPipelineKey) return
-    const t = window.setTimeout(() => setDebouncedPipelineKey(pipelineKey), 150)
-    return () => window.clearTimeout(t)
-  }, [pipelineKey, debouncedPipelineKey])
-
-  // 拉取 previewUrl：
-  //   - GPU 正常路径：override=undefined，主进程只根据 photoPath + filterId 给"基准原图"
-  //   - CPU 兜底：override=currentPipeline，主进程烘焙滤镜到 data URL
-  //   - currentPipeline / needsCpuFallback 经 debouncedPipelineKey 间接依赖，避免每帧 IPC
-  //
-  // P0-6：切滤镜 / 切照片只拉一次 preview；拖滑块（GPU 正常路径）不会触发本 effect，
-  //   因为 pipelineKey 在 !needsCpuFallback 时恒为 null，debouncedPipelineKey 不变化。
-  //   Guard：显式在 effect 内再检查一次，防御 webgl.status 抖动时的误触发。
-  // biome-ignore lint/correctness/useExhaustiveDependencies: currentPipeline/needsCpuFallback 已由 debouncedPipelineKey 代理
+  // 拉取 previewUrl：只依赖 photoPath。filterId / pipelineOverride 永远传 null/undefined，
+  // preview:render 主进程只做 "取原图 + resize + encode"，所有滤镜/滑块实时 GPU 渲染
   useEffect(() => {
     if (!photoPath) return
     let alive = true
     setLoading(true)
     setPreviewError(null)
-    // 再次确认：GPU 正常路径下不传 pipelineOverride（避免主进程 sharp 重做 pipeline）
-    const override = needsCpuFallback ? (currentPipeline ?? undefined) : undefined
-    ipc('preview:render', photoPath, ipcFilterId, override)
+    ipc('preview:render', photoPath, null)
       .then((url) => {
         if (alive) {
           setPreviewUrl(url)
@@ -244,7 +195,6 @@ export default function Editor() {
         }
       })
       .catch((err) => {
-        // 不吞错：卡 "rendering..." 是最差体验。把错误显示到画布上让用户能看到。
         console.error('[preview]', err)
         if (alive) {
           setPreviewUrl(null)
@@ -257,7 +207,7 @@ export default function Editor() {
     return () => {
       alive = false
     }
-  }, [photoPath, ipcFilterId, debouncedPipelineKey])
+  }, [photoPath])
 
   if (!photo) {
     return (
@@ -265,7 +215,7 @@ export default function Editor() {
     )
   }
 
-  const useWebglCanvas = !needsCpuFallback && (webgl.status === 'ready' || webgl.status === 'loading')
+  const useWebglCanvas = !webglFatal && (webgl.status === 'ready' || webgl.status === 'loading')
   const showImgFallback = !useWebglCanvas && previewUrl
   const canvasStyle = { maxWidth: '100%', maxHeight: 'calc(100vh - 240px)' } as const
 
@@ -378,15 +328,10 @@ export default function Editor() {
                 <ValueBadge value="ORIGINAL" variant="amber" size="sm" />
               </div>
             )}
-            {webgl.status === 'ready' && !needsCpuFallback && <GpuBadge />}
-            {needsCpuFallback && (
-              <div className="absolute bottom-3 right-3">
-                <ValueBadge value="CPU" variant="muted" size="sm" />
-              </div>
-            )}
+            {webgl.status === 'ready' && <GpuBadge />}
             {webgl.status === 'unsupported' && (
               <div className="absolute bottom-3 right-3">
-                <ValueBadge value="CPU FALLBACK" variant="muted" size="sm" />
+                <ValueBadge value="WEBGL2 UNSUPPORTED" variant="amber" size="sm" />
               </div>
             )}
             {webgl.status === 'error' && webgl.error && (
@@ -394,13 +339,12 @@ export default function Editor() {
                 GL: {webgl.error}
               </div>
             )}
-            {/* Dev 诊断条：webgl 状态 + pipeline 通道数 + 兜底原因 + Frame budget；仅 import.meta.env.DEV 显示 */}
+            {/* Dev 诊断条：webgl 状态 + pipeline 通道数 + Frame budget；仅 import.meta.env.DEV 显示 */}
             {import.meta.env.DEV && (
               <DevDiagnosticOverlay
                 status={webgl.status}
                 error={webgl.error}
                 channelCount={currentPipeline ? countPipelineChannels(currentPipeline) : 0}
-                needsCpuFallback={needsCpuFallback}
               />
             )}
           </div>
@@ -545,12 +489,10 @@ const DevDiagnosticOverlay = memo(function DevDiagnosticOverlay({
   status,
   error,
   channelCount,
-  needsCpuFallback,
 }: {
   status: string
   error?: string
   channelCount: number
-  needsCpuFallback: boolean
 }) {
   const perf = usePerfStore((s) => s.perf)
   return (
@@ -559,9 +501,7 @@ const DevDiagnosticOverlay = memo(function DevDiagnosticOverlay({
         gl: {status}
         {error ? ` (${error.slice(0, 40)})` : ''}
       </div>
-      <div>
-        pipeline: {channelCount} ch · {needsCpuFallback ? 'CPU' : 'GPU'}
-      </div>
+      <div>pipeline: {channelCount} ch · GPU</div>
       {perf && (
         <div>
           frame: {perf.totalMs.toFixed(1)}ms · run {perf.pipelineRunMs.toFixed(1)} · rd{' '}

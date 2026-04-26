@@ -176,44 +176,13 @@ describe('renderPreview 输出形态', () => {
     expect(meta.height).toBe(900)
   })
 
-  it('pipelineOverride 优先于 filterId（CPU 兜底路径的关键契约）', async () => {
-    // 构造灰色输入：tone.exposure +2 应让输出显著变亮
-    const gray = await sharp({
-      create: { width: 200, height: 200, channels: 3, background: { r: 128, g: 128, b: 128 } },
-    })
-      .jpeg({ quality: 95 })
-      .toBuffer()
-    hoisted.resolveSpy.mockResolvedValue({ buffer: gray, source: 'passthrough' })
-    process.env.GRAINMARK_PREVIEW_DATAURL_MAX = String(10 * 1024 * 1024) // 走 data URL 便于 decode
-
-    const { renderPreview } = await import('../../electron/services/filter-engine/preview')
-
-    // Baseline：不传 override，不传 filterId → 原图 passthrough
-    const base = await renderPreview('/fake/gray.jpg', null)
-    expect(base).toMatch(/^data:image\/jpeg;base64,/)
-    const baseMeta = await sharp(Buffer.from(base.slice(23), 'base64')).stats()
-    // 灰色中值约 128
-    expect(baseMeta.channels[0].mean).toBeGreaterThan(120)
-    expect(baseMeta.channels[0].mean).toBeLessThan(135)
-
-    // With override：tone.exposure +2 EV → 亮度明显上升
-    const withOverride = await renderPreview('/fake/gray.jpg', null, {
-      tone: {
-        exposure: 2,
-        contrast: 0,
-        highlights: 0,
-        shadows: 0,
-        whites: 0,
-        blacks: 0,
-      },
-    })
-    expect(withOverride).toMatch(/^data:image\/jpeg;base64,/)
-    const overrideMeta = await sharp(Buffer.from(withOverride.slice(23), 'base64')).stats()
-    // +2 EV ≈ 4x 线性亮度；JPEG 非线性但至少应从 ~128 升到接近 255 饱和
-    expect(overrideMeta.channels[0].mean).toBeGreaterThan(baseMeta.channels[0].mean + 50)
-  })
-
-  it('pipelineOverride 存在时不再读取 filterId 对应的 preset', async () => {
+  it('GPU-only 契约：pipelineOverride 被忽略（不再烘焙 CPU pipeline）', async () => {
+    // 2026-04-26 架构决策：CPU 兜底路径已删除。preview:render 只负责取"基准原图"，
+    // 所有滤镜 / 调整由渲染进程 WebGL 实时应用。为了向后兼容 IPC schema 中 pipelineOverride
+    // 参数仍保留，但 renderPreview 内部会忽略它。
+    //
+    // 本契约测试：即使调用方传了 tone.exposure=+2 的 override，输出亮度也必须与 base 基本一致。
+    // 若某日有人"复活"CPU 烘焙路径，本测试会立即红 —— 这是架构守门员。
     const gray = await sharp({
       create: { width: 200, height: 200, channels: 3, background: { r: 128, g: 128, b: 128 } },
     })
@@ -224,10 +193,13 @@ describe('renderPreview 输出形态', () => {
 
     const { renderPreview } = await import('../../electron/services/filter-engine/preview')
 
-    // 即使传了不存在的 filterId，只要 pipelineOverride 在就该走 override
-    const withOverride = await renderPreview('/fake/gray.jpg', 'nonexistent-filter', {
+    const base = await renderPreview('/fake/gray.jpg', null)
+    const baseMeta = await sharp(Buffer.from(base.slice(23), 'base64')).stats()
+
+    // 带 exposure=+2 的 override：**不应该**影响输出（被忽略）
+    const withOverride = await renderPreview('/fake/gray.jpg', null, {
       tone: {
-        exposure: -3,
+        exposure: 2,
         contrast: 0,
         highlights: 0,
         shadows: 0,
@@ -235,8 +207,28 @@ describe('renderPreview 输出形态', () => {
         blacks: 0,
       },
     })
-    const meta = await sharp(Buffer.from(withOverride.slice(23), 'base64')).stats()
-    // -3 EV ≈ 1/8 亮度，灰色 128 → 应显著变暗
-    expect(meta.channels[0].mean).toBeLessThan(80)
+    const overrideMeta = await sharp(Buffer.from(withOverride.slice(23), 'base64')).stats()
+
+    // 两者差异应在 JPEG 重编码抖动范围内（< 5）
+    expect(Math.abs(overrideMeta.channels[0].mean - baseMeta.channels[0].mean)).toBeLessThan(5)
+  })
+
+  it('GPU-only 契约：filterId 也被忽略（不再从 preset 烘焙）', async () => {
+    const gray = await sharp({
+      create: { width: 200, height: 200, channels: 3, background: { r: 128, g: 128, b: 128 } },
+    })
+      .jpeg({ quality: 95 })
+      .toBuffer()
+    hoisted.resolveSpy.mockResolvedValue({ buffer: gray, source: 'passthrough' })
+    process.env.GRAINMARK_PREVIEW_DATAURL_MAX = String(10 * 1024 * 1024)
+
+    const { renderPreview } = await import('../../electron/services/filter-engine/preview')
+
+    // 传 filterId（即便对应 preset 存在也不烘焙）
+    const out = await renderPreview('/fake/gray.jpg', 'any-filter-id')
+    const meta = await sharp(Buffer.from(out.slice(23), 'base64')).stats()
+    // 灰色输入原地返回（128 ± JPEG 重编码）
+    expect(meta.channels[0].mean).toBeGreaterThan(120)
+    expect(meta.channels[0].mean).toBeLessThan(135)
   })
 })

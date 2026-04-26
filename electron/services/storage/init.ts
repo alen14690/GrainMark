@@ -40,6 +40,8 @@ export const getModelsDir = () => subDir('models')
 export const getDataDir = () => subDir('data')
 /** Editor 预览渲染输出缓存（当 data URL 过大时改用文件路径 + grain 协议） */
 export const getPreviewCacheDir = () => subDir('preview-cache')
+/** 性能 / 诊断日志沉淀目录（main.ndjson / perf.ndjson） */
+export const getLogsDir = () => subDir('logs')
 
 export function getPhotosTable(): JsonTable<Photo> {
   if (!photosTable) throw new Error('Storage not initialized')

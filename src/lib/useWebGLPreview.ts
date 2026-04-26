@@ -1,5 +1,5 @@
 /**
- * useWebGLPreview — Editor 画布的 WebGL 预览 hook
+ * useWebGLPreview — Editor 画布的 WebGL 预览 hook（GPU-only 架构）
  *
  * 行为：
  *   - 接受 `sourceUrl` (data:/grain:// 均可) + 当前 FilterPipeline
@@ -7,25 +7,27 @@
  *   - sourceUrl 变化 → fetch → createImageBitmap → 上传 GPU
  *   - pipeline 变化 → setSteps + run (自动 abort 上一次 run)
  *   - LUT 异步加载：useLutTexture 管理，LUT ready 后自动重渲染
- *   - 返回：{ canvasRef, status, error, lastDurationMs, needsCpuFallback, histogram, perf }
+ *   - 返回：{ canvasRef, status, error }
  *
  * 性能关键设计（P0 优化后）：
  *   - **preserveDrawingBuffer=false**：浏览器合成器可直接用 swap chain，省每帧 2-5ms blit
  *   - **直方图同 tick 读**：pipe.run 完成后立刻 readPixels 到预分配 buffer，无 setTimeout
  *   - **Uint8Array 复用**：按最大 drawing buffer 尺寸预分配，避免每帧 6-8MB GC pressure
  *   - **跳帧采样**：高频拖动时直方图每 3 帧采一次（而非 120ms debounce 的"等静止"）
- *   - **perf 分段打点**：setSteps / pipeline.run / readPixels / computeHist 各自计时供 UI 显示
+ *   - **perf / histogram 写到外部 perfStore**：Editor 主体不订阅 → 拖滑块时零 re-render
  *
- * 降级：
- *   - WebGL 2 不可用（GLContext.ok=false）→ status='unsupported'
+ * GPU-only 降级策略（2026-04-26 架构决策）：
+ *   - WebGL 2 不可用（GLContext.ok=false）→ status='unsupported'，Editor 显示不兼容提示
  *   - sourceUrl 载入失败 → status='error' + error.message
- *   - context lost → status='lost'，尝试自动重建
- *   - LUT 解析失败（含 SecurityError）会设 needsCpuFallback=true
+ *   - context lost → status='lost'，监听 restored 自动重建 program/texture
+ *   - LUT .cube 解析失败 → pipelineToSteps 自动 skip LUT step（其它通道继续渲染）
+ *
+ * 原 CPU 兜底路径已删除：GPU 坏了就修 GPU，不用更慢的路径掩盖问题。
  *
  * Pipeline 顺序（Lightroom 约定）：
  *   WB → Tone → Curves → HSL → ColorGrading → Adjustments → LUT → Halation → Grain → Vignette
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FilterPipeline } from '../../shared/types'
 import {
   ADJUSTMENTS_FRAG,
@@ -81,11 +83,6 @@ export interface WebGLPreviewResult {
   canvasRef: React.RefObject<HTMLCanvasElement>
   status: WebGLPreviewStatus
   error?: string
-  /**
-   * 仅当 LUT 加载/解析失败时为 true（极少数情况，例如 .cube 文件被破坏）。
-   * 所有 pipeline 通道都已 GPU 化，正常情况下恒为 false。
-   */
-  needsCpuFallback: boolean
 }
 
 /** 构造 pipeline step 时需要的 GPU 资源（LUT 纹理等） */
@@ -251,6 +248,12 @@ export function useWebGLPreview(
   const [status, setStatus] = useState<WebGLPreviewStatus>('idle')
   const [error, setError] = useState<string | undefined>(undefined)
   const [gl, setGl] = useState<GLContext | null>(null)
+  /**
+   * 上下文重建版本号。每次 webglcontextrestored 触发时 +1，让 sourceUrl useEffect
+   * 强制重跑（重上传纹理）。没有这个依赖的话 gl 对象引用不变、sourceUrl 不变，
+   * 纹理在 lost 期间已失效但不会被重建。
+   */
+  const [restoreVersion, setRestoreVersion] = useState(0)
 
   // 长期持有的 GL 对象（跨 render）
   const pipelineRef = useRef<Pipeline | null>(null)
@@ -267,14 +270,10 @@ export function useWebGLPreview(
   // 跳帧计数：每 HISTOGRAM_SAMPLE_EVERY 帧采一次直方图
   const histogramFrameCounterRef = useRef<number>(0)
 
-  // LUT 纹理加载（异步）
+  // LUT 纹理加载（异步）。LUT 失败不 fallback 到 CPU：pipelineToSteps 在
+  //   lut.texture=null 时自动跳过 LUT step，其它通道照常渲染。用户可见的退化
+  //   由 AppShell 层统一给出 Toast 提示，不在这里做产品决策。
   const lut = useLutTexture(gl, pipeline?.lut ?? null)
-
-  // CPU 兜底：只有 LUT 解析失败时才触发（几乎不发生）
-  const needsCpuFallback = useMemo(() => {
-    if (pipeline?.lut && lut.status === 'error') return true
-    return false
-  }, [pipeline?.lut, lut.status])
 
   const renderNow = useCallback(async () => {
     const source = sourceTexRef.current
@@ -371,8 +370,32 @@ export function useWebGLPreview(
     pipelineRef.current = pipelineObj
     setGl(ctx)
 
-    const offLost = ctx.onLost(() => setStatus('lost'))
-    const offRestored = ctx.onRestored(() => setStatus('idle'))
+    const offLost = ctx.onLost(() => {
+      // Context lost：所有 GPU 资源已被浏览器回收。
+      //   - sourceTexRef：置 null，restored 后由 sourceUrl useEffect 重新 decode + 上传
+      //   - Pipeline 的 ping-pong FBO / 纹理：lost 时引用无效，resizePingPong 会在
+      //     下一次 run 时按需重建；这里显式 dispose 保证 reference 清零
+      //   - registry 的 program cache：lost 时引用全部无效，在 restored 中清空
+      sourceTexRef.current = null
+      try {
+        pipelineObj.dispose()
+      } catch {
+        /* context lost 时 dispose 本身可能抛，忽略 */
+      }
+      setStatus('lost')
+    })
+    const offRestored = ctx.onRestored(() => {
+      // GLContext._handleRestored 已经重建了 quad VAO；
+      // ShaderRegistry 的 program cache 失效需清空，让 runPass 下次编译
+      try {
+        registry.dispose()
+      } catch {
+        /* ignore */
+      }
+      setStatus('loading')
+      // 触发 sourceUrl useEffect 重跑 → 重上传纹理 → renderNow（会自动 resize ping-pong）
+      setRestoreVersion((v) => v + 1)
+    })
 
     return () => {
       offLost()
@@ -390,7 +413,10 @@ export function useWebGLPreview(
     }
   }, [])
 
-  // 加载 sourceUrl → ImageBitmap → GPU texture
+  // 加载 sourceUrl → ImageBitmap → GPU texture。
+  // restoreVersion 被故意加进依赖：context restored 时它 bump，强制 effect 重跑
+  //   → 重 decode + 重上传纹理。biome 识别不到"依赖作为触发器"这种模式
+  // biome-ignore lint/correctness/useExhaustiveDependencies: restoreVersion 是 context-restore 重触发信号，非函数体内消费
   useEffect(() => {
     if (!sourceUrl || !gl || !gl.ok || !pipelineRef.current) return
 
@@ -434,7 +460,7 @@ export function useWebGLPreview(
     return () => {
       cancelled = true
     }
-  }, [sourceUrl, gl, renderNow])
+  }, [sourceUrl, gl, renderNow, restoreVersion])
 
   // pipeline 或 LUT 纹理变化 → 重渲染（用 rAF 合并同帧多次触发，比如连续
   // set 多个分组 reset 时只跑一次 renderNow）
@@ -459,5 +485,5 @@ export function useWebGLPreview(
     })
   }, [pipeline, lut.texture, renderNow])
 
-  return { canvasRef, status, error, needsCpuFallback }
+  return { canvasRef, status, error }
 }

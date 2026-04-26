@@ -20,7 +20,7 @@ import { contextBridge, ipcRenderer } from 'electron'
  *    - 子空间：prefix:sub:actionName  （子系统，如 batch:gpu:ready / batch:gpu:task）
  */
 const CHANNEL_PATTERN =
-  /^(filter|photo|preview|batch|extract|watermark|ai|llm|trending|sync|settings|dialog|taste|score|evolve|app):([a-zA-Z]+|[a-zA-Z]+:[a-zA-Z-]+)$/
+  /^(filter|photo|preview|batch|extract|watermark|ai|llm|trending|sync|settings|dialog|taste|score|evolve|app|perf):([a-zA-Z]+|[a-zA-Z]+:[a-zA-Z-]+)$/
 
 const api = {
   invoke: (channel: string, ...args: unknown[]) => {
