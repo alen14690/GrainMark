@@ -553,8 +553,13 @@ export interface AISceneAnalysis {
  *   - whiteBalance.*：±30 上限
  *   - clarity / saturation / vibrance：±40 上限
  *   - colorGrading.hue：0~360，s/l：±40
+ *   - curves.*：控制点 {x,y} ∈ [0,255]，每通道最多 8 个点
+ *   - hsl.*：h/s/l ∈ ±40
+ *   - grain.amount：[0,50]，size：[0.5,3]，roughness：[0,1]
+ *   - halation.amount：[0,40]，threshold：[150,255]，radius：[1,20]
+ *   - vignette.amount：[-60,+30]，midpoint/feather：[20,80]，roundness：[-50,+50]
  *
- * 这是「全局参数」版本，不含局部 mask（M5-LLM-C 再加）。
+ * M5-LLM-C：扩展为 5 维分析（光影/色彩/质感/主体/氛围），覆盖全部 10 个 shader 通道。
  */
 export interface AISuggestedAdjustments {
   tone?: {
@@ -572,27 +577,29 @@ export interface AISuggestedAdjustments {
   clarity?: number
   saturation?: number
   vibrance?: number
-  /** 可选：调色分离（shadows/highlights 色相） */
+  /** 调色分离（shadows/highlights 色相） */
   colorGrading?: {
     shadows?: { h?: number; s?: number; l?: number }
     highlights?: { h?: number; s?: number; l?: number }
     blending?: number
   }
+  /** M5-LLM-C：RGB + 通道曲线建议（2~8 控制点/通道） */
+  curves?: {
+    rgb?: Array<{ x: number; y: number }>
+    r?: Array<{ x: number; y: number }>
+    g?: Array<{ x: number; y: number }>
+    b?: Array<{ x: number; y: number }>
+  }
+  /** M5-LLM-C：HSL 8 通道独立建议（只包含需要调整的通道） */
+  hsl?: Partial<Record<HSLChannel, { h?: number; s?: number; l?: number }>>
+  /** M5-LLM-C：胶片颗粒 */
+  grain?: { amount?: number; size?: number; roughness?: number }
+  /** M5-LLM-C：高光溢光 */
+  halation?: { amount?: number; threshold?: number; radius?: number }
+  /** M5-LLM-C：暗角 / 视觉引导 */
+  vignette?: { amount?: number; midpoint?: number; roundness?: number; feather?: number }
   /** LLM 对每项调整的一句话理由（用于 UI 展示「为什么这么改」），key 与上面字段对应 */
-  reasons?: Partial<{
-    exposure: string
-    contrast: string
-    highlights: string
-    shadows: string
-    whites: string
-    blacks: string
-    temp: string
-    tint: string
-    clarity: string
-    saturation: string
-    vibrance: string
-    colorGrading: string
-  }>
+  reasons?: Record<string, string>
 }
 
 /** 分析结果 · 成功 */

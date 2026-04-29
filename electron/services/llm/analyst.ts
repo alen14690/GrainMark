@@ -47,11 +47,18 @@ const WB_RANGE = 30
 const AUX_RANGE = 40
 /** colorGrading.*.h 范围 0~360；s,l 范围 ±40 */
 const CG_SL_RANGE = 40
+/** HSL 通道 h/s/l 上下限 */
+const HSL_RANGE = 40
 
 function clamp(v: number, min: number, max: number): number {
   if (!Number.isFinite(v)) return 0
   return Math.max(min, Math.min(max, v))
 }
+
+/** 合法 HSL 通道名（白名单，防 LLM 塞非法 key） */
+const VALID_HSL_CHANNELS = new Set([
+  'red', 'orange', 'yellow', 'green', 'aqua', 'blue', 'purple', 'magenta',
+])
 
 /** 把 LLM 输出的对象做"硬安全 clamp"后返回 */
 function clampAdjustments(raw: AISuggestedAdjustments): AISuggestedAdjustments {
@@ -120,6 +127,67 @@ function clampAdjustments(raw: AISuggestedAdjustments): AISuggestedAdjustments {
       if (blending !== undefined) out.colorGrading.blending = blending
     }
   }
+
+  // ---- M5-LLM-C 新增字段 clamp ----
+
+  // Curves：控制点 {x,y} ∈ [0,255]，每通道最多 8 个点
+  if (raw.curves) {
+    const clampPt = (p: { x: number; y: number }) => ({
+      x: clamp(Math.round(p.x), 0, 255),
+      y: clamp(Math.round(p.y), 0, 255),
+    })
+    const curves: NonNullable<AISuggestedAdjustments['curves']> = {}
+    for (const ch of ['rgb', 'r', 'g', 'b'] as const) {
+      const pts = raw.curves[ch]
+      if (Array.isArray(pts) && pts.length >= 2) {
+        curves[ch] = pts.slice(0, 8).map(clampPt)
+      }
+    }
+    if (Object.keys(curves).length > 0) out.curves = curves
+  }
+
+  // HSL 8 通道：h/s/l ∈ ±40，只保留合法通道名
+  if (raw.hsl && typeof raw.hsl === 'object') {
+    const hsl: Record<string, { h?: number; s?: number; l?: number }> = {}
+    for (const [ch, adj] of Object.entries(raw.hsl)) {
+      if (!VALID_HSL_CHANNELS.has(ch) || !adj) continue
+      const entry: { h?: number; s?: number; l?: number } = {}
+      if (typeof adj.h === 'number') { const v = clamp(adj.h, -HSL_RANGE, HSL_RANGE); if (v !== 0) entry.h = v }
+      if (typeof adj.s === 'number') { const v = clamp(adj.s, -HSL_RANGE, HSL_RANGE); if (v !== 0) entry.s = v }
+      if (typeof adj.l === 'number') { const v = clamp(adj.l, -HSL_RANGE, HSL_RANGE); if (v !== 0) entry.l = v }
+      if (Object.keys(entry).length > 0) hsl[ch] = entry
+    }
+    if (Object.keys(hsl).length > 0) out.hsl = hsl as AISuggestedAdjustments['hsl']
+  }
+
+  // Grain：amount [0,50]、size [0.5,3]、roughness [0,1]
+  if (raw.grain) {
+    const grain: NonNullable<AISuggestedAdjustments['grain']> = {}
+    if (typeof raw.grain.amount === 'number') grain.amount = clamp(raw.grain.amount, 0, 50)
+    if (typeof raw.grain.size === 'number') grain.size = clamp(raw.grain.size, 0.5, 3)
+    if (typeof raw.grain.roughness === 'number') grain.roughness = clamp(raw.grain.roughness, 0, 1)
+    if (Object.keys(grain).length > 0) out.grain = grain
+  }
+
+  // Halation：amount [0,40]、threshold [150,255]、radius [1,20]
+  if (raw.halation) {
+    const halation: NonNullable<AISuggestedAdjustments['halation']> = {}
+    if (typeof raw.halation.amount === 'number') halation.amount = clamp(raw.halation.amount, 0, 40)
+    if (typeof raw.halation.threshold === 'number') halation.threshold = clamp(raw.halation.threshold, 150, 255)
+    if (typeof raw.halation.radius === 'number') halation.radius = clamp(raw.halation.radius, 1, 20)
+    if (Object.keys(halation).length > 0) out.halation = halation
+  }
+
+  // Vignette：amount [-60,+30]、midpoint [20,80]、roundness [-50,+50]、feather [20,80]
+  if (raw.vignette) {
+    const vig: NonNullable<AISuggestedAdjustments['vignette']> = {}
+    if (typeof raw.vignette.amount === 'number') vig.amount = clamp(raw.vignette.amount, -60, 30)
+    if (typeof raw.vignette.midpoint === 'number') vig.midpoint = clamp(raw.vignette.midpoint, 20, 80)
+    if (typeof raw.vignette.roundness === 'number') vig.roundness = clamp(raw.vignette.roundness, -50, 50)
+    if (typeof raw.vignette.feather === 'number') vig.feather = clamp(raw.vignette.feather, 20, 80)
+    if (Object.keys(vig).length > 0) out.vignette = vig
+  }
+
   // 理由只按需保留（已 clamp 掉的字段不留理由，用户看了会困惑）
   if (raw.reasons) out.reasons = raw.reasons
   return out
@@ -134,6 +202,8 @@ const HSLTripleSchema = z
     l: z.number().optional(),
   })
   .strict()
+
+const CurvePointSchema = z.object({ x: z.number(), y: z.number() }).strict()
 
 const AdjustmentsSchema = z
   .object({
@@ -160,6 +230,58 @@ const AdjustmentsSchema = z
       })
       .strict()
       .optional(),
+    // M5-LLM-C：曲线（RGB + 通道）
+    curves: z
+      .object({
+        rgb: z.array(CurvePointSchema).max(8).optional(),
+        r: z.array(CurvePointSchema).max(8).optional(),
+        g: z.array(CurvePointSchema).max(8).optional(),
+        b: z.array(CurvePointSchema).max(8).optional(),
+      })
+      .strict()
+      .optional(),
+    // M5-LLM-C：HSL 8 通道
+    hsl: z
+      .object({
+        red: HSLTripleSchema.optional(),
+        orange: HSLTripleSchema.optional(),
+        yellow: HSLTripleSchema.optional(),
+        green: HSLTripleSchema.optional(),
+        aqua: HSLTripleSchema.optional(),
+        blue: HSLTripleSchema.optional(),
+        purple: HSLTripleSchema.optional(),
+        magenta: HSLTripleSchema.optional(),
+      })
+      .strict()
+      .optional(),
+    // M5-LLM-C：胶片颗粒
+    grain: z
+      .object({
+        amount: z.number().optional(),
+        size: z.number().optional(),
+        roughness: z.number().optional(),
+      })
+      .strict()
+      .optional(),
+    // M5-LLM-C：高光溢光
+    halation: z
+      .object({
+        amount: z.number().optional(),
+        threshold: z.number().optional(),
+        radius: z.number().optional(),
+      })
+      .strict()
+      .optional(),
+    // M5-LLM-C：暗角 / 视觉引导
+    vignette: z
+      .object({
+        amount: z.number().optional(),
+        midpoint: z.number().optional(),
+        roundness: z.number().optional(),
+        feather: z.number().optional(),
+      })
+      .strict()
+      .optional(),
     reasons: z.record(z.string(), z.string()).optional(),
   })
   .strict()
@@ -180,30 +302,69 @@ const LLMResponseSchema = z
   })
   .strict()
 
-// ---- Prompt 设计 ----
+// ---- Prompt 设计（M5-LLM-C：5 维分析）----
 
-const SYSTEM_PROMPT = `你是资深摄影后期顾问。用户会给你一张照片原图，你必须：
+const SYSTEM_PROMPT = `你是资深摄影后期顾问，专精胶片美学与光影叙事。用户会给你一张照片原图，你必须完成以下 5 项分析并给出参数建议：
 
-1. 识别主体（谁/什么是这张照片的视觉主角）
-2. 识别环境（次要信息，什么在干扰或衬托主体）
-3. 诊断光影问题（主体够不够亮/立体？背景是否抢戏？色温是否偏移？）
-4. 给出"全局参数"调整建议：tone(曝光/对比度/高光/阴影/白阶/黑阶) + whiteBalance(色温/色调) + clarity/saturation/vibrance + colorGrading(阴影/高光色调分离)
+### 1. 主体与构图
+- 识别视觉主角（人/物/景/抽象）及其在画面中的位置
+- 判断环境元素是衬托还是干扰主体
+- 若需要收拢视线到主体，给出 vignette 暗角建议
+
+### 2. 光影与明暗
+- 诊断高光/阴影区域的细节丢失（高光死白？暗部死黑？）
+- 判断整体曝光偏向
+- 给出 tone（曝光/对比度/高光/阴影/白阶/黑阶）
+- 若需要精细控制明暗层次，给出 curves 曲线控制点
+  - curves 格式：每条曲线 2~5 个 {x,y} 控制点（x=输入亮度 0~255，y=输出亮度 0~255）
+  - 可调通道：rgb（主曲线）/ r / g / b，只输出需要调的通道
+
+### 3. 色彩与白平衡
+- 判断色温偏移方向（偏冷/偏暖/混合光源）
+- 识别主要色彩（占画面 >15% 的色相）
+- 给出 whiteBalance（色温/色调）
+- 给出 hsl 通道建议：8 个通道 red/orange/yellow/green/aqua/blue/purple/magenta
+  - 每通道可调 h(色相偏移)/s(饱和度)/l(明度)，只输出需要调整的通道和维度
+- 给出 colorGrading 色调分离（阴影/高光冷暖色偏）
+
+### 4. 质感与氛围
+- 评估画面噪点水平、锐度、胶片感需求
+- 给出 clarity（清晰度/中间调对比）+ saturation + vibrance
+- 若照片适合胶片氛围，给出：
+  - grain（颗粒：amount 强度 0~50，size 尺寸 0.5~3，roughness 粗糙度 0~1）
+  - halation（高光溢光：amount 0~40，threshold 触发亮度 150~255，radius 扩散 1~20）
+
+### 5. 综合配方
+- summary 字段：1~2 句话概括修图方向（如"提亮主体面部 + 压暗杂乱背景 + 暖调胶片氛围"）
+- diagnosis 数组：2~6 条用户可读的诊断
 
 **硬约束**（违反视为错误输出）：
-- 数值范围：tone/clarity/saturation/vibrance 取 -40 ~ +40；whiteBalance 取 -30 ~ +30；colorGrading.h 取 0~360，s/l 取 -40 ~ +40
+- tone/clarity/saturation/vibrance：-40 ~ +40
+- whiteBalance：-30 ~ +30
+- hsl 各通道 h/s/l：-40 ~ +40
+- colorGrading.h：0~360，s/l：-40 ~ +40
+- curves 控制点 x/y：0~255，每通道 2~5 个点
+- grain.amount：0~50，grain.size：0.5~3，grain.roughness：0~1
+- halation.amount：0~40，halation.threshold：150~255，halation.radius：1~20
+- vignette.amount：-60~+30，midpoint：20~80，roundness：-50~+50，feather：20~80
 - 原则："微调而非重塑"——强化主体光影层次，压低环境抢戏元素
-- 诊断必须对用户可见（"主体面部偏暗"而不是"直方图 30~60 区段不足"）
+- 诊断必须对用户可见（"主体面部偏暗"而非"直方图 30~60 区段不足"）
 - 不需要的字段直接不输出（不要给 0 或 null）
 
 **输出格式**：严格 JSON，不含任何注释或解释性前后文。结构：
 {
-  "analysis": { "summary": string, "subject": string, "environment": string, "diagnosis": [string, ...] },
+  "analysis": { "summary": "string", "subject": "string", "environment": "string", "diagnosis": ["string", ...] },
   "adjustments": {
-    "tone": { "exposure": number, ... } ,
-    "whiteBalance": { "temp": number, "tint": number } ,
-    "clarity": number, "saturation": number, "vibrance": number,
-    "colorGrading": { "shadows": {...}, "highlights": {...}, "blending": number },
-    "reasons": { "shadows": "string 一句话解释为什么提阴影", ... }
+    "tone": { "exposure": N, "contrast": N, ... },
+    "whiteBalance": { "temp": N, "tint": N },
+    "curves": { "rgb": [{"x":0,"y":0}, {"x":128,"y":140}, {"x":255,"y":250}], "r": [...] },
+    "hsl": { "orange": {"h":5, "s":10}, "blue": {"s":-15, "l":-5} },
+    "clarity": N, "saturation": N, "vibrance": N,
+    "colorGrading": { "shadows": {"h":N,"s":N,"l":N}, "highlights": {...}, "blending": N },
+    "grain": { "amount": N, "size": N, "roughness": N },
+    "halation": { "amount": N, "threshold": N, "radius": N },
+    "vignette": { "amount": N, "midpoint": N, "roundness": N, "feather": N },
+    "reasons": { "tone.shadows": "恢复暗部细节", "hsl.orange": "肤色更健康", ... }
   }
 }
 

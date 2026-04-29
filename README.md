@@ -109,6 +109,7 @@ GrainMark/
 | **M4** | ✅ 完成 | 编辑器 UI 闭环（撤销/重做 50 步 + 前后对比 + 保存为我的滤镜 + 滤镜三级分组） | — |
 | **M4-patch** | ✅ 完成 | orientation 统一重构（orientImage SSOT + grain:// 修复 + 镜像 2/4/5/7 + 缓存 GC） | — |
 | **M5-LLM** | ✅ 完成 | LLM 云 AI 顾问（OpenRouter + 场景分析 + 参数建议 + Zod 严校验 + clamp 护栏） | — |
+| **M5-LLM-C** | ✅ 完成 | AI 5 维深度分析（光影/色彩/质感/主体/氛围）+ 全 10 通道参数建议 + 分组 UI | — |
 | **M5** | 🔜 下一步 | 参考图 L2 风格提取 + .cube LUT 烘焙 | — |
 | **M6** | 待办 | 水印 Sharp 渲染实装 | — |
 | **M7** | 待办 | ONNX Runtime 接入 + 5 种本地 AI 模型 | — |

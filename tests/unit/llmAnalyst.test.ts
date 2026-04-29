@@ -158,6 +158,135 @@ describe('clampAdjustments · 防 HDR 塑料感与无效值', () => {
 })
 
 // ==========================================================================
+// M5-LLM-C 新增字段 clamp 护栏
+// ==========================================================================
+
+describe('clampAdjustments · M5-LLM-C 新增字段', () => {
+  it('curves 控制点越界 → clamp 到 [0,255]', () => {
+    const raw: AISuggestedAdjustments = {
+      curves: {
+        rgb: [{ x: -10, y: 0 }, { x: 128, y: 300 }, { x: 255, y: 250 }],
+        r: [{ x: 0, y: 0 }, { x: 255, y: 999 }],
+      },
+    }
+    const out = analyst.__test__.clampAdjustments(raw)
+    expect(out.curves?.rgb?.[0]).toEqual({ x: 0, y: 0 })
+    expect(out.curves?.rgb?.[1]).toEqual({ x: 128, y: 255 })
+    expect(out.curves?.r?.[1]).toEqual({ x: 255, y: 255 })
+  })
+
+  it('curves 单点数组（<2 点） → 被忽略', () => {
+    const raw: AISuggestedAdjustments = {
+      curves: { rgb: [{ x: 0, y: 0 }] },
+    }
+    const out = analyst.__test__.clampAdjustments(raw)
+    expect(out.curves).toBeUndefined()
+  })
+
+  it('hsl 通道 h/s/l 越界 → clamp 到 ±40', () => {
+    const raw: AISuggestedAdjustments = {
+      hsl: {
+        orange: { h: 80, s: -60, l: 5 },
+        blue: { h: 0, s: 0, l: -99 },
+      } as AISuggestedAdjustments['hsl'],
+    }
+    const out = analyst.__test__.clampAdjustments(raw)
+    expect(out.hsl).toBeDefined()
+    const orange = (out.hsl as Record<string, { h?: number; s?: number; l?: number }>)?.orange
+    expect(orange?.h).toBe(40)
+    expect(orange?.s).toBe(-40)
+    expect(orange?.l).toBe(5)
+    const blue = (out.hsl as Record<string, { h?: number; s?: number; l?: number }>)?.blue
+    expect(blue?.l).toBe(-40)
+  })
+
+  it('hsl 非法通道名 → 过滤掉', () => {
+    const raw: AISuggestedAdjustments = {
+      hsl: {
+        red: { h: 5 },
+        notAChannel: { h: 10 },
+      } as AISuggestedAdjustments['hsl'],
+    }
+    const out = analyst.__test__.clampAdjustments(raw)
+    expect(out.hsl).toBeDefined()
+    expect((out.hsl as Record<string, unknown>)?.red).toBeDefined()
+    expect((out.hsl as Record<string, unknown>)?.notAChannel).toBeUndefined()
+  })
+
+  it('grain 参数越界 → clamp 到安全范围', () => {
+    const raw: AISuggestedAdjustments = {
+      grain: { amount: 100, size: 10, roughness: 5 },
+    }
+    const out = analyst.__test__.clampAdjustments(raw)
+    expect(out.grain?.amount).toBe(50)
+    expect(out.grain?.size).toBe(3)
+    expect(out.grain?.roughness).toBe(1)
+  })
+
+  it('halation threshold 越界 → clamp 到 [150,255]', () => {
+    const raw: AISuggestedAdjustments = {
+      halation: { amount: 99, threshold: 50, radius: 30 },
+    }
+    const out = analyst.__test__.clampAdjustments(raw)
+    expect(out.halation?.amount).toBe(40)
+    expect(out.halation?.threshold).toBe(150)
+    expect(out.halation?.radius).toBe(20)
+  })
+
+  it('vignette 参数越界 → clamp 到安全范围', () => {
+    const raw: AISuggestedAdjustments = {
+      vignette: { amount: -100, midpoint: 5, roundness: 99, feather: 99 },
+    }
+    const out = analyst.__test__.clampAdjustments(raw)
+    expect(out.vignette?.amount).toBe(-60)
+    expect(out.vignette?.midpoint).toBe(20)
+    expect(out.vignette?.roundness).toBe(50)
+    expect(out.vignette?.feather).toBe(80)
+  })
+})
+
+// ==========================================================================
+// M5-LLM-C Zod schema 新字段验证
+// ==========================================================================
+
+describe('LLMResponseSchema · M5-LLM-C 新字段', () => {
+  it('完整 5 维分析输出 → 通过', async () => {
+    const m = await import('../../electron/services/llm/analyst')
+    const ok = m.__test__.LLMResponseSchema.safeParse({
+      analysis: {
+        summary: '夕阳下的人像',
+        subject: '女性背影',
+        environment: '海滩日落',
+        diagnosis: ['面部偏暗', '天空过曝'],
+      },
+      adjustments: {
+        tone: { exposure: 15, shadows: 20 },
+        curves: { rgb: [{ x: 0, y: 0 }, { x: 128, y: 140 }, { x: 255, y: 250 }] },
+        hsl: { orange: { h: 5, s: 10 }, blue: { s: -15, l: -5 } },
+        grain: { amount: 15, size: 1.5, roughness: 0.6 },
+        halation: { amount: 8, threshold: 200, radius: 10 },
+        vignette: { amount: -25, midpoint: 50, roundness: 0, feather: 50 },
+        clarity: 12,
+        vibrance: 8,
+        reasons: { 'tone.shadows': '恢复暗部', 'hsl.orange': '肤色健康' },
+      },
+    })
+    expect(ok.success).toBe(true)
+  })
+
+  it('hsl 含非法通道名 → strict 拒绝', async () => {
+    const m = await import('../../electron/services/llm/analyst')
+    const bad = m.__test__.LLMResponseSchema.safeParse({
+      analysis: {
+        summary: '测试', subject: '测试', environment: '测试', diagnosis: ['测试'],
+      },
+      adjustments: { hsl: { badChannel: { h: 5 } } },
+    })
+    expect(bad.success).toBe(false)
+  })
+})
+
+// ==========================================================================
 // Zod schema 护栏：锁死"LLM 返回非法 JSON 就拒绝"
 // ==========================================================================
 
