@@ -7,10 +7,11 @@
  *   - WebGL 渲染 : useWebGLPreview，完整 10-shader GPU pipeline + 实时直方图
  *   - 右栏 Tab   : 滤镜列表 | 参数调整（滑块）
  */
-import { Download, Redo2, RotateCcw, Save, Sliders, SplitSquareHorizontal, Undo2, Wand2 } from 'lucide-react'
+import { Download, Redo2, RotateCcw, Save, Sliders, Sparkles, SplitSquareHorizontal, Undo2 } from 'lucide-react'
 import { memo, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AdjustmentsPanel } from '../components/AdjustmentsPanel'
+import AIAdvisorDialog from '../components/AIAdvisorDialog'
 import { Histogram, ScoreBar, ValueBadge, cn } from '../design'
 import { type FilterGroup, groupAndSortFilters } from '../lib/filterOrder'
 import { ipc } from '../lib/ipc'
@@ -34,6 +35,7 @@ export default function Editor() {
   const [previewError, setPreviewError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [showOriginal, setShowOriginal] = useState(false)
+  const [showAIAdvisor, setShowAIAdvisor] = useState(false)
   const [rightTab, setRightTab] = useState<RightPanelTab>('filters')
 
   const activeFilter = filters.find((f) => f.id === activeFilterId)
@@ -271,6 +273,16 @@ export default function Editor() {
           <div className="divider-metal-v mx-1" />
           <button
             type="button"
+            onClick={() => setShowAIAdvisor(true)}
+            className="btn-ghost btn-xs gap-1"
+            title="AI 摄影顾问：光影/色彩/质感/主体 5 维分析"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-brand-amber" />
+            <span className="text-xxs">AI 顾问</span>
+          </button>
+          <div className="divider-metal-v mx-1" />
+          <button
+            type="button"
             onClick={handleSavePreset}
             disabled={!dirty}
             className={cn('btn-secondary btn-xs', !dirty && 'opacity-40 cursor-not-allowed')}
@@ -451,6 +463,13 @@ export default function Editor() {
         {/* Histogram — 实时从 WebGL readPixels 采样（独立订阅 perfStore，不让 Editor 每帧重渲） */}
         <HistogramPanel />
       </aside>
+
+      {/* AI 摄影顾问弹窗 */}
+      <AIAdvisorDialog
+        open={showAIAdvisor}
+        photoPath={photo?.path ?? null}
+        onClose={() => setShowAIAdvisor(false)}
+      />
     </div>
   )
 }
