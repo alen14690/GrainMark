@@ -235,7 +235,7 @@ export default function Editor() {
             onClick={undo}
             disabled={!canUndoNow}
             className={cn('btn-ghost btn-xs', !canUndoNow && 'opacity-30 cursor-not-allowed')}
-            title={`撤销 (⌘Z) · ${history.length} 步可撤`}
+            title="撤销 (⌘Z)"
           >
             <Undo2 className="w-3.5 h-3.5" />
           </button>
@@ -244,7 +244,7 @@ export default function Editor() {
             onClick={redo}
             disabled={!canRedoNow}
             className={cn('btn-ghost btn-xs', !canRedoNow && 'opacity-30 cursor-not-allowed')}
-            title={`重做 (⌘⇧Z) · ${future.length} 步可重做`}
+            title="重做 (⌘⇧Z)"
           >
             <Redo2 className="w-3.5 h-3.5" />
           </button>

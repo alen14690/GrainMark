@@ -137,7 +137,7 @@ function buildSuggestionGroups(
         key: `hsl.${ch}`,
         label: `${HSL_LABELS[ch] ?? ch} ${parts.join(' ')}`,
         reason: reasons[`hsl.${ch}`],
-        apply: () => setters.setHsl({ ...adj.hsl, [ch]: val }),
+        apply: () => setters.setHsl({ [ch]: { h: val.h ?? 0, s: val.s ?? 0, l: val.l ?? 0 } }),
       })
     }
   }
