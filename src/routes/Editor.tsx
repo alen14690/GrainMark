@@ -7,7 +7,7 @@
  *   - WebGL 渲染 : useWebGLPreview，完整 10-shader GPU pipeline + 实时直方图
  *   - 右栏 Tab   : 滤镜列表 | 参数调整（滑块）
  */
-import { Download, Redo2, RotateCcw, Save, Sliders, Sparkles, SplitSquareHorizontal, Undo2 } from 'lucide-react'
+import { Download, Redo2, RotateCcw, Save, Sliders, Sparkles, SplitSquareHorizontal, Undo2, Wand2 } from 'lucide-react'
 import { memo, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AdjustmentsPanel } from '../components/AdjustmentsPanel'
