@@ -55,6 +55,13 @@ interface EditState {
   /** 基准 preset id；切换时同步更新 */
   baselineFilterId: string | null
 
+  /**
+   * P2 优化：脏标记。set* action 触发时标为 true，loadFromPreset / resetToBaseline 重置为 false。
+   * Editor 的 hasDirtyEdits() 读此值做 O(1) 快速判断，避免每帧 JSON.stringify 深比较。
+   * commitHistory / undo / redo 不改此标记——脏标记描述的是"与 baseline 是否有差异"。
+   */
+  _dirty: boolean
+
   /** 过去的栈（最旧在前，最新在后；不含当前 pipeline） */
   history: HistoryEntry[]
   /** 重做栈（撤销时被推入） */
@@ -117,10 +124,23 @@ function pipelineEquals(a: FilterPipeline | null, b: FilterPipeline | null): boo
   }
 }
 
-/** 判断是否与基准有差异（引用或值不同）——用于 UI 脏提示 */
-export function hasDirtyEdits(current: FilterPipeline | null, baseline: FilterPipeline | null): boolean {
+/**
+ * 判断是否与基准有差异——用于 UI 脏提示。
+ *
+ * P2 优化：优先读 store 内部的 _dirty 快速标记（O(1)）。
+ * _dirty 由 set* action 自动置 true，loadFromPreset / resetToBaseline 重置为 false。
+ * 仅在 _dirty=true 时降级到 JSON.stringify 精确比对（确认真的有差异还是只是标记了）。
+ */
+export function hasDirtyEdits(
+  current: FilterPipeline | null,
+  baseline: FilterPipeline | null,
+  dirty?: boolean,
+): boolean {
+  // 快速路径：_dirty 为 false 说明没有任何 set* 触发过
+  if (dirty === false) return false
   if (current === baseline) return false
-  // 快速 stringify 比对（pipeline 是纯 JSON 结构，不大）
+  if (current === null && baseline === null) return false
+  if (current === null || baseline === null) return true
   try {
     return JSON.stringify(current) !== JSON.stringify(baseline)
   } catch {
@@ -138,9 +158,10 @@ export function canRedo(future: readonly HistoryEntry[]): boolean {
   return future.length > 0
 }
 
-/** 确保 currentPipeline 为对象（null → {}），返回可变引用 */
+/** 确保 currentPipeline 为对象（null → {}），标记 dirty，返回可变引用 */
 function ensurePipe(s: EditState): FilterPipeline {
   if (!s.currentPipeline) s.currentPipeline = {}
+  s._dirty = true
   return s.currentPipeline
 }
 
@@ -149,6 +170,7 @@ export const useEditStore = create<EditState>()(
     currentPipeline: null,
     baselinePipeline: null,
     baselineFilterId: null,
+    _dirty: false,
     history: [],
     future: [],
 
@@ -157,6 +179,7 @@ export const useEditStore = create<EditState>()(
         s.baselineFilterId = preset?.id ?? null
         s.baselinePipeline = preset ? deepClonePipeline(preset.pipeline) : null
         s.currentPipeline = preset ? deepClonePipeline(preset.pipeline) : null
+        s._dirty = false
         // 切滤镜时清空历史（不跨滤镜撤销）
         s.history = []
         s.future = []
@@ -166,6 +189,7 @@ export const useEditStore = create<EditState>()(
     resetToBaseline() {
       set((s) => {
         s.currentPipeline = deepClonePipeline(s.baselinePipeline)
+        s._dirty = false
       })
     },
 
@@ -174,6 +198,7 @@ export const useEditStore = create<EditState>()(
         s.currentPipeline = null
         s.baselinePipeline = null
         s.baselineFilterId = null
+        s._dirty = false
         s.history = []
         s.future = []
       })
@@ -182,7 +207,7 @@ export const useEditStore = create<EditState>()(
     setTone(patch) {
       set((s) => {
         if (patch === null) {
-          if (s.currentPipeline?.tone) s.currentPipeline.tone = undefined
+          if (s.currentPipeline?.tone) { s.currentPipeline.tone = undefined; s._dirty = true }
           return
         }
         const pipe = ensurePipe(s)
@@ -201,7 +226,7 @@ export const useEditStore = create<EditState>()(
     setWhiteBalance(patch) {
       set((s) => {
         if (patch === null) {
-          if (s.currentPipeline?.whiteBalance) s.currentPipeline.whiteBalance = undefined
+          if (s.currentPipeline?.whiteBalance) { s.currentPipeline.whiteBalance = undefined; s._dirty = true }
           return
         }
         const pipe = ensurePipe(s)
@@ -216,7 +241,7 @@ export const useEditStore = create<EditState>()(
     setVignette(patch) {
       set((s) => {
         if (patch === null) {
-          if (s.currentPipeline?.vignette) s.currentPipeline.vignette = undefined
+          if (s.currentPipeline?.vignette) { s.currentPipeline.vignette = undefined; s._dirty = true }
           return
         }
         const pipe = ensurePipe(s)
@@ -241,10 +266,21 @@ export const useEditStore = create<EditState>()(
       })
     },
 
+    setCurves(patch) {
+      set((s) => {
+        const pipe = ensurePipe(s)
+        if (patch === null) {
+          pipe.curves = undefined
+        } else {
+          pipe.curves = patch
+        }
+      })
+    },
+
     setColorGrading(patch) {
       set((s) => {
         if (patch === null) {
-          if (s.currentPipeline?.colorGrading) s.currentPipeline.colorGrading = undefined
+          if (s.currentPipeline?.colorGrading) { s.currentPipeline.colorGrading = undefined; s._dirty = true }
           return
         }
         const pipe = ensurePipe(s)
@@ -259,21 +295,10 @@ export const useEditStore = create<EditState>()(
       })
     },
 
-    setCurves(patch) {
-      set((s) => {
-        const pipe = ensurePipe(s)
-        if (patch === null) {
-          pipe.curves = undefined
-        } else {
-          pipe.curves = patch
-        }
-      })
-    },
-
     setGrain(patch) {
       set((s) => {
         if (patch === null) {
-          if (s.currentPipeline?.grain) s.currentPipeline.grain = undefined
+          if (s.currentPipeline?.grain) { s.currentPipeline.grain = undefined; s._dirty = true }
           return
         }
         const pipe = ensurePipe(s)
@@ -289,7 +314,7 @@ export const useEditStore = create<EditState>()(
     setHalation(patch) {
       set((s) => {
         if (patch === null) {
-          if (s.currentPipeline?.halation) s.currentPipeline.halation = undefined
+          if (s.currentPipeline?.halation) { s.currentPipeline.halation = undefined; s._dirty = true }
           return
         }
         const pipe = ensurePipe(s)
@@ -404,8 +429,7 @@ export const useEditStore = create<EditState>()(
 )
 
 // E2E 测试钩子：将 store 挂到 window 供 Playwright page.evaluate 访问
-// 仅在测试环境注入（GRAINMARK_TEST=1 时 main.ts 注入过 env，无法直接读；
-// 用 Electron renderer 可用的 process? 检测不可靠 —— 改为恒定注入 + 加前缀避免污染）
-if (typeof window !== 'undefined') {
+// 仅在 development / test 模式下注入，生产环境不暴露
+if (typeof window !== 'undefined' && (import.meta.env.DEV || import.meta.env.MODE === 'test')) {
   ;(window as unknown as { __grainEditStore?: unknown }).__grainEditStore = useEditStore
 }

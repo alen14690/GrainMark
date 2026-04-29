@@ -7,10 +7,10 @@ export function registerFilterIpc() {
   registerIpc('filter:list', async () => listFilters())
   registerIpc('filter:get', async (id: unknown) => getFilter(id as string))
   registerIpc('filter:save', async (preset: unknown) => {
-    saveFilter(preset as FilterPreset)
+    await saveFilter(preset as FilterPreset)
   })
   registerIpc('filter:delete', async (id: unknown) => {
-    deleteFilter(id as string)
+    await deleteFilter(id as string)
   })
   // F1：.cube 文件路径必须过 PathGuard
   registerIpc('filter:importCube', async (filePath: unknown) => importCubeAsPreset(filePath as string), {
@@ -20,7 +20,7 @@ export function registerFilterIpc() {
   registerIpc(
     'filter:exportCube',
     async (id: unknown, outPath: unknown) => {
-      const preset = getFilter(id as string)
+      const preset = await getFilter(id as string)
       if (!preset) throw new Error(`Filter not found: ${id}`)
       await exportPresetToCube(preset, outPath as string)
     },

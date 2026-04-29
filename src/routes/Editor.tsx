@@ -49,17 +49,16 @@ export default function Editor() {
   // ---- editStore 与 activeFilter 同步 ----
   const currentPipeline = useEditStore((s) => s.currentPipeline)
   const baselinePipeline = useEditStore((s) => s.baselinePipeline)
+  const dirtyFlag = useEditStore((s) => s._dirty)
   const loadFromPreset = useEditStore((s) => s.loadFromPreset)
   const resetToBaseline = useEditStore((s) => s.resetToBaseline)
   const clearEdits = useEditStore((s) => s.clear)
   // 历史栈 actions & 可用状态（M4.3）
-  const history = useEditStore((s) => s.history)
-  const future = useEditStore((s) => s.future)
+  const canUndoNow = useEditStore((s) => s.history.length > 0)
+  const canRedoNow = useEditStore((s) => s.future.length > 0)
   const commitHistory = useEditStore((s) => s.commitHistory)
   const undo = useEditStore((s) => s.undo)
   const redo = useEditStore((s) => s.redo)
-  const canUndoNow = history.length > 0
-  const canRedoNow = future.length > 0
 
   // 切换 filter → 重置编辑态
   useEffect(() => {
@@ -103,7 +102,7 @@ export default function Editor() {
     return () => window.removeEventListener('keydown', handler, { capture: true })
   }, [undo, redo])
 
-  const dirty = hasDirtyEdits(currentPipeline, baselinePipeline)
+  const dirty = hasDirtyEdits(currentPipeline, baselinePipeline, dirtyFlag)
 
   /** 重置到滤镜预设：先 commit 当前状态为历史（能撤回）再 reset，再 commit reset 后的状态 */
   const handleResetToBaseline = () => {
@@ -124,7 +123,7 @@ export default function Editor() {
    */
   const refreshFilters = useAppStore((s) => s.refreshFilters)
   const handleSavePreset = async () => {
-    if (!currentPipeline || !hasDirtyEdits(currentPipeline, baselinePipeline ?? {})) {
+    if (!currentPipeline || !hasDirtyEdits(currentPipeline, baselinePipeline ?? {}, dirtyFlag)) {
       // 与基准完全一致没必要保存（用户通常想保存"修改过的参数组合"）
       window.alert('当前参数与起点完全一致，无需保存')
       return

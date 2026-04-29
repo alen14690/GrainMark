@@ -13,6 +13,8 @@
  *   2. 根据 luma + balance + blending 生成 shadow/mid/high 三个权重
  *   3. 每个 zone 把 (h,s) 转 RGB 偏移向量，按 l 强度和 zone 权重叠加
  */
+import { clamp } from './mathUtils.js'
+
 export const COLOR_GRADING_FRAG = `
 in vec2 v_uv;
 out vec4 fragColor;
@@ -110,8 +112,4 @@ export function isColorGradingIdentity(p: {
   highlights?: { l?: number }
 }): boolean {
   return (p.shadows?.l ?? 0) === 0 && (p.midtones?.l ?? 0) === 0 && (p.highlights?.l ?? 0) === 0
-}
-
-function clamp(v: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, v))
 }

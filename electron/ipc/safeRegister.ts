@@ -22,6 +22,7 @@
  */
 import { ipcMain } from 'electron'
 import type { z } from 'zod'
+import { ZodTuple } from 'zod'
 import { IPC_SCHEMAS, type IpcChannelName } from '../../shared/ipc-schemas.js'
 import { logger } from '../services/logger/logger.js'
 import type { PathGuard } from '../services/security/pathGuard.js'
@@ -50,7 +51,8 @@ function validate(channel: IpcChannelName, args: unknown[]): unknown[] {
   }
   // 单参 schema → args[0]
   // tuple schema → args 整体
-  const isTuple = (schema as unknown as { _def?: { typeName?: string } })._def?.typeName === 'ZodTuple'
+  // A4 修复：用 instanceof 替代 _def.typeName 内部字段，避免 Zod 升级 silent break
+  const isTuple = schema instanceof ZodTuple
   try {
     if (isTuple) {
       return (schema as z.ZodTuple).parse(args) as unknown[]

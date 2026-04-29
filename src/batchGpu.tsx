@@ -52,7 +52,7 @@ async function renderOne(
     // 1) 加载图像
     const resp = await fetch(task.sourceUrl)
     const blob = await resp.blob()
-    const bitmap = await createImageBitmap(blob, { imageOrientation: 'from-image' })
+    const bitmap = await createImageBitmap(blob, { imageOrientation: 'none' })
 
     // 2) 决定输出尺寸
     let outW = bitmap.width
@@ -67,7 +67,15 @@ async function renderOne(
     canvas.height = outH
 
     // 3) 上传源纹理
-    const sourceTex = textureFromBitmap(ctx, bitmap, { flipY: true })
+    //    Chromium 的 UNPACK_FLIP_Y_WEBGL 对 ImageBitmap 不生效，
+    //    先画到临时 canvas 再用 canvas 上传
+    const tmpCanvas = document.createElement('canvas')
+    tmpCanvas.width = bitmap.width
+    tmpCanvas.height = bitmap.height
+    const ctx2d = tmpCanvas.getContext('2d')!
+    ctx2d.drawImage(bitmap, 0, 0)
+    bitmap.close()
+    const sourceTex = textureFromBitmap(ctx, tmpCanvas, { flipY: true })
 
     // 4) 构建 pipeline steps（A-1：暂不支持 LUT，lutTexture=null 让 pipelineToSteps 跳过 LUT step）
     const steps = pipelineToSteps(task.pipeline, {

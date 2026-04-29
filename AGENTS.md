@@ -5,7 +5,7 @@
 
 ---
 
-## 🎯 七大工作原则
+## 🎯 九大工作原则
 
 1. **方案合理** — 任何结构性变更前必须先出方案或在 plan 中有对应条目
 2. **性能至上** — 性能敏感路径的改动必须附带 benchmark 对比（`npm run bench:report`，详见 `artifact/benchmarks/README.md`）
@@ -27,6 +27,25 @@
    2. **查磁盘像素**：再用 `sharp`/`sips` 看生成的 thumb/preview 真实尺寸和方向
    3. **查 URL/协议**：对照前端发出的 `grain://` URL 是否命中对应文件（WebContents cache）
    4. **再改代码**：前三步都确认后再定位代码层 bug；严禁跳过前三步直接改算法
+8. **禁止散布式逻辑（Single Source of Truth 强制，M4 orientation 复盘总结）** — 同一语义的逻辑（如"图片方向旋转"）散布在多个文件中独立实现，是本项目迄今**最严重的架构反模式**。三轮 orientation 修复失败均因此而起。强制执行：
+   1. **识别"一种判断 + 一种动作"模式**：如果发现同一个 if/switch 或相似的计算逻辑在两个以上文件中出现，**必须立刻重构为单一函数**，所有调用方统一引用
+   2. **新增逻辑时的防重复检查**：在编写 rotate/flip/orientation/缓存 key/安全校验等"基础设施级"逻辑前，先 `grep` 全仓确认是否已有实现，禁止"这里也写一份"
+   3. **修复 Bug 时的"所有路径"检查**：修复任何 Bug 时，必须先列出"消费该逻辑的所有路径"（如 thumbnail/preview/grain:///batch/LLM），确认修复覆盖了每一条路径，**不允许只改报 bug 的那条路径**
+   4. **关键函数必须命名包含语义**：统一函数命名应直接表达意图（如 `orientImage`、`validatePath`），禁止泛化命名（如 `processBuffer`、`handle`）
+   5. **同一语义的散布阈值 = 2**：同一逻辑出现在 ≥ 2 处即为"散布"，必须在当次 commit 内提取。不允许"先写了以后再重构"
+   6. **正例**：`orientImage()` — 旋转/翻转/auto-orient 统一入口，6 处调用方零冗余；`shaders/mathUtils.ts:clamp()` — 10 个 shader 共享数学工具，消除 10 份重复
+   7. **反例**：M3.5 的 orientation 修复只改了 thumbnail/preview，遗漏 grain:///batch/LLM 共 3 处
+
+   **违反本条的典型后果**（实测案例，非假设）：
+   - orientation 散布 6 处 → 修 3 次仍有路径遗漏（grain:// 协议）
+   - 镜像方向 (orientation 2/4/5/7) 需在每处独立处理 → 0 处实现 → 静默 bug
+   - 缓存 key 计算各处自行 hash → preview 用 buffer.length、rawCache 用 mtime → 碰撞风险
+
+9. **缓存契约标准化** — 所有缓存（rawCache / previewCache / thumbCache）必须遵循统一模式：
+   1. **缓存 key**：必须包含源文件路径 + mtime + size（三者缺一不可），禁止用 buffer.length 等衍生值
+   2. **版本号**：算法变更时 bump 版本号并将其纳入 key，确保老缓存自动失效
+   3. **GC 策略**：任何写入缓存目录的路径必须同时设计 LRU 淘汰机制（上限 + 水位回退），禁止"只写不清"
+   4. **磁盘写入**：异步 (`fs.promises`) 而非同步 (`fs.writeFileSync`)，避免阻塞 Electron 主进程事件循环
 
 ---
 

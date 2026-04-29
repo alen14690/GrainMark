@@ -210,14 +210,34 @@ describe('orientationToRotationDegrees', () => {
   it('3 → 180', () => {
     expect(mod.orientationToRotationDegrees(3)).toBe(180)
   })
+  it('4 → 180（垂直翻转 = 旋转 180° + 水平翻转）', () => {
+    expect(mod.orientationToRotationDegrees(4)).toBe(180)
+  })
   it('6 → 90 顺时针', () => {
     expect(mod.orientationToRotationDegrees(6)).toBe(90)
   })
   it('8 → 270 顺时针 (= 90 逆时针)', () => {
     expect(mod.orientationToRotationDegrees(8)).toBe(270)
   })
-  it('包含镜像的 2/4/5/7 目前当作 0 处理（相机罕见）', () => {
-    expect(mod.orientationToRotationDegrees(2)).toBe(0)
-    expect(mod.orientationToRotationDegrees(5)).toBe(0)
+  it('镜像方向 2/5/7 的旋转分量正确', () => {
+    expect(mod.orientationToRotationDegrees(2)).toBe(0)   // 仅水平翻转，无旋转
+    expect(mod.orientationToRotationDegrees(5)).toBe(90)  // 旋转 90° + 水平翻转
+    expect(mod.orientationToRotationDegrees(7)).toBe(270) // 旋转 90° + 水平翻转（另一向）
+  })
+})
+
+describe('orientationNeedsFlip', () => {
+  it('非镜像方向返回 false', () => {
+    expect(mod.orientationNeedsFlip(1)).toBe(false)
+    expect(mod.orientationNeedsFlip(3)).toBe(false)
+    expect(mod.orientationNeedsFlip(6)).toBe(false)
+    expect(mod.orientationNeedsFlip(8)).toBe(false)
+    expect(mod.orientationNeedsFlip(undefined)).toBe(false)
+  })
+  it('镜像方向 2/4/5/7 返回 true', () => {
+    expect(mod.orientationNeedsFlip(2)).toBe(true)
+    expect(mod.orientationNeedsFlip(4)).toBe(true)
+    expect(mod.orientationNeedsFlip(5)).toBe(true)
+    expect(mod.orientationNeedsFlip(7)).toBe(true)
   })
 })

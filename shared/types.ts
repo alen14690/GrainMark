@@ -31,9 +31,14 @@ export interface ToneParams {
 
 export type HSLChannel = 'red' | 'orange' | 'yellow' | 'green' | 'aqua' | 'blue' | 'purple' | 'magenta'
 
-export interface HSLParams {
-  [K: string]: { h: number; s: number; l: number } // -100..+100
+export interface HSLAdjustment {
+  h: number // -100..+100
+  s: number // -100..+100
+  l: number // -100..+100
 }
+
+/** HSL 参数——每个通道只允许 HSLChannel 枚举的 key，杜绝手误 typo 不报错 */
+export type HSLParams = Partial<Record<HSLChannel, HSLAdjustment>>
 
 export interface ColorGradingZone {
   h: number // 0..360
@@ -341,8 +346,12 @@ export interface AppSettings {
   ai: {
     gpuEnabled: boolean
     device: 'auto' | 'cpu' | 'cuda' | 'coreml' | 'directml'
-    /** 未来云端预留 */
-    cloudEndpoints: Record<string, { url: string; apiKey: string; enabled: boolean }>
+    /**
+     * 未来云端预留。
+     * ⚠️ 安全约束：apiKey 等凭证**绝不可**存入此对象——必须走 SecureVault（系统 Keychain）。
+     * 此处仅保存不敏感的 endpoint 配置（URL + 启用状态）。
+     */
+    cloudEndpoints: Record<string, { url: string; enabled: boolean }>
   }
   sync: SyncConfig
   shortcuts: Record<string, string>

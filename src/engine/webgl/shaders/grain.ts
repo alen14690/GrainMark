@@ -14,6 +14,8 @@
  *
  * 性能：一次 hash，M1 24MP <1ms
  */
+import { clamp } from './mathUtils.js'
+
 export const GRAIN_FRAG = `
 in vec2 v_uv;
 out vec4 fragColor;
@@ -77,6 +79,3 @@ export function isGrainIdentity(p: { amount?: number }): boolean {
   return (p.amount ?? 0) === 0
 }
 
-function clamp(v: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, v))
-}

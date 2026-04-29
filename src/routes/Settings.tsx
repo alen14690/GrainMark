@@ -275,7 +275,7 @@ export default function Settings() {
                 />
               </Row>
               <Row label="默认 Logo (PNG)" desc="请确保你有权使用该 Logo">
-                <button className="btn-secondary text-[12px]">
+                <button type="button" className="btn-secondary text-[12px]">
                   <ImgIcon className="w-3.5 h-3.5" />
                   {settings.watermark.defaultLogoPath ? '更换' : '上传'} Logo
                 </button>
@@ -422,10 +422,10 @@ export default function Settings() {
                 />
               </Row>
               <Row label="清除缩略图缓存">
-                <button className="btn-secondary text-[11.5px]">清除</button>
+                <button type="button" className="btn-secondary text-[11.5px]">清除</button>
               </Row>
               <Row label="导出全部数据">
-                <button className="btn-secondary text-[11.5px]">导出 .zip</button>
+                <button type="button" className="btn-secondary text-[11.5px]">导出 .zip</button>
               </Row>
             </Section>
           )}
@@ -526,7 +526,7 @@ function DirPicker({ value, onPick }: { value: string; onPick: () => void }) {
   return (
     <div className="flex gap-2">
       <input value={value} readOnly className="input w-64 font-mono text-[11px]" />
-      <button onClick={onPick} className="btn-secondary text-[11.5px]">
+      <button type="button" onClick={onPick} className="btn-secondary text-[11.5px]">
         <FolderOpen className="w-3.5 h-3.5" />
         选择
       </button>

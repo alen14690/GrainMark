@@ -18,6 +18,7 @@ import fs, { type WriteStream } from 'node:fs'
 import path from 'node:path'
 import type { z } from 'zod'
 import type { PerfLogEventSchema } from '../../shared/ipc-schemas.js'
+import { logger } from '../services/logger/logger.js'
 import { getLogsDir } from '../services/storage/init.js'
 import { registerIpc } from './safeRegister.js'
 
@@ -30,6 +31,11 @@ function ensurePerfSink(): WriteStream | null {
   try {
     const filePath = path.join(getLogsDir(), 'perf.ndjson')
     perfSink = fs.createWriteStream(filePath, { flags: 'a' })
+    // Q4 修复：磁盘满或写入错误时不 crash，静默降级
+    perfSink.on('error', (err) => {
+      logger.warn('perf.sink.error', { err: err.message })
+      perfSink = null
+    })
     const header = JSON.stringify({
       ts: new Date().toISOString(),
       kind: 'marker',

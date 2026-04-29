@@ -1,7 +1,6 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { BrowserWindow, app, dialog, ipcMain, session, shell } from 'electron'
-import { z } from 'zod'
 import { DialogSelectFilesSchema } from '../shared/ipc-schemas.js'
 import { shutdownPerfSink } from './ipc/perf.js'
 import { registerAllIpcHandlers } from './ipc/register.js'
@@ -53,12 +52,11 @@ async function createWindow() {
     minWidth: 1200,
     minHeight: 760,
     title: 'GrainMark',
-    backgroundColor: '#0E0E10',
+    backgroundColor: '#05060E',
     show: false, // 等 ready-to-show 再显示，避免白屏闪
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-    // 交通灯位置：renderer 顶部有一条 30px 高的 `.mac-titlebar` 安全区，
-    //   交通灯 12px 高，让 y 居中到 (30-12)/2 = 9
-    trafficLightPosition: { x: 18, y: 9 },
+    // 交通灯位置：CleanMyMac 方案 — 交通灯叠在 Sidebar 品牌区上方
+    trafficLightPosition: { x: 18, y: 8 },
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       contextIsolation: true,
@@ -226,7 +224,7 @@ function registerDialogHandlers() {
 app.whenReady().then(async () => {
   setupSessionCSP()
 
-  // 初始化存储
+  // 初始化存储（内部末尾会异步触发 cacheSweeper.runStartupSweep 进行 preview + thumb GC）
   await initStorage()
 
   // 初始化日志磁盘沉淀（必须在 initStorage 之后，因为用 userData/logs）
@@ -338,27 +336,35 @@ app.on('browser-window-created', (_e, bw) => {
 })
 
 // 退出前清理 exiftool 子进程 + 刷盘所有 JsonTable（F11：保证不丢尾包数据）
-app.on('before-quit', async () => {
-  try {
-    shutdownGpuRenderer()
-  } catch {
-    // ignore
-  }
-  try {
-    await flushStorage()
-  } catch {
-    // ignore
-  }
-  try {
-    await shutdownExiftool()
-  } catch {
-    // ignore
-  }
-  try {
-    shutdownPerfSink()
-  } catch {
-    // ignore
-  }
+// 修复 A3：Electron 不 await before-quit 的 async callback，必须显式 preventDefault + 等完 + quit
+let isQuitting = false
+app.on('before-quit', (event) => {
+  if (isQuitting) return // 二次进入直接放行
+  event.preventDefault()
+  isQuitting = true
+  ;(async () => {
+    try {
+      shutdownGpuRenderer()
+    } catch {
+      // ignore
+    }
+    try {
+      await flushStorage()
+    } catch {
+      // ignore
+    }
+    try {
+      await shutdownExiftool()
+    } catch {
+      // ignore
+    }
+    try {
+      shutdownPerfSink()
+    } catch {
+      // ignore
+    }
+    app.quit()
+  })()
 })
 
 // 未捕获异常 — 本地记录（不上传）
@@ -376,6 +382,3 @@ export function getPathGuard(): PathGuard {
 export function getSecureVault(): SecureVault | null {
   return secureVault
 }
-
-// suppress unused import warning if tests import z directly
-void z

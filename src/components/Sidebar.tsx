@@ -43,6 +43,8 @@ const NAV_STUDIO: NavItem[] = [
 export default function Sidebar() {
   return (
     <aside className="w-60 shrink-0 glass-surface flex flex-col relative z-10 border-r-0 rounded-none">
+      {/* macOS 交通灯安全区：padding-top 让品牌 logo 下移，交通灯叠在上方空白区 */}
+      <div className="mac-sidebar-pad drag-region shrink-0" />
       {/* 品牌 */}
       <div className="h-14 px-4 flex items-center gap-2.5 drag-region border-b border-white/5">
         <div

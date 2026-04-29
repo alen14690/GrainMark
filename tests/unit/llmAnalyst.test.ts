@@ -24,15 +24,17 @@ vi.mock('../../electron/services/llm/configStore.js', () => {
 vi.mock('../../electron/services/logger/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }))
-vi.mock('../../electron/services/raw/index.js', () => ({
-  resolvePreviewBuffer: vi.fn(),
-  orientationToRotationDegrees: (o?: number) => {
-    if (o === 3) return 180
-    if (o === 6) return 90
-    if (o === 8) return 270
-    return 0
-  },
-}))
+vi.mock('../../electron/services/raw/index.js', () => {
+  // orientImage 返回一个 sharp-like 链式 builder
+  const toBuffer = vi.fn().mockResolvedValue(Buffer.from([0xff, 0xd8, 0xff, 0xe0]))
+  const jpeg = vi.fn(() => ({ toBuffer }))
+  const resize = vi.fn(() => ({ jpeg }))
+  const orientImageMock = vi.fn(() => ({ resize }))
+  return {
+    resolvePreviewBuffer: vi.fn(),
+    orientImage: orientImageMock,
+  }
+})
 vi.mock('sharp', () => {
   // sharp 返回链式 builder：sharp(buf).rotate().resize().jpeg().toBuffer()
   const toBuffer = vi.fn().mockResolvedValue(Buffer.from([0xff, 0xd8, 0xff, 0xe0])) // 假 JPEG magic

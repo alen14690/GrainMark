@@ -32,6 +32,7 @@ body,
 #root {
   height: 100%;
   overflow: hidden;
+  overscroll-behavior: none; /* 防止 macOS 橡皮筋滚动露出窗口背景 */
 }
 
 body {
@@ -63,20 +64,20 @@ textarea,
 }
 
 /*
- * macOS 标题栏安全区（2026-04-26 新增）
- *   - titleBarStyle='hiddenInset' 下红黄绿交通灯固定在 (16, 16) 区域
- *   - 业务 UI 从 y=0 布局会和交通灯重叠（Sidebar logo 和关闭按钮撞在一起）
- *   - 这条 30px 高的透明可拖动条带让业务 UI 从 y=30 开始布局，交通灯在独立区域
- *   - 背景为 bg-0（和应用底色一致），不露出桌面/终端，同时保留 Aurora 底层
- *   - 仅 macOS 生效（Windows/Linux 系统控件是窗口级的，不需要让位）
+ * macOS 标题栏安全区（CleanMyMac 方案）
+ *   - 不使用独立的标题栏 div，Sidebar/TopBar 直接从窗口顶部开始
+ *   - 交通灯叠在 Sidebar 品牌区上方，通过 padding 让内容下移避开
+ *   - glass-surface 背景自然覆盖到窗口最顶部，Aurora 穿透
  */
 .mac-titlebar {
-  display: none; /* 默认隐藏；下方选择器在 macOS 启用 */
+  display: none;
 }
-html[data-platform="darwin"] .mac-titlebar {
+.mac-sidebar-pad {
+  display: none;
+}
+html[data-platform="darwin"] .mac-sidebar-pad {
   display: block;
-  height: 30px;
-  background-color: var(--bg-0);
+  height: 28px;
 }
 
 /* ========== 滚动条（Aurora 风） ========== */

@@ -68,18 +68,27 @@ const ColorGradingZoneSchema = z.object({
   l: z.number().min(-100).max(100),
 })
 
+const HSLAdjustmentSchema = z.object({
+  h: z.number().min(-100).max(100),
+  s: z.number().min(-100).max(100),
+  l: z.number().min(-100).max(100),
+})
+
 export const FilterPipelineSchema = z.object({
   whiteBalance: WhiteBalanceSchema.optional(),
   tone: ToneSchema.optional(),
   hsl: z
-    .record(
-      z.string(),
-      z.object({
-        h: z.number().min(-100).max(100),
-        s: z.number().min(-100).max(100),
-        l: z.number().min(-100).max(100),
-      }),
-    )
+    .object({
+      red: HSLAdjustmentSchema.optional(),
+      orange: HSLAdjustmentSchema.optional(),
+      yellow: HSLAdjustmentSchema.optional(),
+      green: HSLAdjustmentSchema.optional(),
+      aqua: HSLAdjustmentSchema.optional(),
+      blue: HSLAdjustmentSchema.optional(),
+      purple: HSLAdjustmentSchema.optional(),
+      magenta: HSLAdjustmentSchema.optional(),
+    })
+    .strict()
     .optional(),
   colorGrading: z
     .object({

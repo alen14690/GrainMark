@@ -38,15 +38,6 @@ export default function App() {
       {/* 极淡颗粒（保留胶片灵魂，Q3-A） */}
       <GrainOverlay opacity={0.02} />
 
-      {/*
-        macOS 标题栏安全区（2026-04-26 新增）
-        - titleBarStyle='hiddenInset' 下系统的红黄绿交通灯固定在 (16,16) 附近
-        - 若业务 UI 从 y=0 布局会和交通灯重叠
-        - 这条 30px 高的条带负责：(1) 避开交通灯区；(2) 提供 app 级别的可拖动区
-        - 只在 macOS 渲染；其它平台由 CSS `:is([data-platform="darwin"])` 控制
-      */}
-      <div className="mac-titlebar drag-region shrink-0 relative z-20" aria-hidden />
-
       <div className="flex flex-1 min-h-0 relative">
         <Sidebar />
         <div className="flex-1 flex flex-col min-w-0 relative z-10">

@@ -91,7 +91,7 @@ export async function importCubeAsPreset(cubePath: string): Promise<FilterPreset
     updatedAt: Date.now(),
   }
 
-  saveFilter(preset)
+  await saveFilter(preset)
   return preset
 }
 

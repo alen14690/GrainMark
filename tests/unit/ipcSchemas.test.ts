@@ -48,6 +48,22 @@ describe('FilterPipelineSchema', () => {
     const pts = Array.from({ length: 100 }, (_, i) => ({ x: i, y: i }))
     expect(() => FilterPipelineSchema.parse({ curves: { rgb: pts } })).toThrow()
   })
+
+  it('accepts valid HSL with known channel names', () => {
+    expect(() =>
+      FilterPipelineSchema.parse({
+        hsl: { red: { h: 10, s: -5, l: 0 }, blue: { h: 0, s: 20, l: -10 } },
+      }),
+    ).not.toThrow()
+  })
+
+  it('rejects HSL with unknown channel names (S2 security fix)', () => {
+    expect(() =>
+      FilterPipelineSchema.parse({
+        hsl: { notAChannel: { h: 10, s: 0, l: 0 } },
+      }),
+    ).toThrow()
+  })
 })
 
 describe('PhotoImportSchema', () => {

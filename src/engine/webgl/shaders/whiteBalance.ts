@@ -11,6 +11,8 @@
  *   - 强度系数保持 0.30 / 0.10（白平衡本就应是"微调方向"而非"强染色"，
  *     Lightroom 也是类似幅度）。实测 ±100 档在中灰像素上产生 Δ≈38，已够用。
  */
+import { clamp } from './mathUtils.js'
+
 export const WHITE_BALANCE_FRAG = `
 in vec2 v_uv;
 out vec4 fragColor;
@@ -48,6 +50,3 @@ export function normalizeWhiteBalanceParams(p: {
   }
 }
 
-function clamp(v: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, v))
-}

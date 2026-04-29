@@ -16,6 +16,8 @@
  *   完整双向分离高斯需要 2 个 pass，此处单 pass 用 9 tap 近似，M1 24MP ~2-3ms。
  *   Pass 3c 再做专用 blur pass + ping-pong 优化。
  */
+import { clamp } from './mathUtils.js'
+
 export const HALATION_FRAG = `
 in vec2 v_uv;
 out vec4 fragColor;
@@ -91,8 +93,4 @@ export function normalizeHalationParams(
 
 export function isHalationIdentity(p: { amount?: number }): boolean {
   return (p.amount ?? 0) === 0
-}
-
-function clamp(v: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, v))
 }

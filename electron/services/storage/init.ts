@@ -72,8 +72,8 @@ export async function initStorage(): Promise<void> {
   trendingTable = new JsonTable(dataDir, 'trending')
   settingsKV = new JsonKV(dataDir, 'settings')
 
-  // 同步内置滤镜
-  seedBuiltinPresets()
+  // 同步内置滤镜（异步 I/O，不阻塞主进程事件循环）
+  await seedBuiltinPresets()
 
   // 启动期磁盘 GC（异步 fire-and-forget，不阻塞主窗口启动）
   // - preview-cache/ LRU 清理（上限 500MB）

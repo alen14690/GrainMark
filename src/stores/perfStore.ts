@@ -123,7 +123,7 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100
 }
 
-// E2E 测试钩子
-if (typeof window !== 'undefined') {
+// E2E 测试钩子：仅在 development / test 模式下注入，生产环境不暴露
+if (typeof window !== 'undefined' && (import.meta.env.DEV || import.meta.env.MODE === 'test')) {
   ;(window as unknown as { __grainPerfStore?: unknown }).__grainPerfStore = usePerfStore
 }

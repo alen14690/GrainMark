@@ -172,11 +172,14 @@ export class Texture {
 }
 
 /**
- * 工厂：从 ImageBitmap 建一张纹理（尺寸来自 bitmap，自动 upload）。
+ * 工厂：从 ImageBitmap / HTMLCanvasElement 建一张纹理（尺寸来自源，自动 upload）。
+ *
+ * 注意：Chromium 的 UNPACK_FLIP_Y_WEBGL 对 ImageBitmap 源不生效，
+ * 若需要可靠的 flipY，调用方应先将 ImageBitmap 画到 canvas 再传 canvas 进来。
  */
 export function textureFromBitmap(
   ctx: GLContext,
-  bitmap: ImageBitmap,
+  bitmap: ImageBitmap | HTMLCanvasElement,
   opts: { renderable?: boolean; flipY?: boolean; internalFormat?: InternalFormat } = {},
 ): Texture {
   const tex = new Texture(ctx, {

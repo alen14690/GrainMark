@@ -22,6 +22,7 @@
  *
  * 性能：仅 8 次 hue 距离计算，24 × 标量加权累加，M1 GPU 全屏 24MP <2ms
  */
+import { clamp } from './mathUtils.js'
 
 export const HSL_FRAG = `
 in vec2 v_uv;
@@ -129,7 +130,7 @@ export interface HSLUniforms {
  * 把 HSLParams 的对象形式（{ red: {h,s,l}, orange: {...} }）展平为 24 float Array。
  * 未指定的通道视为 0。前端值 -100..100 归一化到 -1..1。
  */
-export function normalizeHslParams(p: Record<string, { h?: number; s?: number; l?: number }>): HSLUniforms {
+export function normalizeHslParams(p: Record<string, { h?: number; s?: number; l?: number } | undefined>): HSLUniforms {
   const arr = new Float32Array(24)
   for (let i = 0; i < HSL_CHANNELS.length; i++) {
     const name = HSL_CHANNELS[i]!
@@ -143,7 +144,7 @@ export function normalizeHslParams(p: Record<string, { h?: number; s?: number; l
 }
 
 /** 判断 HSL 参数是否为"全零"（可完全跳过这个 pass） */
-export function isHslIdentity(p: Record<string, { h?: number; s?: number; l?: number }>): boolean {
+export function isHslIdentity(p: Record<string, { h?: number; s?: number; l?: number } | undefined>): boolean {
   for (const name of HSL_CHANNELS) {
     const v = p[name]
     if (!v) continue
@@ -152,6 +153,3 @@ export function isHslIdentity(p: Record<string, { h?: number; s?: number; l?: nu
   return true
 }
 
-function clamp(v: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, v))
-}

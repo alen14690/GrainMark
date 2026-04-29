@@ -13,6 +13,8 @@
  *   saturation：基于 luma 灰度做 mix
  *   vibrance：同 saturation，但权重 ∝ (1 - currentSaturation)
  */
+import { clamp } from './mathUtils.js'
+
 export const ADJUSTMENTS_FRAG = `
 in vec2 v_uv;
 out vec4 fragColor;
@@ -91,6 +93,3 @@ export function isAdjustmentsIdentity(p: {
   return (p.clarity ?? 0) === 0 && (p.saturation ?? 0) === 0 && (p.vibrance ?? 0) === 0
 }
 
-function clamp(v: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, v))
-}

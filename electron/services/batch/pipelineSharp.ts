@@ -15,6 +15,7 @@
 import sharp, { type Sharp } from 'sharp'
 import type { BatchJobConfig, FilterPipeline } from '../../../shared/types.js'
 import { applyPipelineToRGBA, detectCpuOnlyLimitations } from '../filter-engine/cpuPipeline.js'
+import { orientImage } from '../raw/index.js'
 
 export interface ApplyPipelineOptions {
   /** 原始 RGBA / JPEG / etc. buffer */
@@ -66,15 +67,15 @@ export function detectIgnoredChannels(pipeline: FilterPipeline | null): Unsuppor
 export async function applyPipeline(opts: ApplyPipelineOptions): Promise<ApplyPipelineResult> {
   const { input, pipeline, format, quality, keepExif, resize, sourceOrientation } = opts
 
-  let img = sharp(input, { failOn: 'none' })
+  let img: Sharp
 
-  // Orientation：RAW 走显式 rotate(angle)；非 RAW 靠 sharp 自动
-  if (sourceOrientation !== undefined && sourceOrientation !== 1) {
-    const degByOrient: Record<number, number> = { 3: 180, 6: 90, 8: 270 }
-    const deg = degByOrient[sourceOrientation] ?? 0
-    if (deg !== 0) img = img.rotate(deg)
+  // 统一 orientation 处理（Single Source of Truth：orientImage）
+  if (sourceOrientation !== undefined) {
+    // RAW 路径（有 sourceOrientation）：走 orientImage 显式处理
+    img = orientImage(input, sourceOrientation)
   } else {
-    img = img.rotate()
+    // 非 RAW 路径：走 orientImage（内部 sharp.rotate() 自动读 EXIF）
+    img = orientImage(input, undefined)
   }
 
   // Resize（先 resize 后跑 CPU pipeline —— 节约大量像素）

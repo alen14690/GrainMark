@@ -7,14 +7,15 @@
  *
  * 这样 thumbnail / preview / grain:// 协议三处改动都可以压到"一行替换"。
  *
- * Orientation 契约：
- *   - 除了 buffer，还返回 `sourceOrientation`（来自 RAW 原文件 EXIF 的 Orientation 标签，1..8）
- *   - 上层（thumbnail / preview）不要依赖 sharp 对 buffer 自带 EXIF 的自动 rotate，
- *     因为 RAW 内嵌 JPEG 的 EXIF orientation 有时与原 RAW 不一致（Sony ARW 常见）
- *   - 正确做法：用 sourceOrientation 显式 .rotate(angle) 旋转
+ * Orientation 契约（Single Source of Truth）：
+ *   - resolvePreviewBuffer 返回 buffer + sourceOrientation
+ *   - **所有调用方必须用 orientImage(buffer, sourceOrientation) 做方向处理**
+ *   - 禁止自行实现 rotate/flip 逻辑（AGENTS.md 第 8 条：禁止散布式逻辑）
  */
 import { promises as fsp } from 'node:fs'
 import path from 'node:path'
+import type { Sharp } from 'sharp'
+import sharp from 'sharp'
 import { readExif } from '../exif/reader.js'
 import { logger } from '../logger/logger.js'
 import { getCached, makeCacheKey, putCached } from './rawCache.js'
@@ -40,18 +41,84 @@ export interface ResolvedPreview {
   sourceOrientation?: number
 }
 
-/** EXIF orientation → 顺时针旋转角度（度）。2/4/5/7 含镜像，暂不处理（相机罕见） */
+/**
+ * EXIF orientation → 顺时针旋转角度（度）。
+ * 2/4/5/7 含镜像维度，旋转角度仅描述旋转部分（镜像由 needsFlip 判定）。
+ *
+ * 完整 EXIF orientation 含义：
+ *   1 — 正常
+ *   2 — 水平翻转
+ *   3 — 旋转 180°
+ *   4 — 垂直翻转（= 旋转 180° + 水平翻转）
+ *   5 — 旋转 270° + 水平翻转
+ *   6 — 旋转 90°
+ *   7 — 旋转 90° + 水平翻转
+ *   8 — 旋转 270°
+ */
 export function orientationToRotationDegrees(orientation?: number): number {
   switch (orientation) {
     case 3:
+    case 4:
       return 180
+    case 5:
     case 6:
       return 90
+    case 7:
     case 8:
       return 270
     default:
       return 0
   }
+}
+
+/** EXIF orientation 是否需要水平翻转（镜像）。orientation 2/4/5/7 含镜像维度 */
+export function orientationNeedsFlip(orientation?: number): boolean {
+  return orientation === 2 || orientation === 4 || orientation === 5 || orientation === 7
+}
+
+/**
+ * 统一图像方向处理——**所有需要旋转/翻转的路径必须且仅可通过此函数**。
+ *
+ * 策略：
+ *   - RAW（sourceOrientation 有值且 ≠ undefined）：
+ *     用原 RAW 文件头的 EXIF orientation 显式 rotate + flip
+ *     因为内嵌 JPEG 的 EXIF orientation 常与 RAW 不一致（Sony ARW 常见）
+ *   - 非 RAW（sourceOrientation === undefined）：
+ *     JPEG/HEIC/PNG 自带可靠的 EXIF → sharp.rotate() auto-orient
+ *
+ * 为什么必须统一：
+ *   M3.5 踩坑三次证明——orientation 逻辑散布在多处导致反复误修。
+ *   把判断、旋转、翻转三步集中在一个函数中：
+ *   1. 不可能有"这处改了那处忘了"
+ *   2. 镜像 orientation (2/4/5/7) 只需在这一处处理
+ *   3. 单测只需覆盖此函数，消除 N 倍测试冗余
+ *
+ * @param buffer 图像字节流（可以是内嵌 JPEG、原始 JPEG、HEIC 等 sharp 可处理的格式）
+ * @param sourceOrientation RAW 原文件 EXIF 的 Orientation (1..8)；非 RAW 传 undefined
+ * @returns 已应用 orientation 的 sharp 实例（后续可继续链式 resize/encode）
+ */
+export function orientImage(buffer: Buffer, sourceOrientation?: number): Sharp {
+  let img = sharp(buffer, { failOn: 'none' })
+
+  if (sourceOrientation !== undefined) {
+    // RAW 路径：显式处理旋转 + 镜像
+    const deg = orientationToRotationDegrees(sourceOrientation)
+    const flip = orientationNeedsFlip(sourceOrientation)
+
+    if (flip) {
+      logger.debug('orient.flip', { orientation: sourceOrientation })
+      img = img.flop() // 水平翻转
+    }
+    if (deg !== 0) {
+      img = img.rotate(deg)
+    }
+    // orientation=1 或 undefined（readExif 失败）时：不旋转也不翻转，直接返回
+  } else {
+    // 非 RAW 路径：trust buffer 自带的 EXIF，sharp 自动处理
+    img = img.rotate()
+  }
+
+  return img
 }
 
 /**

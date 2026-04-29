@@ -10,6 +10,7 @@
  * 错误隔离：单个 item 失败只影响该 item；worker 崩溃由 pool 重启兜底
  */
 import * as fs from 'node:fs'
+import { promises as fsp } from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Worker } from 'node:worker_threads'
@@ -23,7 +24,7 @@ import { detectIgnoredChannels } from '../batch/pipelineSharp.js'
 import type { BatchTask, MainMessage, WorkerMessage } from '../batch/worker.js'
 import { readExif } from '../exif/reader.js'
 import { logger } from '../logger/logger.js'
-import { resolvePreviewBuffer } from '../raw/index.js'
+import { orientImage, resolvePreviewBuffer } from '../raw/index.js'
 import { isRawFormat } from '../raw/rawDecoder.js'
 import { getFilter } from '../storage/filterStore.js'
 
@@ -211,7 +212,7 @@ export async function startBatch(config: BatchJobConfig, photoPaths: string[]): 
   jobs.set(id, job)
 
   // 预读 filter pipeline / filter 名字
-  const filter = config.filterId ? getFilter(config.filterId) : null
+  const filter = config.filterId ? await getFilter(config.filterId) : null
   const pipeline: FilterPipeline | null = filter?.pipeline ?? null
   const filterName = filter?.id ?? config.filterId ?? 'original'
 
@@ -382,13 +383,19 @@ async function dispatchGpuTask(
 ): Promise<{ ok: boolean; outputPath?: string; error?: string }> {
   try {
     // 1) 准备 sourceUrl 给渲染进程 fetch
+    //    统一 orientation 处理（Single Source of Truth：orientImage）
     let sourceUrl: string
     if (task.previewBuffer) {
-      // RAW 已预读：走 data URL
-      sourceUrl = `data:image/jpeg;base64,${task.previewBuffer.toString('base64')}`
+      // RAW 已预读：用 orientImage 统一处理方向
+      const buf = await orientImage(task.previewBuffer, task.sourceOrientation)
+        .jpeg({ quality: 95 })
+        .toBuffer()
+      sourceUrl = `data:image/jpeg;base64,${buf.toString('base64')}`
     } else {
-      // 非 RAW：file:// （渲染进程通过 grain:// 也行，但 data URL 更不依赖协议）
-      const buf = await sharp(task.photoPath).rotate().jpeg({ quality: 95 }).toBuffer()
+      // 非 RAW：orientImage(buffer, undefined) → sharp.rotate() autoOrient
+      const buf = await orientImage(await fsp.readFile(task.photoPath), undefined)
+        .jpeg({ quality: 95 })
+        .toBuffer()
       sourceUrl = `data:image/jpeg;base64,${buf.toString('base64')}`
     }
 

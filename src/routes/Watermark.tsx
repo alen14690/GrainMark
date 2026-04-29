@@ -126,7 +126,7 @@ export default function Watermark() {
 
           <div>
             <div className="text-[11px] text-fg-2 uppercase tracking-wider font-mono mb-1.5">Logo (PNG)</div>
-            <button className="btn-secondary w-full text-[11.5px]">
+            <button type="button" className="btn-secondary w-full text-[11.5px]">
               <UploadIcon className="w-3.5 h-3.5" />
               上传 Logo
             </button>
@@ -135,7 +135,7 @@ export default function Watermark() {
             </div>
           </div>
 
-          <button className="btn-primary w-full">应用到当前图</button>
+          <button type="button" className="btn-primary w-full">应用到当前图</button>
         </aside>
       </div>
     </div>

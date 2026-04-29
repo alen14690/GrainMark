@@ -83,7 +83,7 @@ export default function Extract() {
               <Step n={4} title="3D LUT 反推" desc="烘焙标准 .cube，兼容 DaVinci / PR" />
               <Step n={5} title="颗粒频谱估计" desc="检测胶片颗粒强度与粒度" />
             </div>
-            <button onClick={handleExtract} disabled={!refPath || extracting} className="btn-primary w-full">
+            <button type="button" onClick={handleExtract} disabled={!refPath || extracting} className="btn-primary w-full">
               <Sparkles className="w-4 h-4" />
               {extracting ? '提取中...' : '开始提取'}
             </button>

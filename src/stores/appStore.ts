@@ -28,7 +28,11 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>()(
-  immer((set, get) => ({
+  immer((set, get) => {
+    /** 防止 init() 重复调用时注册多个 ipcOn 监听 */
+    let ipcPhotoRepairedRegistered = false
+
+    return {
     settings: null,
     filters: [],
     photos: [],
@@ -62,9 +66,13 @@ export const useAppStore = create<AppState>()(
         })
         // 订阅懒补完成通知：老记录 thumbPath / dimsVerified 被修复后
         // 主进程 push 'photo:repaired'，UI 自动 refreshPhotos → 显示新 thumb
-        ipcOn('photo:repaired', () => {
-          void get().refreshPhotos()
-        })
+        // A7 修复：防止重复注册（React Strict Mode / 多次 init 调用）
+        if (!ipcPhotoRepairedRegistered) {
+          ipcPhotoRepairedRegistered = true
+          ipcOn('photo:repaired', () => {
+            void get().refreshPhotos()
+          })
+        }
       } catch (e) {
         set((s) => {
           s.loading = false
@@ -140,5 +148,5 @@ export const useAppStore = create<AppState>()(
         s.settings = next
       })
     },
-  })),
+  }}),
 )

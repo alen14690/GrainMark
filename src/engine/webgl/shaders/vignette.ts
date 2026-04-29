@@ -13,6 +13,8 @@
  *   weight = smoothstep(midpoint, midpoint + feather, r)
  *   color = mix(color, color * (1 + amount), weight)
  */
+import { clamp } from './mathUtils.js'
+
 export const VIGNETTE_FRAG = `
 in vec2 v_uv;
 out vec4 fragColor;
@@ -61,8 +63,4 @@ export function normalizeVignetteParams(
     u_feather: clamp((p.feather ?? 50) / 100, 0, 1),
     u_aspect: aspect,
   }
-}
-
-function clamp(v: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, v))
 }

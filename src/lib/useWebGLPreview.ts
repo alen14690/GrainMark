@@ -440,12 +440,25 @@ export function useWebGLPreview(
           canvas.height = bitmap.height
         }
 
+        // Chromium 的 ImageBitmap 内部像素已是 GL 方向（底→顶），
+        // 且 UNPACK_FLIP_Y_WEBGL 对 ImageBitmap 源不生效。
+        // 解决：先画到临时 canvas，再用 canvas 作为纹理源（flipY 对 canvas 可靠）。
+        const tmpCanvas = document.createElement('canvas')
+        tmpCanvas.width = bitmap.width
+        tmpCanvas.height = bitmap.height
+        const ctx2d = tmpCanvas.getContext('2d')!
+        ctx2d.drawImage(bitmap, 0, 0)
+        bitmap.close()
+
         sourceTexRef.current?.dispose()
-        sourceTexRef.current = textureFromBitmap(gl, bitmap, {
+        sourceTexRef.current = textureFromBitmap(gl, tmpCanvas, {
           flipY: true,
           renderable: false,
         })
-        bitmap.close()
+
+        // P2 修复：上传完成后立即释放 tmpCanvas 的 backing store（24MP ≈ 96MB）
+        tmpCanvas.width = 0
+        tmpCanvas.height = 0
 
         // 换图必然重采一次直方图（重置计数器让第一帧强制采样）
         histogramFrameCounterRef.current = 0

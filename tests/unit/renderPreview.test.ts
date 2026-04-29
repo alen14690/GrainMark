@@ -101,7 +101,7 @@ describe('renderPreview 输出形态', () => {
     hoisted.resolveSpy.mockResolvedValue({ buffer: small, source: 'passthrough' })
 
     const { renderPreview } = await import('../../electron/services/filter-engine/preview')
-    const url = await renderPreview('/fake/small.jpg', null)
+    const url = await renderPreview('/fake/small.jpg')
 
     expect(url).toMatch(/^data:image\/jpeg;base64,/)
   })
@@ -112,7 +112,7 @@ describe('renderPreview 输出形态', () => {
     hoisted.resolveSpy.mockResolvedValue({ buffer: large, source: 'passthrough' })
 
     const { renderPreview } = await import('../../electron/services/filter-engine/preview')
-    const url = await renderPreview('/fake/large.jpg', null)
+    const url = await renderPreview('/fake/large.jpg')
 
     expect(url).toMatch(/^grain:\/\/preview-tmp\/[a-f0-9]+\.jpg$/)
     // 实际文件应落在 preview-cache 下
@@ -128,22 +128,17 @@ describe('renderPreview 输出形态', () => {
     hoisted.resolveSpy.mockResolvedValue({ buffer: large, source: 'passthrough' })
 
     const { renderPreview } = await import('../../electron/services/filter-engine/preview')
-    const url1 = await renderPreview('/fake/same.jpg', null)
-    const url2 = await renderPreview('/fake/same.jpg', null)
+    const url1 = await renderPreview('/fake/same.jpg')
+    const url2 = await renderPreview('/fake/same.jpg')
 
     expect(url1).toBe(url2)
     // 都必须是 grain 形式（因为阈值低）
     expect(url1).toMatch(/^grain:\/\/preview-tmp\//)
   })
 
-  it('RAW sourceOrientation 不再用于显式旋转 · 防 Sony ARW 倒挂（2026-04-27 修正）', async () => {
-    // 2026-04-27 架构修正：preview.ts 不再用 RAW 文件头的 sourceOrientation 显式旋转。
-    // 改为统一 sharp.rotate() 无参数（读 buffer 内 EXIF tag 自动处理）。
-    //
-    // 根因：Sony ARW 的内嵌 JPEG 已被固件物理旋转过，再根据 RAW 文件头做 rotate(90°/270°)
-    // 会导致"双重旋转 = 照片 180° 倒挂"——用户截图已实锤此 bug。
-    //
-    // 本 mock buffer 由 sharp raw 模式生成（无 EXIF tag），新契约：不旋转 → 保持原尺寸。
+  it('RAW sourceOrientation 显式旋转（内嵌 JPEG 无 EXIF 时用 RAW 文件头 orientation）', async () => {
+    // Sony ARW 实测：内嵌 JPEG 无 EXIF orientation，必须用 RAW 文件头的 sourceOrientation
+    // mock: 900×600 无 EXIF，sourceOrientation=6 → rotate(90) → 600×900
     process.env.GRAINMARK_PREVIEW_DATAURL_MAX = String(2 * 1024 * 1024)
     const hPixels = new Uint8Array(900 * 600 * 3)
     for (let i = 0; i < hPixels.length; i += 3) {
@@ -160,11 +155,11 @@ describe('renderPreview 输出形态', () => {
     hoisted.resolveSpy.mockResolvedValue({
       buffer: rawLikeJpeg,
       source: 'raw-extracted',
-      sourceOrientation: 6, // RAW 文件头说要旋转，但 preview.ts 不再使用
+      sourceOrientation: 6,
     })
 
     const { renderPreview } = await import('../../electron/services/filter-engine/preview')
-    const url = await renderPreview('/fake/raw.nef', null)
+    const url = await renderPreview('/fake/raw.nef')
 
     let imgBuffer: Buffer
     if (url.startsWith('data:image/jpeg;base64,')) {
@@ -174,20 +169,14 @@ describe('renderPreview 输出形态', () => {
       imgBuffer = fs.readFileSync(path.join(tmpRoot, 'preview-cache', fileName))
     }
     const meta = await sharp(imgBuffer).metadata()
-    // 新契约：mock buffer 无 EXIF tag → sharp.rotate() 不旋转 → 保持 900×600
-    expect(meta.width).toBe(900)
-    expect(meta.height).toBe(600)
-    // EXIF orientation 必须被 withMetadata 强制置为 1
-    expect(meta.orientation).toBe(1)
+    expect(meta.width).toBe(600)
+    expect(meta.height).toBe(900)
   })
 
-  it('GPU-only 契约：pipelineOverride 被忽略（不再烘焙 CPU pipeline）', async () => {
-    // 2026-04-26 架构决策：CPU 兜底路径已删除。preview:render 只负责取"基准原图"，
-    // 所有滤镜 / 调整由渲染进程 WebGL 实时应用。为了向后兼容 IPC schema 中 pipelineOverride
-    // 参数仍保留，但 renderPreview 内部会忽略它。
-    //
-    // 本契约测试：即使调用方传了 tone.exposure=+2 的 override，输出亮度也必须与 base 基本一致。
-    // 若某日有人"复活"CPU 烘焙路径，本测试会立即红 —— 这是架构守门员。
+  it('GPU-only 契约：renderPreview 签名只接受 photoPath（filterId/pipelineOverride 已清理）', async () => {
+    // 2026-04-27 P1 清理：renderPreview 签名简化为只接受 photoPath。
+    // 所有滤镜 / 调整由渲染进程 WebGL 实时应用，主进程不烘焙。
+    // 本测试验证：相同输入不论调用几次，输出亮度一致（没有副作用泄漏）。
     const gray = await sharp({
       create: { width: 200, height: 200, channels: 3, background: { r: 128, g: 128, b: 128 } },
     })
@@ -198,42 +187,16 @@ describe('renderPreview 输出形态', () => {
 
     const { renderPreview } = await import('../../electron/services/filter-engine/preview')
 
-    const base = await renderPreview('/fake/gray.jpg', null)
-    const baseMeta = await sharp(Buffer.from(base.slice(23), 'base64')).stats()
+    const out1 = await renderPreview('/fake/gray.jpg')
+    const out2 = await renderPreview('/fake/gray.jpg')
 
-    // 带 exposure=+2 的 override：**不应该**影响输出（被忽略）
-    const withOverride = await renderPreview('/fake/gray.jpg', null, {
-      tone: {
-        exposure: 2,
-        contrast: 0,
-        highlights: 0,
-        shadows: 0,
-        whites: 0,
-        blacks: 0,
-      },
-    })
-    const overrideMeta = await sharp(Buffer.from(withOverride.slice(23), 'base64')).stats()
+    const meta1 = await sharp(Buffer.from(out1.slice(23), 'base64')).stats()
+    const meta2 = await sharp(Buffer.from(out2.slice(23), 'base64')).stats()
 
     // 两者差异应在 JPEG 重编码抖动范围内（< 5）
-    expect(Math.abs(overrideMeta.channels[0].mean - baseMeta.channels[0].mean)).toBeLessThan(5)
-  })
-
-  it('GPU-only 契约：filterId 也被忽略（不再从 preset 烘焙）', async () => {
-    const gray = await sharp({
-      create: { width: 200, height: 200, channels: 3, background: { r: 128, g: 128, b: 128 } },
-    })
-      .jpeg({ quality: 95 })
-      .toBuffer()
-    hoisted.resolveSpy.mockResolvedValue({ buffer: gray, source: 'passthrough' })
-    process.env.GRAINMARK_PREVIEW_DATAURL_MAX = String(10 * 1024 * 1024)
-
-    const { renderPreview } = await import('../../electron/services/filter-engine/preview')
-
-    // 传 filterId（即便对应 preset 存在也不烘焙）
-    const out = await renderPreview('/fake/gray.jpg', 'any-filter-id')
-    const meta = await sharp(Buffer.from(out.slice(23), 'base64')).stats()
+    expect(Math.abs(meta2.channels[0].mean - meta1.channels[0].mean)).toBeLessThan(5)
     // 灰色输入原地返回（128 ± JPEG 重编码）
-    expect(meta.channels[0].mean).toBeGreaterThan(120)
-    expect(meta.channels[0].mean).toBeLessThan(135)
+    expect(meta1.channels[0].mean).toBeGreaterThan(120)
+    expect(meta1.channels[0].mean).toBeLessThan(135)
   })
 })

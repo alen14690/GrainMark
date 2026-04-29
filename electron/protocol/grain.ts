@@ -1,4 +1,4 @@
-import fs from 'node:fs'
+import { promises as fsp } from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 /**
@@ -19,7 +19,7 @@ import { pathToFileURL } from 'node:url'
  */
 import { net, protocol } from 'electron'
 import { logger } from '../services/logger/logger.js'
-import { isRawFormat, resolvePreviewBuffer } from '../services/raw/index.js'
+import { orientImage, isRawFormat, resolvePreviewBuffer } from '../services/raw/index.js'
 import { UnsupportedRawError } from '../services/raw/rawDecoder.js'
 import type { PathGuard } from '../services/security/pathGuard.js'
 import { getLUTDir, getPreviewCacheDir, getThumbsDir } from '../services/storage/init.js'
@@ -67,6 +67,12 @@ export function registerGrainProtocol(pathGuard: PathGuard): void {
         return new Response('Bad id', { status: 400 })
       }
 
+      // S3 纵深防御：即便正则允许 '.'，也必须拒绝路径遍历组件
+      if (id.includes('..')) {
+        logger.warn('grain.traversal.blocked', { id })
+        return new Response('Bad id', { status: 400 })
+      }
+
       let absPath: string | null = null
 
       if (kind === 'photo' || kind === 'preview') {
@@ -82,26 +88,34 @@ export function registerGrainProtocol(pathGuard: PathGuard): void {
       // PathGuard 双重校验（即使 resolver 返回，也必须在白名单内）
       const safe = await pathGuard.validate(absPath).catch(() => null)
       if (!safe) return new Response('Forbidden', { status: 403 })
-      if (!fs.existsSync(safe)) return new Response('Not found', { status: 404 })
 
-      const stat = fs.statSync(safe)
+      // Q3 修复：用单次异步 stat 替代 existsSync + statSync，不阻塞主进程
+      let stat: Awaited<ReturnType<typeof fsp.stat>>
+      try {
+        stat = await fsp.stat(safe)
+      } catch {
+        return new Response('Not found', { status: 404 })
+      }
       if (stat.isDirectory()) return new Response('Forbidden', { status: 403 })
 
       // RAW 分支：photo / preview kind 对 RAW 做透明 JPEG 预览替换
       // thumb / lut 不经过 RAW 解码（thumb 已由 photoStore 预先走过 resolvePreviewBuffer 生成了 JPEG）
       if ((kind === 'photo' || kind === 'preview') && isRawFormat(safe)) {
         try {
-          const { buffer } = await resolvePreviewBuffer(safe)
-          // Node Buffer → Blob 以兼容 Web Response BodyInit 类型签名
-          // （Electron/Node 运行时可直接接受 Buffer，但 DOM lib 的 TS 类型只认标准 BodyInit）
-          const body = new Blob([new Uint8Array(buffer).buffer as ArrayBuffer], {
+          const { buffer, sourceOrientation } = await resolvePreviewBuffer(safe)
+          // 统一 orientation 处理（Single Source of Truth：orientImage）
+          // 修复 P0：grain:// 协议之前未对 RAW 做 orientation 旋转
+          const orientedBuffer = await orientImage(buffer, sourceOrientation)
+            .jpeg({ quality: 90 })
+            .toBuffer()
+          const body = new Blob([new Uint8Array(orientedBuffer).buffer as ArrayBuffer], {
             type: 'image/jpeg',
           })
           return new Response(body, {
             status: 200,
             headers: {
               'Content-Type': 'image/jpeg',
-              'Content-Length': String(buffer.length),
+              'Content-Length': String(orientedBuffer.length),
               'Cache-Control': 'private, max-age=3600',
             },
           })

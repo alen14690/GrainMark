@@ -23,6 +23,8 @@
  *     ±100 档位在高光/暗部产生 40~55% 的亮度位移，视觉上"强烈"。
  *   - Rec.709 luma；sRGB 空间（与 Lightroom 视觉直觉一致；HDR 扩展留给 M5）。
  */
+import { clamp } from './mathUtils.js'
+
 export const TONE_FRAG = `
 in vec2 v_uv;
 out vec4 fragColor;
@@ -99,8 +101,4 @@ export function normalizeToneParams(p: {
     u_whites: clamp((p.whites ?? 0) / 100, -1, 1),
     u_blacks: clamp((p.blacks ?? 0) / 100, -1, 1),
   }
-}
-
-function clamp(v: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, v))
 }

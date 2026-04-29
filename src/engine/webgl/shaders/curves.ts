@@ -14,6 +14,8 @@
  * GLSL 没 sampler1D，用数组查表 + 手动线性插值。
  * 未指定的曲线应传"恒等 LUT"（0..255），由 CPU 补齐。
  */
+import { clamp } from './mathUtils.js'
+
 export const CURVES_FRAG = `
 in vec2 v_uv;
 out vec4 fragColor;
@@ -201,6 +203,3 @@ export function isCurvesIdentity(p: {
   return isIdent(p.rgb) && isIdent(p.r) && isIdent(p.g) && isIdent(p.b)
 }
 
-function clamp(v: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, v))
-}

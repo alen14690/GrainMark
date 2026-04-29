@@ -20,11 +20,10 @@
  *   - LLM 输出**不可信任**：clamp 所有数值、schema 拒绝未知字段
  */
 import path from 'node:path'
-import sharp from 'sharp'
 import { z } from 'zod'
 import type { AIAnalysisResult, AISuggestedAdjustments } from '../../../shared/types.js'
 import { logger } from '../logger/logger.js'
-import { orientationToRotationDegrees, resolvePreviewBuffer } from '../raw/index.js'
+import { orientImage, resolvePreviewBuffer } from '../raw/index.js'
 import { getApiKeyForInternalUse, getPublicConfig } from './configStore.js'
 
 // ---- 硬编码常量 ----
@@ -367,15 +366,8 @@ async function buildImageDataUrl(photoPath: string): Promise<string> {
   // resolvePreviewBuffer 统一处理 RAW/HEIC/JPEG，返回可直接喂 sharp 的 buffer + 原始方向
   const { buffer, sourceOrientation } = await resolvePreviewBuffer(photoPath)
 
-  // 对 RAW：用 sourceOrientation 显式旋转；对普通 JPEG：sharp.rotate() 会自动读 EXIF
-  const rotateDeg = orientationToRotationDegrees(sourceOrientation)
-
-  let img = sharp(buffer, { failOn: 'none' })
-  if (rotateDeg) {
-    img = img.rotate(rotateDeg)
-  } else {
-    img = img.rotate() // 让 sharp 读 EXIF 自动旋
-  }
+  // 统一 orientation 处理（Single Source of Truth：orientImage）
+  const img = orientImage(buffer, sourceOrientation)
 
   const jpegBuffer = await img
     .resize({

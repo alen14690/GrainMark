@@ -72,7 +72,7 @@ export default function Filters() {
           </button>
         ))}
         <div className="flex-1" />
-        <button onClick={handleImportLUT} className="btn-secondary">
+        <button type="button" onClick={handleImportLUT} className="btn-secondary">
           <Upload className="w-3.5 h-3.5" />
           导入 LUT
         </button>
@@ -114,7 +114,7 @@ export default function Filters() {
               </div>
             )}
             <div className="flex gap-1 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button onClick={() => handleExport(f.id)} className="btn-ghost py-1 px-2 text-[11px] flex-1">
+              <button type="button" onClick={() => handleExport(f.id)} className="btn-ghost py-1 px-2 text-[11px] flex-1">
                 <Download className="w-3 h-3" />
                 导出 .cube
               </button>

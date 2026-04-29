@@ -1,5 +1,6 @@
 import { exiftool } from 'exiftool-vendored'
 import type { PhotoExif } from '../../../shared/types.js'
+import { logger } from '../logger/logger.js'
 
 const MAX_STR_LEN = 1024
 
@@ -53,13 +54,16 @@ function formatShutterNumeric(e: number): string | undefined {
  * 读取 EXIF
  * 安全加固：
  *   - 字符串字段长度 ≤ 1KB
- *   - 单文件读取超时 5s
+ *   - 单文件读取超时 5s（P2 修复：超时 timer 在成功时也会被清理）
  */
 export async function readExif(filePath: string): Promise<PhotoExif> {
+  let timer: NodeJS.Timeout | undefined
   try {
     const tags = await Promise.race([
       exiftool.read(filePath),
-      new Promise<never>((_, rej) => setTimeout(() => rej(new Error('EXIF read timeout')), 5000)),
+      new Promise<never>((_, rej) => {
+        timer = setTimeout(() => rej(new Error('EXIF read timeout')), 5000)
+      }),
     ])
 
     return {
@@ -80,8 +84,10 @@ export async function readExif(filePath: string): Promise<PhotoExif> {
       orientation: toNum(tags.Orientation),
     }
   } catch (err) {
-    console.error('[exif] read failed:', (err as Error).message)
+    logger.warn('exif.read.failed', { path: filePath, err: (err as Error).message })
     return {}
+  } finally {
+    if (timer) clearTimeout(timer)
   }
 }
 

@@ -45,37 +45,43 @@ export default function TopBar() {
   }
 
   return (
-    <header className="h-16 shrink-0 glass-surface rounded-none border-x-0 border-t-0 drag-region flex items-center gap-5 px-8 relative z-10">
-      {/* 标题 */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-baseline gap-3">
-          <h1 className="font-display-serif text-2xl text-fg-1 leading-none">{title.zh}</h1>
-          <span className="text-[10px] font-mono text-fg-3 tracking-[0.18em] uppercase">{title.en}</span>
-        </div>
-        {photoCount > 0 && (
-          <div className="flex items-center gap-2 mt-2 no-drag">
-            <ValueBadge label="LIBRARY" value={photoCount} size="sm" variant="muted" />
-            {selectedCount > 0 && (
-              <ValueBadge label="SELECTED" value={selectedCount} size="sm" variant="amber" />
-            )}
+    <header className="shrink-0 glass-surface rounded-none border-x-0 border-t-0 drag-region flex flex-col relative z-10">
+      {/* macOS 交通灯安全区对齐 */}
+      <div className="mac-sidebar-pad shrink-0" />
+      <div className="h-16 flex items-center gap-5 px-8">
+        {/* 标题 */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-3">
+            <h1 className="font-display text-3xl text-fg-1 leading-none tracking-tight italic">{title.zh}</h1>
+            <span className="text-xs font-mono text-fg-3/60 tracking-[0.22em] uppercase font-medium">
+              {title.en}
+            </span>
           </div>
-        )}
-      </div>
-
-      {/* 操作区 */}
-      <div className="flex items-center gap-2 no-drag">
-        <div className="relative">
-          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3 pointer-events-none" />
-          <input placeholder="搜索滤镜 / 标签…" className="input pl-8 py-1.5 w-60 text-xs" />
+          {photoCount > 0 && (
+            <div className="flex items-center gap-2 mt-2 no-drag">
+              <ValueBadge label="LIBRARY" value={photoCount} size="sm" variant="muted" />
+              {selectedCount > 0 && (
+                <ValueBadge label="SELECTED" value={selectedCount} size="sm" variant="amber" />
+              )}
+            </div>
+          )}
         </div>
-        <button type="button" onClick={handleImportDir} className="btn-ghost btn-sm" title="选择文件夹">
-          <FolderOpen className="w-3.5 h-3.5" strokeWidth={1.8} />
-          <span>目录</span>
-        </button>
-        <button type="button" onClick={handleImport} className="btn-primary btn-sm">
-          <Upload className="w-3.5 h-3.5" strokeWidth={2} />
-          <span>导入照片</span>
-        </button>
+
+        {/* 操作区 */}
+        <div className="flex items-center gap-2 no-drag">
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3 pointer-events-none" />
+            <input placeholder="搜索滤镜 / 标签…" className="input pl-8 py-1.5 w-60 text-xs" />
+          </div>
+          <button type="button" onClick={handleImportDir} className="btn-ghost btn-sm" title="选择文件夹">
+            <FolderOpen className="w-3.5 h-3.5" strokeWidth={1.8} />
+            <span>目录</span>
+          </button>
+          <button type="button" onClick={handleImport} className="btn-primary btn-sm">
+            <Upload className="w-3.5 h-3.5" strokeWidth={2} />
+            <span>导入照片</span>
+          </button>
+        </div>
       </div>
     </header>
   )

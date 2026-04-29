@@ -17,6 +17,8 @@
  *   u_lutSize     LUT 每边的采样数 N（2..64）
  *   u_intensity   强度 [0, 1]，0 = 原图、1 = 完全应用 LUT
  */
+import { clamp } from './mathUtils.js'
+
 export const LUT3D_FRAG = `
 in vec2 v_uv;
 out vec4 fragColor;
@@ -54,6 +56,3 @@ export function normalizeLut3dParams(p: {
   }
 }
 
-function clamp(v: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, v))
-}

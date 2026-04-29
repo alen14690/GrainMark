@@ -40,7 +40,7 @@ export default function Trending() {
             基于合法抓取的公开元数据（Reddit r/AnalogCommunity / Unsplash / Glass 等），反映当下最热的胶片风格
           </p>
         </div>
-        <button onClick={refresh} disabled={loading} className="btn-secondary">
+        <button type="button" onClick={refresh} disabled={loading} className="btn-secondary">
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           刷新
         </button>

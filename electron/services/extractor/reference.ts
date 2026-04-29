@@ -66,6 +66,6 @@ export async function extractFilterFromReference(
     updatedAt: Date.now(),
   }
 
-  saveFilter(preset)
+  await saveFilter(preset)
   return preset
 }
