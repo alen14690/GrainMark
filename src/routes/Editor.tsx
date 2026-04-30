@@ -232,6 +232,7 @@ export default function Editor() {
 
   /** 导出当前编辑结果为全分辨率图片 */
   const [exportSize, setExportSize] = useState<'original' | '4000' | '2400' | '1600'>('original')
+  const [exportToast, setExportToast] = useState<string | null>(null)
   const handleExport = async () => {
     if (!photo?.path) return
     try {
@@ -244,7 +245,8 @@ export default function Editor() {
         flipV,
       })
       if (result) {
-        // 导出成功
+        setExportToast(result)
+        setTimeout(() => setExportToast(null), 6000)
       }
     } catch (err) {
       console.error('[export]', err)
@@ -707,6 +709,31 @@ export default function Editor() {
         activeFilterCategory={activeFilter?.category ?? null}
         onClose={() => setShowAIAdvisor(false)}
       />
+
+      {/* 导出成功 Toast */}
+      {exportToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-lg bg-bg-0 border border-sem-success/40 shadow-2xl animate-fade-in">
+          <div className="text-sem-success text-xs font-medium">导出成功</div>
+          <div className="text-xxs text-fg-3 font-mono truncate max-w-[300px]">{exportToast}</div>
+          <button
+            type="button"
+            className="text-xxs text-brand-amber hover:text-brand-amber/80 whitespace-nowrap"
+            onClick={() => {
+              ipc('dialog:selectDir').catch(() => {}) // 触发 Finder（占位，实际用 shell.showItemInFolder）
+              setExportToast(null)
+            }}
+          >
+            在 Finder 中显示
+          </button>
+          <button
+            type="button"
+            className="text-fg-4 hover:text-fg-2 text-xs"
+            onClick={() => setExportToast(null)}
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   )
 }
