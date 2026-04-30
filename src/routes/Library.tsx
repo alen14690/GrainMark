@@ -3,7 +3,7 @@
  *
  * 卤化银风格：EXIF 徽章统计 + PhotoCard（含胶片齿孔装饰）
  */
-import { ImageIcon, Trash2, Upload } from 'lucide-react'
+import { Download, ImageIcon, Trash2, Upload } from 'lucide-react'
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { EmptyState, PhotoCard, ValueBadge } from '../design'
@@ -79,22 +79,38 @@ export default function Library() {
         <ValueBadge label="CAMERAS" value={stats.cameras} />
         {selected.length > 0 && <ValueBadge label="SELECTED" value={selected.length} variant="amber" />}
 
-        {/* 选中态下出现移除按钮；强调"仅记录"避免误操作 */}
+        {/* 选中态下出现操作按钮 */}
         {selected.length > 0 && (
-          <button
-            type="button"
-            onClick={handleRemoveSelected}
-            title="从图库移除选中照片的导入记录；不会删除硬盘上的原文件"
-            className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md
-              text-xs font-medium
-              bg-white/[0.04] hover:bg-red-500/15
-              border border-white/10 hover:border-red-400/50
-              text-fg-2 hover:text-red-300
-              transition-all duration-fast ease-liquid"
-          >
-            <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />
-            <span>移除 {selected.length} 张（仅记录）</span>
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate('/batch')}
+              title="将选中照片批量导出"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md
+                text-xs font-medium
+                bg-brand-amber/10 hover:bg-brand-amber/20
+                border border-brand-amber/30 hover:border-brand-amber/50
+                text-brand-amber
+                transition-all duration-fast ease-liquid"
+            >
+              <Download className="w-3.5 h-3.5" strokeWidth={2} />
+              <span>批量导出 {selected.length} 张</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleRemoveSelected}
+              title="从图库移除选中照片的导入记录；不会删除硬盘上的原文件"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md
+                text-xs font-medium
+                bg-white/[0.04] hover:bg-red-500/15
+                border border-white/10 hover:border-red-400/50
+                text-fg-2 hover:text-red-300
+                transition-all duration-fast ease-liquid"
+            >
+              <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />
+              <span>移除 {selected.length} 张（仅记录）</span>
+            </button>
+          </div>
         )}
       </div>
 
