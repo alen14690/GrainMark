@@ -361,6 +361,11 @@ export const IPC_SCHEMAS = {
   'photo:readExif': PathSchema,
   'photo:thumb': z.tuple([PathSchema, z.number().int().min(64).max(4096)]),
   'photo:remove': PhotoRemoveSchema,
+  'photo:exportSingle': z.tuple([
+    PathSchema,
+    z.any(), // FilterPipeline | null
+    z.object({ longEdge: z.number().nullable(), quality: z.number().min(1).max(100) }),
+  ]),
 
   'preview:render': z.tuple([PathSchema, FilterIdSchema.nullable(), FilterPipelineSchema.optional()]),
 
@@ -392,7 +397,7 @@ export const IPC_SCHEMAS = {
   'llm:clearConfig': null,
   'llm:testConnection': null,
   'llm:listModels': null,
-  'llm:analyzePhoto': PathSchema,
+  'llm:analyzePhoto': z.tuple([PathSchema, z.string().nullable(), z.string().nullable()]),
 
   'dialog:selectFiles': DialogSelectFilesSchema,
   'dialog:selectDir': null,

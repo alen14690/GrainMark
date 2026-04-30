@@ -23,6 +23,7 @@ import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import type {
   ColorGradingParams,
+  CropParams,
   CurvesParams,
   FilterPipeline,
   FilterPreset,
@@ -84,6 +85,7 @@ interface EditState {
   setCurves: (patch: CurvesParams | null) => void
   setGrain: (patch: Partial<GrainParams> | null) => void
   setHalation: (patch: Partial<HalationParams> | null) => void
+  setCrop: (patch: CropParams | null) => void
   setClarity: (v: number) => void
   setSaturation: (v: number) => void
   setVibrance: (v: number) => void
@@ -324,6 +326,18 @@ export const useEditStore = create<EditState>()(
           radius: pipe.halation?.radius ?? 10,
           ...patch,
         }
+      })
+    },
+
+    setCrop(patch) {
+      set((s) => {
+        if (patch === null) {
+          if (s.currentPipeline?.crop) { s.currentPipeline.crop = undefined; s._dirty = true }
+          return
+        }
+        const pipe = ensurePipe(s)
+        pipe.crop = patch
+        s._dirty = true
       })
     },
 

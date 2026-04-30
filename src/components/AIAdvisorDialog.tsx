@@ -1,20 +1,22 @@
 /**
- * AI 摄影顾问弹窗（M5-LLM-B）
+ * AI 摄影顾问面板（M5-LLM-C）
  *
  * 职责：
- *   1. 用户点「✨ AI 顾问」按钮 → 打开此弹窗 → 调 llm:analyzePhoto
+ *   1. 用户点「✨ AI 顾问」按钮 → 打开右侧面板 → 调 llm:analyzePhoto
  *   2. LLM 返回后展示：主体识别 + 诊断清单 + 参数建议预览（可逐项否决）
- *   3. 用户勾选要应用的项 → 一键写入 editStore + commitHistory
+ *   3. **实时预览**：勾选/取消勾选 → 立即应用到 editStore → WebGL 画布刷新
+ *   4. 确认应用：commitHistory 一次性入栈（⌘Z 一步撤销）
+ *   5. 取消：恢复到 AI 分析前的状态
  *
- * 设计原则（M5-LLM-B 阶段）：
- *   - 只做全局参数（tone/wb/clarity/saturation/vibrance/colorGrading），不做局部 mask
- *   - 参数已在主进程 clamp 到 ±40（防 HDR 塑料感）
- *   - 用户必须「明确同意」才会写入 pipeline（默认全不勾，避免一键应用导致后悔）
- *   - 应用后进入 history，可 ⌘Z 完整撤销
+ * 设计原则：
+ *   - 右侧侧边栏面板（不遮挡画布，用户可实时看到效果）
+ *   - 每次 checkbox 变化 → 同步 pipeline 到画布（无需点"应用"就能看效果）
+ *   - 确认后一个 ⌘Z 完整撤销全部 AI 建议
+ *   - 取消即恢复原始状态，安全无副作用
  */
-import { AlertTriangle, CheckCircle2, Loader2, Sparkles, X } from 'lucide-react'
-import { memo, useMemo, useState } from 'react'
-import type { AIAnalysisResult, AISuggestedAdjustments } from '../../shared/types'
+import { AlertTriangle, CheckCircle2, Loader2, Sparkles, X, XCircle } from 'lucide-react'
+import { memo, useCallback, useMemo, useRef, useState } from 'react'
+import type { AIAnalysisResult, AISuggestedAdjustments, FilterPipeline } from '../../shared/types'
 import { cn } from '../design'
 import { ipc } from '../lib/ipc'
 import { useEditStore } from '../stores/editStore'
@@ -22,15 +24,19 @@ import { useEditStore } from '../stores/editStore'
 interface Props {
   open: boolean
   photoPath: string | null
+  /** 当前选中的滤镜名称（如 "Kodak Portra 400"），null 表示未选滤镜 */
+  activeFilterName: string | null
+  /** 当前滤镜分类（如 "oil-painting"、"negative-color"） */
+  activeFilterCategory: string | null
   onClose: () => void
 }
 
 /** 把 AISuggestedAdjustments 展平成一个可勾选的"建议项"列表 */
 interface SuggestionItem {
-  /** 唯一 id，也是展示给用户的中文 label */
+  /** 唯一 id */
   key: string
   label: string
-  /** 数值（若有）；colorGrading 子字段这里只放 "已启用" 占位符 */
+  /** 数值（若有） */
   value?: number
   /** LLM 给的一句话理由（可选） */
   reason?: string
@@ -219,7 +225,13 @@ function fmtSigned(v: number): string {
   return v.toFixed(0)
 }
 
-function AIAdvisorDialog({ open, photoPath, onClose }: Props) {
+/** 深拷贝 pipeline（JSON round-trip，与 editStore 一致） */
+function clonePipeline(p: FilterPipeline | null): FilterPipeline | null {
+  if (!p) return null
+  return JSON.parse(JSON.stringify(p)) as FilterPipeline
+}
+
+function AIAdvisorDialog({ open, photoPath, activeFilterName, activeFilterCategory, onClose }: Props) {
   const [state, setState] = useState<
     | { phase: 'idle' }
     | { phase: 'loading' }
@@ -227,6 +239,11 @@ function AIAdvisorDialog({ open, photoPath, onClose }: Props) {
     | { phase: 'result'; result: AIAnalysisResult & { ok: true } }
   >({ phase: 'idle' })
   const [selected, setSelected] = useState<Record<string, boolean>>({})
+
+  /** AI 分析前的 pipeline 快照（用于预览恢复 & 取消恢复） */
+  const preAISnapshotRef = useRef<FilterPipeline | null>(null)
+  /** 是否已进入预览模式（避免重复保存快照） */
+  const previewActiveRef = useRef(false)
 
   const setTone = useEditStore((s) => s.setTone)
   const setWhiteBalance = useEditStore((s) => s.setWhiteBalance)
@@ -253,19 +270,58 @@ function AIAdvisorDialog({ open, photoPath, onClose }: Props) {
 
   const allItems = useMemo(() => suggestionGroups.flatMap((g) => g.items), [suggestionGroups])
 
+  /**
+   * 同步预览到画布：恢复到 pre-AI 快照，然后只应用已勾选项。
+   * 因为 setter 是 patch 模式（merge），必须先恢复到干净基准再叠加。
+   */
+  const syncPreviewToCanvas = useCallback((sel: Record<string, boolean>, items: SuggestionItem[]) => {
+    // 1. 恢复到 AI 分析前的 pipeline 快照
+    const snapshot = preAISnapshotRef.current
+    useEditStore.setState((s) => {
+      s.currentPipeline = clonePipeline(snapshot)
+      s._dirty = true
+    })
+    // 2. 在恢复后的基础上叠加已勾选项
+    for (const it of items) {
+      if (sel[it.key]) it.apply()
+    }
+  }, [])
+
+  /** 进入预览模式：保存快照 + 首次应用 */
+  const enterPreview = useCallback((items: SuggestionItem[], sel: Record<string, boolean>) => {
+    if (!previewActiveRef.current) {
+      // 保存当前 pipeline 快照（AI 分析前的状态）
+      preAISnapshotRef.current = clonePipeline(useEditStore.getState().currentPipeline)
+      // commitHistory 让 ⌘Z 可以回到 AI 分析前
+      commitHistory('AI 分析前')
+      previewActiveRef.current = true
+    }
+    // 同步预览
+    syncPreviewToCanvas(sel, items)
+  }, [commitHistory, syncPreviewToCanvas])
+
   const analyze = async () => {
     if (!photoPath) return
     setState({ phase: 'loading' })
     setSelected({})
+    previewActiveRef.current = false
     try {
-      const r = await ipc('llm:analyzePhoto', photoPath)
+      const r = await ipc('llm:analyzePhoto', photoPath, activeFilterName, activeFilterCategory)
       if (r.ok) {
         setState({ phase: 'result', result: r })
-        // 默认全选（让用户体验"一键应用"；勾选仍可去掉）
-        const initSelected: Record<string, boolean> = {}
+        // 默认全选
         const groups = buildSuggestionGroups(r.adjustments, allSetters)
-        for (const g of groups) for (const it of g.items) initSelected[it.key] = true
+        const initSelected: Record<string, boolean> = {}
+        const items: SuggestionItem[] = []
+        for (const g of groups) {
+          for (const it of g.items) {
+            initSelected[it.key] = true
+            items.push(it)
+          }
+        }
         setSelected(initSelected)
+        // 立即进入预览模式 → 画布显示 AI 建议效果
+        enterPreview(items, initSelected)
       } else {
         setState({ phase: 'error', kind: r.errorKind, message: r.message })
       }
@@ -278,247 +334,316 @@ function AIAdvisorDialog({ open, photoPath, onClose }: Props) {
     }
   }
 
-  const handleApplySelected = () => {
-    const toApply = allItems.filter((it) => selected[it.key])
-    if (toApply.length === 0) return
-    for (const it of toApply) it.apply()
-    commitHistory(`AI 顾问建议（${toApply.length} 项）`)
-    onClose()
-    // 关闭后清理，避免再次打开时看到旧结果
-    setTimeout(() => {
-      setState({ phase: 'idle' })
-      setSelected({})
-    }, 200)
-  }
+  /** checkbox 变化 → 更新 selected + 同步预览 */
+  const handleToggle = useCallback((key: string, checked: boolean) => {
+    setSelected((prev) => {
+      const next = { ...prev, [key]: checked }
+      // 延迟到下一微任务确保 state 已更新（items 依赖 suggestionGroups 不变）
+      queueMicrotask(() => {
+        syncPreviewToCanvas(next, allItems)
+      })
+      return next
+    })
+  }, [allItems, syncPreviewToCanvas])
 
-  const handleClose = () => {
+  /** 分组全选/取消全选 */
+  const handleGroupToggle = useCallback((group: SuggestionGroup) => {
+    setSelected((prev) => {
+      const allChecked = group.items.every((it) => prev[it.key])
+      const next = { ...prev }
+      for (const it of group.items) next[it.key] = !allChecked
+      queueMicrotask(() => {
+        syncPreviewToCanvas(next, allItems)
+      })
+      return next
+    })
+  }, [allItems, syncPreviewToCanvas])
+
+  /** 确认应用：commit 入 history 后关闭 */
+  const handleApply = useCallback(() => {
+    const selectedCount = Object.values(selected).filter(Boolean).length
+    if (selectedCount === 0) return
+    // 当前 canvas 已经是预览状态（已应用勾选项），直接 commit 即可
+    commitHistory(`AI 顾问建议（${selectedCount} 项）`)
+    previewActiveRef.current = false
+    preAISnapshotRef.current = null
     onClose()
-    setTimeout(() => {
-      setState({ phase: 'idle' })
-      setSelected({})
-    }, 200)
-  }
+    // 确认应用后清理内部状态（下次打开是全新流程）
+    setState({ phase: 'idle' })
+    setSelected({})
+  }, [selected, commitHistory, onClose])
+
+  /** 取消：恢复到 AI 分析前状态后关闭 */
+  const handleCancel = useCallback(() => {
+    if (previewActiveRef.current) {
+      // 恢复到快照
+      const snapshot = preAISnapshotRef.current
+      useEditStore.setState((s) => {
+        s.currentPipeline = clonePipeline(snapshot)
+        s._dirty = snapshot !== null
+      })
+    }
+    previewActiveRef.current = false
+    preAISnapshotRef.current = null
+    onClose()
+    // 取消后清理状态
+    setState({ phase: 'idle' })
+    setSelected({})
+  }, [onClose])
+
+  // 面板关闭时不清理状态（保持后台进展）
+  // 只有用户明确 handleCancel / handleApply 时才清理
+  // 如果面板被强制卸载（比如离开 Editor 页面），React 会自然销毁状态
 
   if (!open) return null
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-      onClick={handleClose}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') handleClose()
-      }}
+      className="fixed right-0 top-0 h-screen z-40 w-[420px] bg-bg-0 border-l border-fg-4/60 shadow-2xl flex flex-col"
       role="dialog"
-      aria-modal="true"
+      aria-modal="false"
+      aria-label="AI 摄影顾问"
     >
-      <div
-        className="w-[640px] max-h-[85vh] bg-bg-0 border border-fg-4/60 rounded-lg shadow-2xl flex flex-col overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-        role="document"
-      >
-        {/* Header */}
-        <header className="h-14 border-b border-fg-4/50 flex items-center px-5 gap-3 bg-gradient-to-r from-brand-amber/10 to-transparent">
-          <Sparkles className="w-5 h-5 text-brand-amber" />
-          <div className="flex-1">
-            <div className="text-sm font-semibold">AI 摄影顾问</div>
-            <div className="text-xxs text-fg-3">由 OpenRouter 云端模型分析，调整参数可逐项勾选</div>
-          </div>
-          <button type="button" onClick={handleClose} className="btn-ghost btn-xs">
-            <X className="w-4 h-4" />
-          </button>
-        </header>
+      {/* Header */}
+      <header className="h-14 border-b border-fg-4/50 flex items-center px-5 gap-3 bg-gradient-to-r from-brand-amber/10 to-transparent shrink-0">
+        <Sparkles className="w-5 h-5 text-brand-amber" />
+        <div className="flex-1">
+          <div className="text-sm font-semibold">AI 摄影顾问</div>
+          <div className="text-xxs text-fg-3">实时预览 · 勾选即应用到画布</div>
+        </div>
+        <button type="button" onClick={handleCancel} className="btn-ghost btn-xs" title="关闭（取消预览）">
+          <X className="w-4 h-4" />
+        </button>
+      </header>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-5">
-          {state.phase === 'idle' && (
-            <div className="text-center py-8 space-y-4">
-              <div className="text-sm text-fg-2 leading-relaxed">
-                点击下方按钮，AI 会降采样这张照片（768px）并上传给你配置的 OpenRouter 模型。
-                <br />
-                返回：<strong className="text-fg-1">光影诊断 · 色彩分析 · 质感评估 · 主体强化 · 全通道参数建议</strong>。
+      {/* Body */}
+      <div className="flex-1 overflow-y-auto p-5">
+        {state.phase === 'idle' && (
+          <div className="text-center py-8 space-y-4">
+            <div className="text-sm text-fg-2 leading-relaxed">
+              点击下方按钮，AI 会降采样这张照片（768px）并上传给你配置的 OpenRouter 模型。
+              <br />
+              返回：<strong className="text-fg-1">光影诊断 · 色彩分析 · 质感评估 · 主体强化 · 全通道参数建议</strong>。
+            </div>
+            <div className="text-xxs text-fg-3 leading-relaxed px-6">
+              分析完成后建议会<strong>实时应用到画布</strong>，你可以逐项勾选调整，确认后一键保存。
+            </div>
+            <button type="button" onClick={analyze} className="btn-primary btn-md mt-2">
+              <Sparkles className="w-4 h-4" />
+              开始分析
+            </button>
+          </div>
+        )}
+
+        {state.phase === 'loading' && (
+          <div className="text-center py-12 space-y-3">
+            <Loader2 className="w-8 h-8 mx-auto animate-spin text-brand-amber" />
+            <div className="text-sm text-fg-2">正在分析照片...</div>
+            <div className="text-xxs text-fg-3">多模态分析耗时较长，请耐心等待（最长约 6 分钟）</div>
+          </div>
+        )}
+
+        {state.phase === 'error' && (
+          <div className="py-6 space-y-4">
+            <div className="flex items-start gap-3 p-4 rounded-md bg-sem-error/10 border border-sem-error/30">
+              <AlertTriangle className="w-5 h-5 text-sem-error shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <div className="text-sm font-medium text-sem-error">{humanizeErrorKind(state.kind)}</div>
+                <div className="text-xxs text-fg-2 mt-1 font-mono break-all">{state.message}</div>
               </div>
-              <div className="text-xxs text-fg-3 leading-relaxed px-6">
-                ⚠️ 本次调用会消耗你的 OpenRouter 额度（约 $0.005~$0.05 / 次，依选择的模型）
+            </div>
+            {(state.kind === 'no-config' || state.kind === 'not-opted-in') && (
+              <div className="text-xxs text-fg-3 px-1">
+                提示：请到 Settings → AI 检查 OpenRouter apiKey 和 opt-in 同意勾选。
               </div>
-              <button type="button" onClick={analyze} className="btn-primary btn-md mt-2">
-                <Sparkles className="w-4 h-4" />
-                开始分析
+            )}
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={handleCancel} className="btn-ghost btn-xs">
+                关闭
+              </button>
+              <button type="button" onClick={analyze} className="btn-secondary btn-xs">
+                重试
               </button>
             </div>
-          )}
+          </div>
+        )}
 
-          {state.phase === 'loading' && (
-            <div className="text-center py-12 space-y-3">
-              <Loader2 className="w-8 h-8 mx-auto animate-spin text-brand-amber" />
-              <div className="text-sm text-fg-2">正在分析照片...</div>
-              <div className="text-xxs text-fg-3">首次调用约 5-15s；网络慢或模型复杂时最长 30s</div>
-            </div>
-          )}
-
-          {state.phase === 'error' && (
-            <div className="py-6 space-y-4">
-              <div className="flex items-start gap-3 p-4 rounded-md bg-sem-error/10 border border-sem-error/30">
-                <AlertTriangle className="w-5 h-5 text-sem-error shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-sem-error">{humanizeErrorKind(state.kind)}</div>
-                  <div className="text-xxs text-fg-2 mt-1 font-mono break-all">{state.message}</div>
-                </div>
+        {state.phase === 'result' && (
+          <div className="space-y-5">
+            {/* 主体 / 环境 / 诊断 */}
+            <section className="space-y-3">
+              <div>
+                <div className="text-xxs font-mono uppercase tracking-wider text-fg-3 mb-1">场景摘要</div>
+                <div className="text-[13px] text-fg-1 leading-relaxed">{state.result.analysis.summary}</div>
               </div>
-              {(state.kind === 'no-config' || state.kind === 'not-opted-in') && (
-                <div className="text-xxs text-fg-3 px-1">
-                  提示：请到 Settings → AI 检查 OpenRouter apiKey 和 opt-in 同意勾选。
-                </div>
-              )}
-              <div className="flex gap-2 justify-end">
-                <button type="button" onClick={handleClose} className="btn-ghost btn-xs">
-                  关闭
-                </button>
-                <button type="button" onClick={analyze} className="btn-secondary btn-xs">
-                  重试
-                </button>
-              </div>
-            </div>
-          )}
-
-          {state.phase === 'result' && (
-            <div className="space-y-5">
-              {/* 主体 / 环境 / 诊断 */}
-              <section className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <div className="text-xxs font-mono uppercase tracking-wider text-fg-3 mb-1">场景摘要</div>
-                  <div className="text-[13px] text-fg-1 leading-relaxed">{state.result.analysis.summary}</div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <div className="text-xxs font-mono uppercase tracking-wider text-fg-3 mb-1">主体</div>
-                    <div className="text-xs text-fg-2">{state.result.analysis.subject}</div>
-                  </div>
-                  <div>
-                    <div className="text-xxs font-mono uppercase tracking-wider text-fg-3 mb-1">环境</div>
-                    <div className="text-xs text-fg-2">{state.result.analysis.environment}</div>
-                  </div>
+                  <div className="text-xxs font-mono uppercase tracking-wider text-fg-3 mb-1">主体</div>
+                  <div className="text-xs text-fg-2">{state.result.analysis.subject}</div>
                 </div>
                 <div>
-                  <div className="text-xxs font-mono uppercase tracking-wider text-fg-3 mb-1">光影诊断</div>
-                  <ul className="text-xs text-fg-2 space-y-1 list-disc list-inside">
-                    {state.result.analysis.diagnosis.map((d) => (
-                      <li key={d}>{d}</li>
-                    ))}
-                  </ul>
+                  <div className="text-xxs font-mono uppercase tracking-wider text-fg-3 mb-1">环境</div>
+                  <div className="text-xs text-fg-2">{state.result.analysis.environment}</div>
                 </div>
-              </section>
+              </div>
+              <div>
+                <div className="text-xxs font-mono uppercase tracking-wider text-fg-3 mb-1">光影诊断</div>
+                <ul className="text-xs text-fg-2 space-y-1 list-disc list-inside">
+                  {state.result.analysis.diagnosis.map((d) => (
+                    <li key={d}>{d}</li>
+                  ))}
+                </ul>
+              </div>
+            </section>
 
-              <div className="divider-metal" />
+            <div className="divider-metal" />
 
-              {/* 参数建议 · 分组展示 */}
-              <section>
-                <div className="flex items-baseline gap-2 mb-3">
-                  <div className="text-xxs font-mono uppercase tracking-wider text-fg-3">
-                    参数建议（可逐项勾选）
-                  </div>
-                  <span className="text-xxs text-fg-4 ml-auto">共 {allItems.length} 项</span>
+            {/* 参数建议 · 分组展示 */}
+            <section>
+              <div className="flex items-baseline gap-2 mb-3">
+                <div className="text-xxs font-mono uppercase tracking-wider text-fg-3">
+                  参数建议（勾选即预览）
                 </div>
+                <span className="text-xxs text-fg-4 ml-auto">共 {allItems.length} 项</span>
+              </div>
 
-                {allItems.length === 0 ? (
-                  <div className="text-xs text-fg-3 italic py-4 text-center">AI 判断无需调整参数。</div>
-                ) : (
-                  <div className="space-y-4">
-                    {suggestionGroups.map((group) => (
-                      <div key={group.id} className="rounded-lg border border-fg-4/30 overflow-hidden">
-                        {/* 分组标题 */}
-                        <div className="flex items-center gap-2 px-3 py-2 bg-bg-1 border-b border-fg-4/20">
-                          <span className="text-sm">{group.icon}</span>
-                          <span className="text-xs font-semibold text-fg-1">{group.label}</span>
-                          <span className="text-xxs text-fg-4 ml-auto">{group.items.length} 项</span>
-                          <button
-                            type="button"
-                            className="text-xxs text-brand-amber hover:text-brand-amber/80 ml-1"
-                            onClick={() => {
-                              const allChecked = group.items.every((it) => selected[it.key])
-                              setSelected((s) => {
-                                const next = { ...s }
-                                for (const it of group.items) next[it.key] = !allChecked
-                                return next
-                              })
-                            }}
+              {allItems.length === 0 ? (
+                <div className="text-xs text-fg-3 italic py-4 text-center">AI 判断无需调整参数。</div>
+              ) : (
+                <div className="space-y-4">
+                  {suggestionGroups.map((group) => (
+                    <div key={group.id} className="rounded-lg border border-fg-4/30 overflow-hidden">
+                      {/* 分组标题 */}
+                      <div className="flex items-center gap-2 px-3 py-2 bg-bg-1 border-b border-fg-4/20">
+                        <span className="text-sm">{group.icon}</span>
+                        <span className="text-xs font-semibold text-fg-1">{group.label}</span>
+                        <span className="text-xxs text-fg-4 ml-auto">{group.items.length} 项</span>
+                        <button
+                          type="button"
+                          className="text-xxs text-brand-amber hover:text-brand-amber/80 ml-1"
+                          onClick={() => handleGroupToggle(group)}
+                        >
+                          {group.items.every((it) => selected[it.key]) ? '取消全选' : '全选'}
+                        </button>
+                      </div>
+                      {/* 分组内的建议项 */}
+                      <div className="divide-y divide-fg-4/10">
+                        {group.items.map((it) => (
+                          <label
+                            key={it.key}
+                            className={cn(
+                              'flex items-start gap-3 px-3 py-2.5 cursor-pointer transition-colors',
+                              selected[it.key]
+                                ? 'bg-brand-amber/5'
+                                : 'hover:bg-fg-4/5',
+                            )}
                           >
-                            {group.items.every((it) => selected[it.key]) ? '取消全选' : '全选'}
-                          </button>
-                        </div>
-                        {/* 分组内的建议项 */}
-                        <div className="divide-y divide-fg-4/10">
-                          {group.items.map((it) => (
-                            <label
-                              key={it.key}
-                              className={cn(
-                                'flex items-start gap-3 px-3 py-2.5 cursor-pointer transition-colors',
-                                selected[it.key]
-                                  ? 'bg-brand-amber/5'
-                                  : 'hover:bg-fg-4/5',
-                              )}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={!!selected[it.key]}
-                                onChange={(e) => setSelected((s) => ({ ...s, [it.key]: e.target.checked }))}
-                                className="mt-0.5 accent-brand-amber"
-                              />
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-baseline gap-2">
-                                  <span className="text-xs font-medium text-fg-1">{it.label}</span>
-                                  {it.value !== undefined && (
-                                    <span
-                                      className={cn(
-                                        'text-xs font-numeric',
-                                        it.value > 0 ? 'text-sem-success' : 'text-sem-info',
-                                      )}
-                                    >
-                                      {fmtSigned(it.value)}
-                                    </span>
-                                  )}
-                                </div>
-                                {it.reason && (
-                                  <div className="text-xxs text-fg-3 mt-0.5 leading-snug">{it.reason}</div>
+                            <input
+                              type="checkbox"
+                              checked={!!selected[it.key]}
+                              onChange={(e) => handleToggle(it.key, e.target.checked)}
+                              className="mt-0.5 accent-brand-amber"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-xs font-medium text-fg-1">{it.label}</span>
+                                {it.value !== undefined && (
+                                  <span
+                                    className={cn(
+                                      'text-xs font-numeric',
+                                      it.value > 0 ? 'text-sem-success' : 'text-sem-info',
+                                    )}
+                                  >
+                                    {fmtSigned(it.value)}
+                                  </span>
                                 )}
                               </div>
-                            </label>
-                          ))}
-                        </div>
+                              {it.reason && (
+                                <div className="text-xxs text-fg-3 mt-0.5 leading-snug">{it.reason}</div>
+                              )}
+                            </div>
+                          </label>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                )}
-              </section>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
 
-              {/* 元信息 */}
-              <div className="text-xxs text-fg-4 font-mono pt-2 border-t border-fg-4/30 flex gap-3 flex-wrap">
-                <span>模型：{state.result.meta.model}</span>
-                <span>耗时：{state.result.meta.latencyMs}ms</span>
-                {state.result.meta.promptTokens !== undefined && (
-                  <span>
-                    tokens：{state.result.meta.promptTokens} in / {state.result.meta.completionTokens ?? 0}{' '}
-                    out
-                  </span>
-                )}
-              </div>
+            {/* 元信息 */}
+            <div className="text-xxs text-fg-4 font-mono pt-2 border-t border-fg-4/30 flex gap-3 flex-wrap">
+              <span>模型：{state.result.meta.model}</span>
+              <span>耗时：{state.result.meta.latencyMs}ms</span>
+              {state.result.meta.promptTokens !== undefined && (
+                <span>
+                  tokens：{state.result.meta.promptTokens} in / {state.result.meta.completionTokens ?? 0}{' '}
+                  out
+                </span>
+              )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
+      </div>
 
-        {/* Footer */}
-        {state.phase === 'result' && (
-          <footer className="h-14 border-t border-fg-4/50 flex items-center px-5 gap-2 bg-bg-1">
+      {/* Footer */}
+      {state.phase === 'result' && (
+        <footer className="border-t border-fg-4/50 flex flex-col bg-bg-1 shrink-0">
+          {/* 全局快捷操作行 */}
+          <div className="flex items-center px-5 pt-2.5 pb-1 gap-2">
+            <button
+              type="button"
+              className="text-xxs text-fg-2 hover:text-fg-1 transition-colors"
+              onClick={() => {
+                const next: Record<string, boolean> = {}
+                for (const it of allItems) next[it.key] = true
+                setSelected(next)
+                queueMicrotask(() => syncPreviewToCanvas(next, allItems))
+              }}
+            >
+              全选
+            </button>
+            <span className="text-fg-4">·</span>
+            <button
+              type="button"
+              className="text-xxs text-fg-2 hover:text-fg-1 transition-colors"
+              onClick={() => {
+                const next: Record<string, boolean> = {}
+                for (const it of allItems) next[it.key] = false
+                setSelected(next)
+                queueMicrotask(() => syncPreviewToCanvas(next, allItems))
+              }}
+            >
+              全不选
+            </button>
+            <span className="text-fg-4">·</span>
+            <button
+              type="button"
+              className="text-xxs text-fg-2 hover:text-fg-1 transition-colors"
+              onClick={() => {
+                const next: Record<string, boolean> = {}
+                for (const it of allItems) next[it.key] = !selected[it.key]
+                setSelected(next)
+                queueMicrotask(() => syncPreviewToCanvas(next, allItems))
+              }}
+            >
+              反选
+            </button>
+            <div className="flex-1" />
             <div className="text-xxs text-fg-3">
               {Object.values(selected).filter(Boolean).length} / {allItems.length} 项已选
             </div>
+          </div>
+          {/* 主操作行 */}
+          <div className="flex items-center px-5 pb-2.5 pt-1 gap-2">
             <div className="flex-1" />
-            <button type="button" onClick={handleClose} className="btn-ghost btn-sm">
+            <button type="button" onClick={handleCancel} className="btn-ghost btn-sm gap-1">
+              <XCircle className="w-3.5 h-3.5" />
               取消
             </button>
             <button
               type="button"
-              onClick={handleApplySelected}
+              onClick={handleApply}
               disabled={Object.values(selected).filter(Boolean).length === 0}
               className={cn(
                 'btn-primary btn-sm',
@@ -526,11 +651,11 @@ function AIAdvisorDialog({ open, photoPath, onClose }: Props) {
               )}
             >
               <CheckCircle2 className="w-4 h-4" />
-              应用已选（可 ⌘Z 撤销）
+              确认应用（可 ⌘Z 撤销）
             </button>
-          </footer>
-        )}
-      </div>
+          </div>
+        </footer>
+      )}
     </div>
   )
 }

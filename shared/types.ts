@@ -11,6 +11,7 @@ export type FilterCategory =
   | 'slide' // 反转片
   | 'cinema' // 电影胶片
   | 'instant' // 拍立得
+  | 'oil-painting' // 油画质感
   | 'digital' // 数码模拟
   | 'custom' // 用户自定义
   | 'extracted' // 从参考图提取
@@ -85,6 +86,14 @@ export interface VignetteParams {
   feather: number // 0..100
 }
 
+/** 裁切参数（比例值 0-1，相对原图尺寸） */
+export interface CropParams {
+  x: number      // 裁切起点 x（0-1）
+  y: number      // 裁切起点 y（0-1）
+  width: number  // 裁切宽度（0-1）
+  height: number // 裁切高度（0-1）
+}
+
 /** 滤镜完整 Pipeline */
 export interface FilterPipeline {
   whiteBalance?: WhiteBalanceParams
@@ -102,6 +111,8 @@ export interface FilterPipeline {
   lut?: string | null
   /** LUT 强度 0..100 */
   lutIntensity?: number
+  /** 裁切（比例值 0-1） */
+  crop?: CropParams
 }
 
 /** 滤镜对象（内置/用户/提取统一结构） */
@@ -382,6 +393,13 @@ export interface IpcApi {
    */
   'photo:remove': (ids: string[]) => Promise<{ removed: number; orphanedThumbs: number }>
 
+  /** 单图导出：原图 + pipeline CPU 渲染 → 弹出保存对话框 → 写文件 */
+  'photo:exportSingle': (
+    photoPath: string,
+    pipeline: FilterPipeline | null,
+    options: { longEdge: number | null; quality: number; rotation?: number; flipH?: boolean; flipV?: boolean },
+  ) => Promise<string | null>
+
   // 预览
   'preview:render': (
     photoPath: string,
@@ -441,7 +459,7 @@ export interface IpcApi {
    *
    * 失败策略：任一环节失败返回 AIAnalysisResult.ok=false + 错误分类；UI 展示友好文案。
    */
-  'llm:analyzePhoto': (photoPath: string) => Promise<AIAnalysisResult>
+  'llm:analyzePhoto': (photoPath: string, activeFilterName: string | null, activeFilterCategory: string | null) => Promise<AIAnalysisResult>
 }
 
 // ============ LLM 配置（M5-LLM-A） ============

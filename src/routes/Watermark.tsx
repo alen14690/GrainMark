@@ -1,4 +1,4 @@
-import { Camera, Stamp, Upload as UploadIcon } from 'lucide-react'
+import { Camera, Check, Stamp, Upload as UploadIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { WatermarkStyle, WatermarkTemplate, WatermarkTemplateId } from '../../shared/types'
 import { thumbSrc } from '../lib/grainUrl'
@@ -126,16 +126,49 @@ export default function Watermark() {
 
           <div>
             <div className="text-[11px] text-fg-2 uppercase tracking-wider font-mono mb-1.5">Logo (PNG)</div>
-            <button type="button" className="btn-secondary w-full text-[11.5px]">
+            <button
+              type="button"
+              className="btn-secondary w-full text-[11.5px]"
+              onClick={async () => {
+                const paths = await ipc('dialog:selectFiles', {
+                  filters: [{ name: 'Image', extensions: ['png', 'jpg', 'jpeg', 'svg'] }],
+                  multi: false,
+                })
+                if (paths.length > 0 && style) {
+                  setStyle({ ...style, showLogo: true, logoPath: paths[0] })
+                }
+              }}
+            >
               <UploadIcon className="w-3.5 h-3.5" />
-              上传 Logo
+              {style?.logoPath ? '更换 Logo' : '上传 Logo'}
             </button>
+            {style?.logoPath && (
+              <div className="text-[10.5px] text-sem-success mt-1">已选择 Logo</div>
+            )}
             <div className="text-[10.5px] text-fg-3 mt-1.5 leading-relaxed">
               ⚠ 请上传你有权使用的 Logo。应用不内置任何受商标保护的品牌 Logo。
             </div>
           </div>
 
-          <button type="button" className="btn-primary w-full">应用到当前图</button>
+          <button
+            type="button"
+            className="btn-primary w-full"
+            onClick={async () => {
+              if (!refPhoto?.path || !style) return
+              try {
+                const resultUrl = await ipc('watermark:render', refPhoto.path, style)
+                // 打开预览（用新 tab 或弹窗显示渲染结果）
+                if (resultUrl) {
+                  window.open(resultUrl, '_blank', 'width=800,height=600')
+                }
+              } catch (err) {
+                window.alert(`水印渲染失败：${(err as Error).message}`)
+              }
+            }}
+          >
+            <Check className="w-3.5 h-3.5" />
+            应用到当前图
+          </button>
         </aside>
       </div>
     </div>

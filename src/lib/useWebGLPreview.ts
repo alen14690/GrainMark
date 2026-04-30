@@ -358,7 +358,7 @@ export function useWebGLPreview(
   useEffect(() => {
     if (!canvasRef.current) return
     // P0-1：preserveDrawingBuffer=false —— 让合成器走 swap chain 快路径，
-    //       省每帧 2-5ms blit。readPixels 改为在 draw 后同 tick 读，不需要保留
+    //       省每帧 2-5ms blit。导出改走主进程 CPU 渲染，不再依赖 canvas.toDataURL()
     const ctx = new GLContext(canvasRef.current, { preserveDrawingBuffer: false })
     if (!ctx.ok) {
       setStatus('unsupported')

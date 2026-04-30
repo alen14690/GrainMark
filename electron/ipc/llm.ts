@@ -31,7 +31,13 @@ export function registerLLMIpc(): void {
   registerIpc('llm:listModels', async () => listModels())
 
   // 图像分析：photoPath 必须过 PathGuard（防路径穿越到用户未授权目录）
-  registerIpc('llm:analyzePhoto', async (photoPath: unknown) => analyzePhoto(photoPath as string), {
+  registerIpc('llm:analyzePhoto', async (photoPath: unknown, filterName: unknown, filterCategory: unknown) => {
+    return analyzePhoto(
+      photoPath as string,
+      (filterName as string | null) ?? undefined,
+      (filterCategory as string | null) ?? undefined,
+    )
+  }, {
     pathFields: ['arg'],
   })
 }

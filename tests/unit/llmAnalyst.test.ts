@@ -66,7 +66,7 @@ beforeEach(async () => {
 // ==========================================================================
 
 describe('clampAdjustments · 防 HDR 塑料感与无效值', () => {
-  it('LLM 返回 ±80 越界 → 应 clamp 到 ±40（tone/clarity/saturation/vibrance）', () => {
+  it('LLM 返回越界 → tone.exposure clamp 到 ±3（EV），其余 clamp 到 ±40', () => {
     const raw: AISuggestedAdjustments = {
       tone: { exposure: 80, contrast: -75, highlights: 99, shadows: -90, whites: 60, blacks: -55 },
       clarity: 77,
@@ -74,7 +74,7 @@ describe('clampAdjustments · 防 HDR 塑料感与无效值', () => {
       vibrance: 44,
     }
     const out = analyst.__test__.clampAdjustments(raw)
-    expect(out.tone?.exposure).toBe(40)
+    expect(out.tone?.exposure).toBe(3)
     expect(out.tone?.contrast).toBe(-40)
     expect(out.tone?.highlights).toBe(40)
     expect(out.tone?.shadows).toBe(-40)
@@ -120,12 +120,12 @@ describe('clampAdjustments · 防 HDR 塑料感与无效值', () => {
     expect(out.vibrance).toBeUndefined()
   })
 
-  it('tone 部分字段有效 + 部分为 0 → 只保留非零字段', () => {
+  it('tone 部分字段有效 + 部分为 0 → 只保留非零字段（exposure clamp 到 ±3）', () => {
     const raw: AISuggestedAdjustments = {
-      tone: { exposure: 15, contrast: 0, shadows: -20, highlights: 0 },
+      tone: { exposure: 1.5, contrast: 0, shadows: -20, highlights: 0 },
     }
     const out = analyst.__test__.clampAdjustments(raw)
-    expect(out.tone).toEqual({ exposure: 15, shadows: -20 })
+    expect(out.tone).toEqual({ exposure: 1.5, shadows: -20 })
   })
 
   it('colorGrading 仅有 hue 但 s=0 且 l=0 → 视为无效（hue 单独无意义）', () => {
@@ -274,15 +274,21 @@ describe('LLMResponseSchema · M5-LLM-C 新字段', () => {
     expect(ok.success).toBe(true)
   })
 
-  it('hsl 含非法通道名 → strict 拒绝', async () => {
+  it('hsl 含非法通道名 → schema 通过但 clamp 过滤掉（strip 模式剥离未知 key）', async () => {
     const m = await import('../../electron/services/llm/analyst')
-    const bad = m.__test__.LLMResponseSchema.safeParse({
+    // schema 层 strip 模式：不拒绝，但多余字段被丢弃
+    const result = m.__test__.LLMResponseSchema.safeParse({
       analysis: {
         summary: '测试', subject: '测试', environment: '测试', diagnosis: ['测试'],
       },
       adjustments: { hsl: { badChannel: { h: 5 } } },
     })
-    expect(bad.success).toBe(false)
+    // strip 模式下通过 schema（badChannel 被剥离）
+    expect(result.success).toBe(true)
+    if (result.success) {
+      // badChannel 应被 strip 掉
+      expect((result.data.adjustments.hsl as Record<string, unknown>)?.badChannel).toBeUndefined()
+    }
   })
 })
 
@@ -314,7 +320,7 @@ describe('LLMResponseSchema · 拒绝异常 LLM 输出', () => {
     expect(bad.success).toBe(false)
   })
 
-  it('analysis 缺 subject → 拒绝（strict + min 1）', async () => {
+  it('analysis 缺 subject → 拒绝（required 字段）', async () => {
     const m = await import('../../electron/services/llm/analyst')
     const bad = m.__test__.LLMResponseSchema.safeParse({
       analysis: { summary: '一张照片', environment: '室内', diagnosis: ['主体偏暗'] },
@@ -323,9 +329,9 @@ describe('LLMResponseSchema · 拒绝异常 LLM 输出', () => {
     expect(bad.success).toBe(false)
   })
 
-  it('adjustments 里塞了未知字段 → 拒绝（strict）', async () => {
+  it('adjustments 里塞了未知字段 → strip 模式通过但字段被剥离', async () => {
     const m = await import('../../electron/services/llm/analyst')
-    const bad = m.__test__.LLMResponseSchema.safeParse({
+    const result = m.__test__.LLMResponseSchema.safeParse({
       analysis: {
         summary: '一张照片',
         subject: '人',
@@ -334,7 +340,11 @@ describe('LLMResponseSchema · 拒绝异常 LLM 输出', () => {
       },
       adjustments: { unknownField: 42 },
     })
-    expect(bad.success).toBe(false)
+    // strip 模式：通过 schema，未知字段被剥离
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect((result.data.adjustments as Record<string, unknown>).unknownField).toBeUndefined()
+    }
   })
 })
 

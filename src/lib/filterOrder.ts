@@ -59,9 +59,23 @@ export const CATEGORY_LABEL: Record<FilterCategory, string> = {
   slide: '反转片',
   cinema: '电影胶片',
   instant: '拍立得',
+  'oil-painting': '油画质感',
   digital: '数码',
   custom: '自定义',
   extracted: '已提取',
+}
+
+/** Category 在组内的展示顺序（数字越小越靠前） */
+const CATEGORY_PRIORITY: Record<FilterCategory, number> = {
+  'oil-painting': 1,
+  'negative-color': 2,
+  'negative-bw': 3,
+  slide: 4,
+  cinema: 5,
+  instant: 6,
+  digital: 7,
+  custom: 8,
+  extracted: 9,
 }
 
 /** 分组内二级子分组（同 category 紧挨） */
@@ -139,11 +153,11 @@ export function groupAndSortFilters(filters: readonly FilterPreset[]): FilterGro
         filters: arr,
       })
     }
-    // Subgroup 之间按"组内最高 popularity"降序（更火的 category 先出现）
+    // Subgroup 之间按 category 优先级排序（胶片类在前，油画在中，数码在后）
     subgroups.sort((a, b) => {
-      const ap = a.filters[0]?.popularity ?? 0
-      const bp = b.filters[0]?.popularity ?? 0
-      return bp - ap
+      const ap = CATEGORY_PRIORITY[a.category] ?? 99
+      const bp = CATEGORY_PRIORITY[b.category] ?? 99
+      return ap - bp
     })
     groups.push({
       meta,

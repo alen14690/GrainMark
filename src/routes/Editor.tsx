@@ -7,11 +7,12 @@
  *   - WebGL 渲染 : useWebGLPreview，完整 10-shader GPU pipeline + 实时直方图
  *   - 右栏 Tab   : 滤镜列表 | 参数调整（滑块）
  */
-import { Download, Redo2, RotateCcw, Save, Sliders, Sparkles, SplitSquareHorizontal, Undo2, Wand2 } from 'lucide-react'
-import { memo, useEffect, useMemo, useState } from 'react'
+import { Crop, Download, Eye, FlipHorizontal2, FlipVertical2, Maximize, Redo2, RotateCcw, RotateCw, Save, Sliders, Sparkles, SplitSquareHorizontal, Undo2, Wand2, ZoomIn } from 'lucide-react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AdjustmentsPanel } from '../components/AdjustmentsPanel'
 import AIAdvisorDialog from '../components/AIAdvisorDialog'
+import CropOverlay from '../components/CropOverlay'
 import { Histogram, ScoreBar, ValueBadge, cn } from '../design'
 import { type FilterGroup, groupAndSortFilters } from '../lib/filterOrder'
 import { ipc } from '../lib/ipc'
@@ -37,6 +38,20 @@ export default function Editor() {
   const [showOriginal, setShowOriginal] = useState(false)
   const [showAIAdvisor, setShowAIAdvisor] = useState(false)
   const [rightTab, setRightTab] = useState<RightPanelTab>('filters')
+  /** 持久 Before/After 切换（区别于 showOriginal 的 press-to-hold） */
+  const [compareMode, setCompareMode] = useState(false)
+  /** Viewport transform（本地状态，不需要 undo） */
+  const [viewport, setViewport] = useState({ zoom: 1, panX: 0, panY: 0 })
+  /** 图片旋转 & 翻转（影响输出，需要 undo） */
+  const [rotation, setRotation] = useState<0 | 90 | 180 | 270>(0)
+  const [flipH, setFlipH] = useState(false)
+  const [flipV, setFlipV] = useState(false)
+  /** 拖拽平移状态 */
+  const isPanning = useRef(false)
+  const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 })
+  /** 裁切模式 */
+  const [cropMode, setCropMode] = useState(false)
+  const canvasContainerRef = useRef<HTMLDivElement>(null)
 
   const activeFilter = filters.find((f) => f.id === activeFilterId)
 
@@ -59,6 +74,7 @@ export default function Editor() {
   const canUndoNow = useEditStore((s) => s.history.length > 0)
   const canRedoNow = useEditStore((s) => s.future.length > 0)
   const commitHistory = useEditStore((s) => s.commitHistory)
+  const setCrop = useEditStore((s) => s.setCrop)
   const undo = useEditStore((s) => s.undo)
   const redo = useEditStore((s) => s.redo)
 
@@ -103,6 +119,50 @@ export default function Editor() {
     window.addEventListener('keydown', handler, { capture: true })
     return () => window.removeEventListener('keydown', handler, { capture: true })
   }, [undo, redo])
+
+  // 额外快捷键：\ Before/After、⌘0 Fit、⌘1 100%、R 旋转、H 翻转
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+
+      const grainPlatform = typeof window !== 'undefined' ? window.grain?.platform : undefined
+      const isMac = grainPlatform !== undefined ? grainPlatform === 'darwin' : /Mac|iPod|iPhone|iPad/.test(navigator.platform)
+      const isCmdOrCtrl = isMac ? e.metaKey : e.ctrlKey
+
+      // \ = Before/After toggle
+      if (e.key === '\\' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault()
+        setCompareMode((m) => !m)
+        return
+      }
+      // ⌘0 = Fit to window
+      if (isCmdOrCtrl && e.key === '0') {
+        e.preventDefault()
+        setViewport({ zoom: 1, panX: 0, panY: 0 })
+        return
+      }
+      // ⌘1 = 100% zoom (actual pixels)
+      if (isCmdOrCtrl && e.key === '1') {
+        e.preventDefault()
+        setViewport((v) => ({ ...v, zoom: 3, panX: 0, panY: 0 }))
+        return
+      }
+      // R = 旋转 90°（无修饰键）
+      if (e.key === 'r' && !isCmdOrCtrl && !e.altKey) {
+        e.preventDefault()
+        setRotation((r) => ((r + 90) % 360) as 0 | 90 | 180 | 270)
+        return
+      }
+      // H = 水平翻转（无修饰键）
+      if (e.key === 'h' && !isCmdOrCtrl && !e.altKey) {
+        e.preventDefault()
+        setFlipH((f) => !f)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   const dirty = hasDirtyEdits(currentPipeline, baselinePipeline, dirtyFlag)
 
@@ -170,8 +230,30 @@ export default function Editor() {
     }
   }
 
-  // ---- WebGL 预览：按 showOriginal 短路 pipeline ----
-  const renderPipeline = showOriginal ? null : currentPipeline
+  /** 导出当前编辑结果为全分辨率图片 */
+  const [exportSize, setExportSize] = useState<'original' | '4000' | '2400' | '1600'>('original')
+  const handleExport = async () => {
+    if (!photo?.path) return
+    try {
+      const longEdge = exportSize === 'original' ? null : Number(exportSize)
+      const result = await ipc('photo:exportSingle', photo.path, currentPipeline, {
+        longEdge,
+        quality: 92,
+        rotation,
+        flipH,
+        flipV,
+      })
+      if (result) {
+        // 导出成功
+      }
+    } catch (err) {
+      console.error('[export]', err)
+      window.alert(`导出失败：${(err as Error).message}`)
+    }
+  }
+
+  // ---- WebGL 预览：按 showOriginal / compareMode 短路 pipeline ----
+  const renderPipeline = (showOriginal || compareMode) ? null : currentPipeline
   const webgl = useWebGLPreview(previewUrl, renderPipeline)
 
   // GPU-only 策略（2026-04-26 起）：
@@ -213,6 +295,42 @@ export default function Editor() {
       alive = false
     }
   }, [photoPath])
+
+  // ---- Viewport: 滚轮缩放 ----
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault()
+    const factor = e.ctrlKey ? 0.01 : 0.002 // trackpad 捏合用 ctrlKey
+    setViewport((v) => {
+      const newZoom = Math.max(0.25, Math.min(8, v.zoom * (1 - e.deltaY * factor)))
+      // 缩小到 fit 以下时重置 pan
+      if (newZoom <= 1) return { zoom: newZoom, panX: 0, panY: 0 }
+      return { ...v, zoom: newZoom }
+    })
+  }, [])
+
+  // ---- Viewport: 拖拽平移 ----
+  const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
+    if (viewport.zoom <= 1) return // fit 模式下不可 pan
+    isPanning.current = true
+    panStart.current = { x: e.clientX, y: e.clientY, panX: viewport.panX, panY: viewport.panY }
+    e.preventDefault()
+  }, [viewport.zoom, viewport.panX, viewport.panY])
+
+  const handleCanvasMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isPanning.current) return
+    const dx = e.clientX - panStart.current.x
+    const dy = e.clientY - panStart.current.y
+    setViewport((v) => ({ ...v, panX: panStart.current.panX + dx, panY: panStart.current.panY + dy }))
+  }, [])
+
+  const handleCanvasMouseUp = useCallback(() => {
+    isPanning.current = false
+  }, [])
+
+  // 双击画布切换 Fit ↔ 放大
+  const handleCanvasDoubleClick = useCallback(() => {
+    setViewport((v) => v.zoom > 1 ? { zoom: 1, panX: 0, panY: 0 } : { zoom: 3, panX: 0, panY: 0 })
+  }, [])
 
   if (!photo) {
     return (
@@ -260,6 +378,67 @@ export default function Editor() {
           >
             <SplitSquareHorizontal className="w-3.5 h-3.5" />
           </button>
+          <button
+            type="button"
+            onClick={() => setCompareMode((m) => !m)}
+            className={cn('btn-ghost btn-xs', compareMode && 'bg-brand-amber/20 text-brand-amber')}
+            title="Before/After 切换 (\)"
+          >
+            <Eye className="w-3.5 h-3.5" />
+          </button>
+          <div className="divider-metal-v mx-1" />
+          {/* 旋转 & 翻转 */}
+          <button
+            type="button"
+            onClick={() => setRotation((r) => ((r + 90) % 360) as 0 | 90 | 180 | 270)}
+            className="btn-ghost btn-xs"
+            title="旋转 90° (R)"
+          >
+            <RotateCw className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setFlipH((f) => !f)}
+            className={cn('btn-ghost btn-xs', flipH && 'bg-fg-4/20')}
+            title="水平翻转 (H)"
+          >
+            <FlipHorizontal2 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setFlipV((f) => !f)}
+            className={cn('btn-ghost btn-xs', flipV && 'bg-fg-4/20')}
+            title="垂直翻转"
+          >
+            <FlipVertical2 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setCropMode((m) => !m)}
+            className={cn('btn-ghost btn-xs', cropMode && 'bg-brand-amber/20 text-brand-amber')}
+            title="裁切 (C)"
+          >
+            <Crop className="w-3.5 h-3.5" />
+          </button>
+          <div className="divider-metal-v mx-1" />
+          {/* 缩放控制 */}
+          <button
+            type="button"
+            onClick={() => setViewport({ zoom: 1, panX: 0, panY: 0 })}
+            className={cn('btn-ghost btn-xs', viewport.zoom === 1 && 'text-brand-amber')}
+            title="适应窗口 (⌘0)"
+          >
+            <Maximize className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewport({ zoom: 3, panX: 0, panY: 0 })}
+            className={cn('btn-ghost btn-xs', viewport.zoom === 3 && 'text-brand-amber')}
+            title="放大 100% (⌘1)"
+          >
+            <ZoomIn className="w-3.5 h-3.5" />
+          </button>
+          <span className="text-xxs font-numeric text-fg-3 w-10 text-center">{Math.round(viewport.zoom * 100)}%</span>
           {dirty && (
             <button
               type="button"
@@ -291,7 +470,18 @@ export default function Editor() {
             <Save className="w-3.5 h-3.5" />
             保存预设
           </button>
-          <button type="button" className="btn-primary btn-xs">
+          <select
+            value={exportSize}
+            onChange={(e) => setExportSize(e.target.value as typeof exportSize)}
+            className="text-xxs bg-bg-1 border border-fg-4/40 rounded px-1.5 py-1 text-fg-2"
+            title="导出尺寸（长边像素）"
+          >
+            <option value="original">原图尺寸</option>
+            <option value="4000">长边 4000px</option>
+            <option value="2400">长边 2400px</option>
+            <option value="1600">长边 1600px</option>
+          </select>
+          <button type="button" onClick={handleExport} className="btn-primary btn-xs">
             <Download className="w-3.5 h-3.5" />
             导出
           </button>
@@ -303,8 +493,30 @@ export default function Editor() {
         </div>
 
         {/* 画布 */}
-        <div className="flex-1 flex items-center justify-center p-6 overflow-hidden">
-          <div className="relative max-w-full max-h-full">
+        <div
+          ref={canvasContainerRef}
+          className="flex-1 flex items-center justify-center p-6 overflow-hidden relative"
+          style={{ cursor: viewport.zoom > 1 ? (isPanning.current ? 'grabbing' : 'grab') : 'default' }}
+          onWheel={handleWheel}
+          onMouseDown={handleCanvasMouseDown}
+          onMouseMove={handleCanvasMouseMove}
+          onMouseUp={handleCanvasMouseUp}
+          onMouseLeave={handleCanvasMouseUp}
+          onDoubleClick={handleCanvasDoubleClick}
+        >
+          <div
+            className="relative max-w-full max-h-full transition-transform duration-75"
+            style={{
+              transform: [
+                `translate(${viewport.panX}px, ${viewport.panY}px)`,
+                `scale(${viewport.zoom})`,
+                `rotate(${rotation}deg)`,
+                `scaleX(${flipH ? -1 : 1})`,
+                `scaleY(${flipV ? -1 : 1})`,
+              ].join(' '),
+              transformOrigin: 'center center',
+            }}
+          >
             {/* WebGL 画布（主路径） */}
             <canvas
               ref={webgl.canvasRef}
@@ -348,6 +560,11 @@ export default function Editor() {
                 <ValueBadge value="ORIGINAL" variant="amber" size="sm" />
               </div>
             )}
+            {compareMode && !showOriginal && (
+              <div className="absolute top-3 left-3">
+                <ValueBadge value="BEFORE" variant="amber" size="sm" />
+              </div>
+            )}
             {webgl.status === 'ready' && <GpuBadge />}
             {webgl.status === 'unsupported' && (
               <div className="absolute bottom-3 right-3">
@@ -369,6 +586,24 @@ export default function Editor() {
             )}
           </div>
         </div>
+
+        {/* 裁切覆盖层 */}
+        {cropMode && canvasContainerRef.current && (
+          <div className="absolute inset-6" style={{ pointerEvents: 'auto' }}>
+            <CropOverlay
+              containerWidth={canvasContainerRef.current.clientWidth - 48}
+              containerHeight={canvasContainerRef.current.clientHeight - 48}
+              initial={currentPipeline?.crop ?? null}
+              onConfirm={(crop) => {
+                commitHistory('裁切前')
+                setCrop(crop)
+                commitHistory('裁切')
+                setCropMode(false)
+              }}
+              onCancel={() => setCropMode(false)}
+            />
+          </div>
+        )}
 
         {/* EXIF 金属条 */}
         <div className="h-12 border-t border-fg-4/50 px-4 flex items-center gap-3 text-xs">
@@ -468,6 +703,8 @@ export default function Editor() {
       <AIAdvisorDialog
         open={showAIAdvisor}
         photoPath={photo?.path ?? null}
+        activeFilterName={activeFilter?.name ?? null}
+        activeFilterCategory={activeFilter?.category ?? null}
         onClose={() => setShowAIAdvisor(false)}
       />
     </div>

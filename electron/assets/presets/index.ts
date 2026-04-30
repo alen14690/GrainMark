@@ -518,4 +518,109 @@ export const BUILTIN_PRESETS: FilterPreset[] = [
     },
     ['bright', 'airy', 'japanese'],
   ),
+
+  // —— 油画质感系列 ——
+  p(
+    'oil-painting-classic',
+    '古典油画',
+    'oil-painting',
+    88,
+    {
+      tone: { exposure: 0, contrast: -15, highlights: -20, shadows: 12, whites: -10, blacks: 8 },
+      curves: {
+        rgb: [
+          { x: 0, y: 20 }, { x: 64, y: 72 }, { x: 128, y: 135 }, { x: 192, y: 200 }, { x: 255, y: 235 },
+        ],
+        r: [{ x: 0, y: 8 }, { x: 128, y: 132 }, { x: 255, y: 248 }],
+      },
+      hsl: {
+        orange: { h: 5, s: -8, l: 3 },
+        yellow: { h: 8, s: -12, l: 0 },
+        green: { h: 10, s: -20, l: -5 },
+        blue: { h: 0, s: -25, l: -3 },
+      },
+      colorGrading: {
+        shadows: { h: 35, s: 12, l: -3 },
+        midtones: { h: 38, s: 5, l: 0 },
+        highlights: { h: 45, s: 6, l: 2 },
+        blending: 45,
+        balance: 0,
+      },
+      clarity: -12,
+      saturation: -18,
+      vibrance: 8,
+      grain: { amount: 12, size: 2.0, roughness: 0.3 },
+      halation: { amount: 8, threshold: 210, radius: 10 },
+      vignette: { amount: -18, midpoint: 55, roundness: 0, feather: 65 },
+    },
+    ['oil-painting', 'classic', 'warm', 'portrait'],
+  ),
+
+  p(
+    'oil-painting-rembrandt',
+    '伦勃朗光影',
+    'oil-painting',
+    82,
+    {
+      tone: { exposure: -0.3, contrast: -10, highlights: -25, shadows: 8, whites: -15, blacks: 12 },
+      curves: {
+        rgb: [
+          { x: 0, y: 25 }, { x: 80, y: 65 }, { x: 128, y: 120 }, { x: 200, y: 190 }, { x: 255, y: 225 },
+        ],
+      },
+      hsl: {
+        orange: { h: 3, s: -5, l: 5 },
+        yellow: { h: 5, s: -15, l: -3 },
+        blue: { h: 0, s: -30, l: -8 },
+      },
+      colorGrading: {
+        shadows: { h: 30, s: 18, l: -5 },
+        midtones: { h: 35, s: 8, l: -2 },
+        highlights: { h: 40, s: 10, l: 3 },
+        blending: 50,
+        balance: -10,
+      },
+      clarity: -15,
+      saturation: -22,
+      vibrance: 5,
+      grain: { amount: 10, size: 2.2, roughness: 0.25 },
+      vignette: { amount: -35, midpoint: 40, roundness: -10, feather: 55 },
+    },
+    ['oil-painting', 'dark', 'dramatic', 'portrait'],
+  ),
+
+  p(
+    'oil-painting-impressionist',
+    '印象派光彩',
+    'oil-painting',
+    85,
+    {
+      tone: { exposure: 0.2, contrast: -12, highlights: -15, shadows: 15, whites: -8, blacks: 5 },
+      curves: {
+        rgb: [
+          { x: 0, y: 15 }, { x: 64, y: 75 }, { x: 128, y: 138 }, { x: 192, y: 205 }, { x: 255, y: 240 },
+        ],
+      },
+      hsl: {
+        orange: { h: 5, s: -5, l: 3 },
+        yellow: { h: 5, s: -8, l: 5 },
+        green: { h: 8, s: -15, l: 3 },
+        blue: { h: -5, s: -10, l: 5 },
+        purple: { h: -5, s: -8, l: 3 },
+      },
+      colorGrading: {
+        shadows: { h: 220, s: 8, l: 2 },
+        midtones: { h: 140, s: 5, l: 2 },
+        highlights: { h: 55, s: 10, l: 5 },
+        blending: 40,
+        balance: 5,
+      },
+      clarity: -10,
+      saturation: -12,
+      vibrance: 12,
+      grain: { amount: 8, size: 1.8, roughness: 0.35 },
+      halation: { amount: 10, threshold: 200, radius: 12 },
+    },
+    ['oil-painting', 'bright', 'pastel', 'landscape'],
+  ),
 ]

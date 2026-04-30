@@ -19,6 +19,7 @@
  *   - 图片降到 768px（防隐私信息 OCR 泄漏 + 控制上传流量）
  *   - LLM 输出**不可信任**：clamp 所有数值、schema 拒绝未知字段
  */
+import { promises as fsp } from 'node:fs'
 import path from 'node:path'
 import { z } from 'zod'
 import type { AIAnalysisResult, AISuggestedAdjustments } from '../../../shared/types.js'
@@ -31,7 +32,7 @@ import { getApiKeyForInternalUse, getPublicConfig } from './configStore.js'
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1'
 const CHAT_ENDPOINT = `${OPENROUTER_BASE}/chat/completions`
 
-const ANALYZE_TIMEOUT_MS = 30_000
+const ANALYZE_TIMEOUT_MS = 360_000
 /** 降采样边长；768 足够让 vision 模型识别主体，又不会上传大量数据 */
 const DOWNSAMPLE_SIDE = 768
 /** JPEG 质量（65 是 vision 模型能很清楚解读的下限，再低会糊） */
@@ -39,7 +40,9 @@ const DOWNSAMPLE_QUALITY = 65
 
 // ---- clamp 硬约束（不信任 LLM 输出）----
 
-/** tone.* 字段上下限（和 editStore / slider 的实际范围一致） */
+/** tone.exposure 字段上下限（EV 单位，和 slider -5~+5 一致） */
+const EXPOSURE_RANGE = 3
+/** tone.* 其余字段上下限（contrast/highlights/shadows/whites/blacks，-100~100 中取保守值） */
 const TONE_RANGE = 40
 /** whiteBalance.* 字段上下限 */
 const WB_RANGE = 30
@@ -76,7 +79,9 @@ function clampAdjustments(raw: AISuggestedAdjustments): AISuggestedAdjustments {
     ]
     for (const [k, src] of pairs) {
       if (typeof src === 'number') {
-        const v = clamp(src, -TONE_RANGE, TONE_RANGE)
+        // exposure 是 EV 单位（±5），其余字段是 ±100 量纲取保守值 ±40
+        const range = k === 'exposure' ? EXPOSURE_RANGE : TONE_RANGE
+        const v = clamp(src, -range, range)
         if (v !== 0) tone[k] = v
       }
     }
@@ -193,114 +198,111 @@ function clampAdjustments(raw: AISuggestedAdjustments): AISuggestedAdjustments {
   return out
 }
 
-// ---- LLM 返回 JSON 的 Zod schema（strict，不让 LLM 塞未知字段）----
+// ---- LLM 返回 JSON 的 Zod schema ----
 
-const HSLTripleSchema = z
-  .object({
-    h: z.number().optional(),
-    s: z.number().optional(),
-    l: z.number().optional(),
-  })
-  .strict()
+/**
+ * LLM 输出 JSON 的 Zod schema。
+ *
+ * 设计原则：**宽进严出**。
+ *   - 用 .strip()（Zod 默认行为）自动剥离 LLM 多返回的未知字段
+ *     而不是用 .strict() 直接拒绝。Vision 模型经常附加多余字段
+ *     （如 "sharpness", "denoise", "confidence" 等），.strict() 会
+ *     导致整个校验失败。
+ *   - 关键字段仍通过类型校验保证正确性，再由 clampAdjustments() 做
+ *     数值安全约束。
+ */
 
-const CurvePointSchema = z.object({ x: z.number(), y: z.number() }).strict()
+const HSLTripleSchema = z.object({
+  h: z.number().optional(),
+  s: z.number().optional(),
+  l: z.number().optional(),
+})
 
-const AdjustmentsSchema = z
-  .object({
-    tone: z
-      .object({
-        exposure: z.number().optional(),
-        contrast: z.number().optional(),
-        highlights: z.number().optional(),
-        shadows: z.number().optional(),
-        whites: z.number().optional(),
-        blacks: z.number().optional(),
-      })
-      .strict()
-      .optional(),
-    whiteBalance: z.object({ temp: z.number().optional(), tint: z.number().optional() }).strict().optional(),
-    clarity: z.number().optional(),
-    saturation: z.number().optional(),
-    vibrance: z.number().optional(),
-    colorGrading: z
-      .object({
-        shadows: HSLTripleSchema.optional(),
-        highlights: HSLTripleSchema.optional(),
-        blending: z.number().optional(),
-      })
-      .strict()
-      .optional(),
-    // M5-LLM-C：曲线（RGB + 通道）
-    curves: z
-      .object({
-        rgb: z.array(CurvePointSchema).max(8).optional(),
-        r: z.array(CurvePointSchema).max(8).optional(),
-        g: z.array(CurvePointSchema).max(8).optional(),
-        b: z.array(CurvePointSchema).max(8).optional(),
-      })
-      .strict()
-      .optional(),
-    // M5-LLM-C：HSL 8 通道
-    hsl: z
-      .object({
-        red: HSLTripleSchema.optional(),
-        orange: HSLTripleSchema.optional(),
-        yellow: HSLTripleSchema.optional(),
-        green: HSLTripleSchema.optional(),
-        aqua: HSLTripleSchema.optional(),
-        blue: HSLTripleSchema.optional(),
-        purple: HSLTripleSchema.optional(),
-        magenta: HSLTripleSchema.optional(),
-      })
-      .strict()
-      .optional(),
-    // M5-LLM-C：胶片颗粒
-    grain: z
-      .object({
-        amount: z.number().optional(),
-        size: z.number().optional(),
-        roughness: z.number().optional(),
-      })
-      .strict()
-      .optional(),
-    // M5-LLM-C：高光溢光
-    halation: z
-      .object({
-        amount: z.number().optional(),
-        threshold: z.number().optional(),
-        radius: z.number().optional(),
-      })
-      .strict()
-      .optional(),
-    // M5-LLM-C：暗角 / 视觉引导
-    vignette: z
-      .object({
-        amount: z.number().optional(),
-        midpoint: z.number().optional(),
-        roundness: z.number().optional(),
-        feather: z.number().optional(),
-      })
-      .strict()
-      .optional(),
-    reasons: z.record(z.string(), z.string()).optional(),
-  })
-  .strict()
+const CurvePointSchema = z.object({ x: z.number(), y: z.number() })
 
-const AnalysisSchema = z
-  .object({
-    summary: z.string().min(5).max(600),
-    subject: z.string().min(2).max(200),
-    environment: z.string().min(2).max(300),
-    diagnosis: z.array(z.string().min(2).max(200)).min(1).max(8),
-  })
-  .strict()
+const AdjustmentsSchema = z.object({
+  tone: z
+    .object({
+      exposure: z.number().optional(),
+      contrast: z.number().optional(),
+      highlights: z.number().optional(),
+      shadows: z.number().optional(),
+      whites: z.number().optional(),
+      blacks: z.number().optional(),
+    })
+    .optional(),
+  whiteBalance: z.object({ temp: z.number().optional(), tint: z.number().optional() }).optional(),
+  clarity: z.number().optional(),
+  saturation: z.number().optional(),
+  vibrance: z.number().optional(),
+  colorGrading: z
+    .object({
+      shadows: HSLTripleSchema.optional(),
+      highlights: HSLTripleSchema.optional(),
+      blending: z.number().optional(),
+    })
+    .optional(),
+  // M5-LLM-C：曲线（RGB + 通道）
+  curves: z
+    .object({
+      rgb: z.array(CurvePointSchema).max(8).optional(),
+      r: z.array(CurvePointSchema).max(8).optional(),
+      g: z.array(CurvePointSchema).max(8).optional(),
+      b: z.array(CurvePointSchema).max(8).optional(),
+    })
+    .optional(),
+  // M5-LLM-C：HSL 8 通道
+  hsl: z
+    .object({
+      red: HSLTripleSchema.optional(),
+      orange: HSLTripleSchema.optional(),
+      yellow: HSLTripleSchema.optional(),
+      green: HSLTripleSchema.optional(),
+      aqua: HSLTripleSchema.optional(),
+      blue: HSLTripleSchema.optional(),
+      purple: HSLTripleSchema.optional(),
+      magenta: HSLTripleSchema.optional(),
+    })
+    .optional(),
+  // M5-LLM-C：胶片颗粒
+  grain: z
+    .object({
+      amount: z.number().optional(),
+      size: z.number().optional(),
+      roughness: z.number().optional(),
+    })
+    .optional(),
+  // M5-LLM-C：高光溢光
+  halation: z
+    .object({
+      amount: z.number().optional(),
+      threshold: z.number().optional(),
+      radius: z.number().optional(),
+    })
+    .optional(),
+  // M5-LLM-C：暗角 / 视觉引导
+  vignette: z
+    .object({
+      amount: z.number().optional(),
+      midpoint: z.number().optional(),
+      roundness: z.number().optional(),
+      feather: z.number().optional(),
+    })
+    .optional(),
+  reasons: z.record(z.string(), z.string()).optional(),
+})
 
-const LLMResponseSchema = z
-  .object({
-    analysis: AnalysisSchema,
-    adjustments: AdjustmentsSchema,
-  })
-  .strict()
+const AnalysisSchema = z.object({
+  summary: z.string().min(5).max(600),
+  subject: z.string().min(2).max(200),
+  environment: z.string().min(2).max(300),
+  diagnosis: z.array(z.string().min(2).max(200)).min(1).max(8),
+})
+
+const LLMResponseSchema = z.object({
+  analysis: AnalysisSchema,
+  adjustments: AdjustmentsSchema,
+})
 
 // ---- Prompt 设计（M5-LLM-C：5 维分析）----
 
@@ -339,7 +341,8 @@ const SYSTEM_PROMPT = `你是资深摄影后期顾问，专精胶片美学与光
 - diagnosis 数组：2~6 条用户可读的诊断
 
 **硬约束**（违反视为错误输出）：
-- tone/clarity/saturation/vibrance：-40 ~ +40
+- tone.exposure：-3 ~ +3（EV 单位！不是百分比！0.5 就是半档曝光补偿）
+- tone 其余（contrast/highlights/shadows/whites/blacks）：-40 ~ +40
 - whiteBalance：-30 ~ +30
 - hsl 各通道 h/s/l：-40 ~ +40
 - colorGrading.h：0~360，s/l：-40 ~ +40
@@ -351,11 +354,21 @@ const SYSTEM_PROMPT = `你是资深摄影后期顾问，专精胶片美学与光
 - 诊断必须对用户可见（"主体面部偏暗"而非"直方图 30~60 区段不足"）
 - 不需要的字段直接不输出（不要给 0 或 null）
 
+**美学风格倾向**（当照片适合时主动运用）：
+如果照片的光影、色彩和主体适合油画质感美学，可以主动倾向以下方向：
+- 负 clarity（-8~-15）创造中频柔化的"奶油过渡"
+- curves 压缩两端（黑点提到 15-25，白点压到 230-240）避免死黑/死白
+- 全通道 HSL 降饱和（-10~-20），但用 vibrance 补偿低饱和区
+- colorGrading 阴影偏暖棕（H:30-40）、高光偏象牙暖黄（H:40-55）
+- 适量 grain（size 1.5-2.5）模拟画布肌理
+- 轻度 halation（amount 5-10）让高光"发光"
+判断标准：人像、静物、风光、建筑适合油画感；运动、新闻、科技产品不适合。
+
 **输出格式**：严格 JSON，不含任何注释或解释性前后文。结构：
 {
   "analysis": { "summary": "string", "subject": "string", "environment": "string", "diagnosis": ["string", ...] },
   "adjustments": {
-    "tone": { "exposure": N, "contrast": N, ... },
+    "tone": { "exposure": 0.7, "contrast": N, ... },
     "whiteBalance": { "temp": N, "tint": N },
     "curves": { "rgb": [{"x":0,"y":0}, {"x":128,"y":140}, {"x":255,"y":250}], "r": [...] },
     "hsl": { "orange": {"h":5, "s":10}, "blue": {"s":-15, "l":-5} },
@@ -370,9 +383,61 @@ const SYSTEM_PROMPT = `你是资深摄影后期顾问，专精胶片美学与光
 
 语言：所有字符串用简体中文。`
 
+// ---- AI 分析缓存（避免重复分析同一张照片浪费 API 额度）----
+
+interface CacheEntry {
+  result: AIAnalysisResult
+  timestamp: number
+  filterContext: string // photoPath + filterName 组合作为 key 的一部分
+}
+
+const CACHE_TTL_MS = 30 * 60 * 1000 // 30 分钟
+const CACHE_MAX_SIZE = 20
+const analysisCache = new Map<string, CacheEntry>()
+
+async function getCacheKey(photoPath: string, filterName?: string): Promise<string> {
+  try {
+    const stat = await fsp.stat(photoPath)
+    return `${photoPath}|${stat.mtimeMs}|${stat.size}|${filterName ?? ''}`
+  } catch {
+    return `${photoPath}|${Date.now()}|${filterName ?? ''}`
+  }
+}
+
+function getCachedResult(key: string): AIAnalysisResult | null {
+  const entry = analysisCache.get(key)
+  if (!entry) return null
+  if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+    analysisCache.delete(key)
+    return null
+  }
+  return entry.result
+}
+
+function setCachedResult(key: string, result: AIAnalysisResult): void {
+  // LRU：超过上限时删最旧的
+  if (analysisCache.size >= CACHE_MAX_SIZE) {
+    const oldest = analysisCache.keys().next().value
+    if (oldest) analysisCache.delete(oldest)
+  }
+  analysisCache.set(key, { result, timestamp: Date.now(), filterContext: key })
+}
+
 // ---- 主入口 ----
 
-export async function analyzePhoto(photoPath: string): Promise<AIAnalysisResult> {
+export async function analyzePhoto(
+  photoPath: string,
+  activeFilterName?: string,
+  activeFilterCategory?: string,
+): Promise<AIAnalysisResult> {
+  // ---- 缓存命中检查 ----
+  const cacheKey = await getCacheKey(photoPath, activeFilterName)
+  const cached = getCachedResult(cacheKey)
+  if (cached) {
+    logger.info('llm.analyze.cache-hit', { path: path.basename(photoPath) })
+    return cached
+  }
+
   const pub = getPublicConfig()
 
   // ---- 前置校验 ----
@@ -401,6 +466,7 @@ export async function analyzePhoto(photoPath: string): Promise<AIAnalysisResult>
   }
 
   // ---- 1. 降采样原图 ----
+  const t0Total = Date.now()
   let imageDataUrl: string
   try {
     imageDataUrl = await buildImageDataUrl(photoPath)
@@ -409,6 +475,7 @@ export async function analyzePhoto(photoPath: string): Promise<AIAnalysisResult>
     logger.warn('llm.analyze.image-prep-failed', { path: path.basename(photoPath), err: msg })
     return { ok: false, errorKind: 'image-prep-failed', message: `原图处理失败：${msg}` }
   }
+  const imagePrepMs = Date.now() - t0Total
 
   // ---- 2. 调 LLM ----
   const controller = new AbortController()
@@ -416,6 +483,12 @@ export async function analyzePhoto(photoPath: string): Promise<AIAnalysisResult>
   const t0 = Date.now()
   let latencyMs = 0
   try {
+    // 构建用户消息：包含滤镜上下文引导
+    let userText = '请分析这张照片并给出建议。'
+    if (activeFilterName) {
+      userText = `这张照片当前已应用了"${activeFilterName}"滤镜风格（类型：${activeFilterCategory ?? '未知'}）。请以该风格为基准进行优化建议——保持并强化该风格的美学方向（色调、影调、质感倾向），在此基础上针对这张具体照片的光影/主体/色彩做精细化调整。不要偏离已选风格的整体方向。`
+    }
+
     const resp = await fetch(CHAT_ENDPOINT, {
       method: 'POST',
       signal: controller.signal,
@@ -428,13 +501,13 @@ export async function analyzePhoto(photoPath: string): Promise<AIAnalysisResult>
       body: JSON.stringify({
         model,
         response_format: { type: 'json_object' },
-        temperature: 0.3, // 微调风格适合低温
+        temperature: 0.3,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           {
             role: 'user',
             content: [
-              { type: 'text', text: '请分析这张照片并给出建议。' },
+              { type: 'text', text: userText },
               { type: 'image_url', image_url: { url: imageDataUrl } },
             ],
           },
@@ -475,13 +548,29 @@ export async function analyzePhoto(photoPath: string): Promise<AIAnalysisResult>
       return { ok: false, errorKind: 'invalid-response', message: `JSON 解析失败：${msg}` }
     }
 
-    const check = LLMResponseSchema.safeParse(parsed)
+    // 尝试直接解析；若失败，看看是否 LLM 多包了一层（如 {response: {...}}）
+    let check = LLMResponseSchema.safeParse(parsed)
+    if (!check.success && parsed && typeof parsed === 'object') {
+      // 宽松回退：遍历顶层 key，如果任何值含 analysis+adjustments，就用那层
+      for (const val of Object.values(parsed as Record<string, unknown>)) {
+        if (val && typeof val === 'object' && 'analysis' in val && 'adjustments' in val) {
+          const retry = LLMResponseSchema.safeParse(val)
+          if (retry.success) { check = retry; break }
+        }
+      }
+    }
     if (!check.success) {
-      logger.warn('llm.analyze.schema-failed', { issueCount: check.error.issues.length })
+      // 记录前 5 条 Zod issue 详情，方便日后排查
+      const issues = check.error.issues.slice(0, 5).map((i) => ({
+        path: i.path.join('.'),
+        code: i.code,
+        msg: i.message,
+      }))
+      logger.warn('llm.analyze.schema-failed', { issueCount: check.error.issues.length, issues })
       return {
         ok: false,
         errorKind: 'invalid-response',
-        message: `响应 schema 不符：${check.error.issues[0]?.message ?? 'unknown'}`,
+        message: `响应 schema 不符：${check.error.issues[0]?.message ?? 'unknown'}（字段: ${check.error.issues[0]?.path?.join('.') ?? '?'}）`,
       }
     }
 
@@ -490,12 +579,14 @@ export async function analyzePhoto(photoPath: string): Promise<AIAnalysisResult>
 
     logger.info('llm.analyze.ok', {
       model,
+      imagePrepMs,
       latencyMs,
+      totalMs: Date.now() - t0Total,
       hasAdjustments: Object.keys(adjustments).length > 0,
       diagnosisCount: check.data.analysis.diagnosis.length,
     })
 
-    return {
+    const successResult: AIAnalysisResult = {
       ok: true,
       analysis: check.data.analysis,
       adjustments,
@@ -506,6 +597,11 @@ export async function analyzePhoto(photoPath: string): Promise<AIAnalysisResult>
         completionTokens: raw.usage?.completion_tokens,
       },
     }
+
+    // 缓存成功结果
+    setCachedResult(cacheKey, successResult)
+
+    return successResult
   } catch (err) {
     latencyMs = Date.now() - t0
     const msg = err instanceof Error ? err.message : String(err)
