@@ -61,7 +61,12 @@ export default function Library() {
           </>
         }
         action={
-          <button type="button" onClick={handleImport} className="btn-primary">
+          <button
+            type="button"
+            onClick={handleImport}
+            className="btn-primary"
+            data-testid="import-photos-btn"
+          >
             <Upload className="w-4 h-4" strokeWidth={2} />
             导入照片
           </button>
@@ -71,7 +76,7 @@ export default function Library() {
   }
 
   return (
-    <div className="p-6 animate-fade-in">
+    <div className="p-6 animate-fade-in" data-testid="library-root">
       {/* Stats */}
       <div className="flex items-center gap-2 mb-5">
         <ValueBadge label="TOTAL" value={stats.total} />
@@ -84,7 +89,7 @@ export default function Library() {
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
-              onClick={() => navigate('/batch')}
+              onClick={() => navigate('/batch', { state: { selectedPhotoIds: selected } })}
               title="将选中照片批量导出"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md
                 text-xs font-medium
@@ -115,7 +120,10 @@ export default function Library() {
       </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
+      <div
+        data-testid="photo-grid"
+        className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3"
+      >
         {photos.map((photo) => {
           const cameraLabel = [
             photo.exif.model,
@@ -135,6 +143,7 @@ export default function Library() {
               selected={selected.includes(photo.id)}
               cameraLabel={cameraLabel}
               dimensions={photo.width ? `${photo.width}×${photo.height}` : undefined}
+              testId={`photo-card-${photo.id}`}
               // Lightroom grid 风格：所有卡片统一方形（aspectRatio=1），
               // 图片走 object-cover 居中裁切铺满 —— 整个网格像书架一样对齐
               // 不再按 photo.width/height 设置每卡独立比例（那会让竖图和横图卡尺寸不同）

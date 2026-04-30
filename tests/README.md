@@ -1,6 +1,7 @@
 # tests/README.md — 测试资产索引
 
-> 生成时间：2026-04-26 · 对应 main @ 测试瘦身后（37 文件 · 466 例）
+> 生成时间：2026-04-26 · 对应 main @ 测试瘦身后（37 文件 · 466 例）  
+> Pass T1（2026-05-01 更新）：新增 E2E 基础设施 + 冒烟用例（5 例真 Electron 启动）  
 > 本索引的唯一目标：**让下次写新测试前能先看到"这块是否已有人测过"，避免重复覆盖与凑数**
 
 ---
@@ -139,3 +140,51 @@
 5. 这个测试的**维护成本**是否合理？（简单工具函数不值得 20 行测试）
 
 **任一答"否"或"不清楚" → 不要写这个测试**。
+
+---
+
+## 🚀 E2E 基础设施（Pass T1 · 2026-05-01）
+
+### 目录结构
+
+```
+tests/e2e/
+├── _support/                 # 共享 fixture（非 spec，playwright 不拾取）
+│   ├── launchApp.ts          # 启动真 Electron + 隔离 userData + 等 preload 就绪
+│   ├── grainInvoke.ts        # page 内类型化 IPC 调用 helper
+│   ├── seedFixtures.ts       # 把 tests/fixtures/images 注入到 photoStore
+│   └── selectors.ts          # 选择器集中表（Single Source of Truth · 第 8 条）
+└── smoke.spec.ts             # 冒烟：启动 + Sidebar + 路由切换（5 例）
+```
+
+### 运行
+
+```bash
+npm run build                 # 必须先构建 dist-electron/main.js
+npm run test:e2e              # 运行全部 E2E
+npx playwright test --project=e2e smoke.spec.ts   # 只跑冒烟
+```
+
+### 核心设计决策
+
+1. **testid 命名规则**（UI 侧硬编码，测试侧集中查询）
+   - Sidebar 导航：`nav-${route}`（如 `nav-library`、`nav-settings`）
+   - Library：`library-root`、`photo-grid`、`photo-card-${id}`、`import-photos-btn`
+   - Editor：`editor-root`、`editor-undo-btn`、`editor-redo-btn`、`editor-export-btn`、`preview-canvas`、`editor-tab-filters`、`editor-tab-adjust`、`filter-row-${id}`（原图用 `filter-row-original`）
+   - Slider：**不加 testid**，走 `getByRole('slider', { name: label })`；aria-label 已由设计系统提供
+
+2. **选择器散布阈值 = 1**：所有 Playwright 选择器收敛到 `tests/e2e/_support/selectors.ts`，UI 改名时只改本文件
+
+3. **隔离 userData**：每个 E2E run 在 `os.tmpdir()` 下创建独立 userData 目录（`GRAINMARK_USER_DATA` env），不污染开发用户数据
+
+4. **PathGuard 配合**：fixtures 拷到 `os.tmpdir()` 下（命中 main.ts 默认白名单 `app.getPath('temp')`），不需要给 guard 开测试后门
+
+### 新增 E2E 用例前自查
+
+除通用 5 条外，还需：
+
+6. 失败时能否 **仅通过截图 + error-context.md 定位**？（playwright 自动附件）
+7. 是否对**真实副作用**断言（磁盘文件 / 像素 / IPC 回调），而不是只看 DOM 存在？
+8. 用例启动代价 ≤ 2s？（否则应合并到同一 `describe` 共享 Electron 实例）
+9. 给高风险改动做过**蓝军 mutation 验证**（手工破坏一次断言确认真能红）？
+

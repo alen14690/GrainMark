@@ -40,6 +40,11 @@ export interface PhotoCardProps {
   onDoubleClick?: () => void
   className?: string
   ariaLabel?: string
+  /**
+   * 测试专用稳定选择器。不影响运行时行为，仅供 Playwright 精准命中。
+   * 调用方传入如 `photo-card-${photo.id}`。
+   */
+  testId?: string
 }
 
 /** 将任意 aspect 归到合理范围，避免极端值撑爆网格 */
@@ -64,6 +69,7 @@ export function PhotoCard({
   onDoubleClick,
   className,
   ariaLabel,
+  testId,
 }: PhotoCardProps) {
   // cover 模式：aspectRatio 默认 1（方形，Lightroom grid 风格）；若调用方明确传值则用该值
   // contain 模式：按图片真实比例撑卡片（老行为）
@@ -75,6 +81,7 @@ export function PhotoCard({
       tabIndex={0}
       aria-label={ariaLabel ?? name}
       aria-pressed={selected}
+      data-testid={testId}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onKeyDown={(e) => {

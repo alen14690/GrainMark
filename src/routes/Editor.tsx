@@ -166,7 +166,7 @@ export default function Editor() {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [])
+  }, [rotation, flipH, flipV, setTransform, commitHistory])
 
   const dirty = hasDirtyEdits(currentPipeline, baselinePipeline, dirtyFlag)
 
@@ -362,7 +362,7 @@ export default function Editor() {
   const canvasStyle = { maxWidth: '100%', maxHeight: 'calc(100vh - 240px)' } as const
 
   return (
-    <div className="h-full flex animate-fade-in bg-bg-0">
+    <div className="h-full flex animate-fade-in bg-bg-0" data-testid="editor-root">
       {/* Canvas Column */}
       <section className="flex-1 flex flex-col min-w-0 bg-bg-0">
         {/* 顶部工具条 */}
@@ -373,6 +373,7 @@ export default function Editor() {
             type="button"
             onClick={undo}
             disabled={!canUndoNow}
+            data-testid="editor-undo-btn"
             className={cn('btn-ghost btn-xs', !canUndoNow && 'opacity-30 cursor-not-allowed')}
             title="撤销 (⌘Z)"
           >
@@ -382,6 +383,7 @@ export default function Editor() {
             type="button"
             onClick={redo}
             disabled={!canRedoNow}
+            data-testid="editor-redo-btn"
             className={cn('btn-ghost btn-xs', !canRedoNow && 'opacity-30 cursor-not-allowed')}
             title="重做 (⌘⇧Z)"
           >
@@ -519,7 +521,12 @@ export default function Editor() {
             />
             水印
           </label>
-          <button type="button" onClick={handleExport} className="btn-primary btn-xs">
+          <button
+            type="button"
+            onClick={handleExport}
+            className="btn-primary btn-xs"
+            data-testid="editor-export-btn"
+          >
             <Download className="w-3.5 h-3.5" />
             导出
           </button>
@@ -558,6 +565,7 @@ export default function Editor() {
             {/* WebGL 画布（主路径） */}
             <canvas
               ref={webgl.canvasRef}
+              data-testid="preview-canvas"
               className={cn('rounded-md shadow-soft-lg object-contain', useWebglCanvas ? 'block' : 'hidden')}
               style={canvasStyle}
             />
@@ -669,6 +677,7 @@ export default function Editor() {
             icon={<Wand2 className="w-3.5 h-3.5" strokeWidth={2} />}
             label="滤镜"
             sub={activeFilter?.name}
+            testId="editor-tab-filters"
           />
           <TabButton
             active={rightTab === 'adjust'}
@@ -676,6 +685,7 @@ export default function Editor() {
             icon={<Sliders className="w-3.5 h-3.5" strokeWidth={2} />}
             label="调整"
             sub={dirty ? '已修改' : undefined}
+            testId="editor-tab-adjust"
           />
         </div>
 
@@ -864,17 +874,20 @@ function TabButton({
   icon,
   label,
   sub,
+  testId,
 }: {
   active: boolean
   onClick: () => void
   icon: React.ReactNode
   label: string
   sub?: string
+  testId?: string
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      data-testid={testId}
       className={cn(
         'flex-1 flex items-center justify-center gap-2 px-3 transition-all duration-fast border-b-2',
         active
@@ -931,10 +944,13 @@ const FilterRowMemo = memo(function FilterRowInner({
   filterId: string | null
 }) {
   const handleClick = () => useAppStore.getState().setActiveFilter(filterId)
+  // 稳定 testid：原图用 "filter-row-original"，其它按 filterId
+  const testId = filterId === null ? 'filter-row-original' : `filter-row-${filterId}`
   return (
     <button
       type="button"
       onClick={handleClick}
+      data-testid={testId}
       className={cn(
         'w-full text-left px-3 py-2.5 rounded-md transition-all duration-fast',
         active

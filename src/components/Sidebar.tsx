@@ -42,7 +42,10 @@ const NAV_STUDIO: NavItem[] = [
 
 export default function Sidebar() {
   return (
-    <aside className="w-60 shrink-0 glass-surface flex flex-col relative z-10 border-r-0 rounded-none">
+    <aside
+      data-testid="sidebar"
+      className="w-60 shrink-0 glass-surface flex flex-col relative z-10 border-r-0 rounded-none"
+    >
       {/* macOS 交通灯安全区：padding-top 让品牌 logo 下移，交通灯叠在上方空白区 */}
       <div className="mac-sidebar-pad drag-region shrink-0" />
       {/* 品牌 */}
@@ -77,6 +80,7 @@ export default function Sidebar() {
       <div className="p-3 border-t border-white/5 no-drag">
         <NavLink
           to="/settings"
+          data-testid="nav-settings"
           className={({ isActive }) =>
             cn(
               'flex items-center gap-2.5 px-3 py-2 rounded-md text-sm',
@@ -107,9 +111,12 @@ function NavGroup({ title, children }: { title: string; children: React.ReactNod
 }
 
 function NavItemLink({ to, icon: Icon, label, desc, badge }: NavItem) {
+  // 稳定 testid：把路由 "/library" 压成 "nav-library"，供 E2E 精准命中
+  const testId = `nav-${to.replace(/^\//, '').replace(/\//g, '-') || 'root'}`
   return (
     <NavLink
       to={to}
+      data-testid={testId}
       className={({ isActive }) =>
         cn(
           'group flex items-center gap-3 px-3 py-2 rounded-md',
