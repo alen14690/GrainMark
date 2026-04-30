@@ -244,6 +244,9 @@ function AIAdvisorDialog({ open, photoPath, activeFilterName, activeFilterCatego
   const preAISnapshotRef = useRef<FilterPipeline | null>(null)
   /** 是否已进入预览模式（避免重复保存快照） */
   const previewActiveRef = useRef(false)
+  /** 跟踪 open 状态，防止 queueMicrotask 在面板关闭后触发无效操作 */
+  const openRef = useRef(open)
+  openRef.current = open
 
   const setTone = useEditStore((s) => s.setTone)
   const setWhiteBalance = useEditStore((s) => s.setWhiteBalance)
@@ -275,6 +278,8 @@ function AIAdvisorDialog({ open, photoPath, activeFilterName, activeFilterCatego
    * 因为 setter 是 patch 模式（merge），必须先恢复到干净基准再叠加。
    */
   const syncPreviewToCanvas = useCallback((sel: Record<string, boolean>, items: SuggestionItem[]) => {
+    // 防止面板关闭后仍触发（由 queueMicrotask 延迟执行）
+    if (!openRef.current) return
     // 1. 恢复到 AI 分析前的 pipeline 快照
     const snapshot = preAISnapshotRef.current
     useEditStore.setState((s) => {

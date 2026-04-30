@@ -421,6 +421,7 @@ export function useWebGLPreview(
     if (!sourceUrl || !gl || !gl.ok || !pipelineRef.current) return
 
     let cancelled = false
+    let tmpCanvas: HTMLCanvasElement | null = null
     setStatus('loading')
     setError(undefined)
     ;(async () => {
@@ -443,7 +444,7 @@ export function useWebGLPreview(
         // Chromium 的 ImageBitmap 内部像素已是 GL 方向（底→顶），
         // 且 UNPACK_FLIP_Y_WEBGL 对 ImageBitmap 源不生效。
         // 解决：先画到临时 canvas，再用 canvas 作为纹理源（flipY 对 canvas 可靠）。
-        const tmpCanvas = document.createElement('canvas')
+        tmpCanvas = document.createElement('canvas')
         tmpCanvas.width = bitmap.width
         tmpCanvas.height = bitmap.height
         const ctx2d = tmpCanvas.getContext('2d')!
@@ -459,12 +460,15 @@ export function useWebGLPreview(
         // P2 修复：上传完成后立即释放 tmpCanvas 的 backing store（24MP ≈ 96MB）
         tmpCanvas.width = 0
         tmpCanvas.height = 0
+        tmpCanvas = null
 
         // 换图必然重采一次直方图（重置计数器让第一帧强制采样）
         histogramFrameCounterRef.current = 0
         await renderNow()
       } catch (e) {
         if (cancelled) return
+        // 释放 tmpCanvas 防止 96MB 内存泄漏
+        if (tmpCanvas) { tmpCanvas.width = 0; tmpCanvas.height = 0; tmpCanvas = null }
         // 关键错误记录到 console（诊断 "GL: Failed to fetch" 类问题）：
         //   - sourceUrl 前缀（判断是 data:/grain:/file:/...）
         //   - URL 长度（data URL 过大 Chromium 会拒）
@@ -506,7 +510,12 @@ export function useWebGLPreview(
     if (renderRafRef.current !== null) return
     renderRafRef.current = requestAnimationFrame(() => {
       renderRafRef.current = null
-      renderNow()
+      try {
+        renderNow()
+      } catch (e) {
+        // 确保 renderRafRef 已重置，后续 pipeline 变化不会被永久跳过
+        console.error('[useWebGLPreview] renderNow failed:', e)
+      }
     })
   }, [pipeline, lut.texture, renderNow])
 

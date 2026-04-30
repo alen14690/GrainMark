@@ -2,6 +2,7 @@ import { promises as fsp } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { dialog } from 'electron'
+import sharp from 'sharp'
 import type { FilterPipeline } from '../../shared/types.js'
 import { applyPipeline } from '../services/batch/pipelineSharp.js'
 import { readExif } from '../services/exif/reader.js'
@@ -84,16 +85,18 @@ export function registerPhotoIpc() {
 
       // 应用裁切（在 pipeline 渲染之后、旋转之前）
       if (pipe?.crop) {
-        const sharpMod = (await import('sharp')).default
-        const meta = await sharpMod(outBuffer).metadata()
+        const meta = await sharp(outBuffer).metadata()
         const imgW = meta.width ?? 1920
         const imgH = meta.height ?? 1080
-        const cropX = Math.round(pipe.crop.x * imgW)
-        const cropY = Math.round(pipe.crop.y * imgH)
-        const cropW = Math.round(pipe.crop.width * imgW)
-        const cropH = Math.round(pipe.crop.height * imgH)
+        const cropX = Math.max(0, Math.round(pipe.crop.x * imgW))
+        const cropY = Math.max(0, Math.round(pipe.crop.y * imgH))
+        let cropW = Math.round(pipe.crop.width * imgW)
+        let cropH = Math.round(pipe.crop.height * imgH)
+        // 边界校验：防止 extract 越界
+        cropW = Math.min(cropW, imgW - cropX)
+        cropH = Math.min(cropH, imgH - cropY)
         if (cropW > 0 && cropH > 0) {
-          outBuffer = await sharpMod(outBuffer)
+          outBuffer = await sharp(outBuffer)
             .extract({ left: cropX, top: cropY, width: cropW, height: cropH })
             .toBuffer()
         }
@@ -102,7 +105,6 @@ export function registerPhotoIpc() {
       // 应用旋转和翻转（在裁切之后）
       const needsTransform = (opts.rotation && opts.rotation !== 0) || opts.flipH || opts.flipV
       if (needsTransform) {
-        const sharp = (await import('sharp')).default
         let img = sharp(outBuffer)
         if (opts.rotation && opts.rotation !== 0) {
           img = img.rotate(opts.rotation)
