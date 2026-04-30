@@ -406,7 +406,14 @@ export interface IpcApi {
   'photo:exportSingle': (
     photoPath: string,
     pipeline: FilterPipeline | null,
-    options: { longEdge: number | null; quality: number; rotation?: number; flipH?: boolean; flipV?: boolean },
+    options: {
+      longEdge: number | null
+      quality: number
+      rotation?: number
+      flipH?: boolean
+      flipV?: boolean
+      watermark?: WatermarkStyle | null
+    },
   ) => Promise<string | null>
 
   // 预览

@@ -236,6 +236,7 @@ export default function Editor() {
 
   /** 导出当前编辑结果为全分辨率图片 */
   const [exportSize, setExportSize] = useState<'original' | '4000' | '2400' | '1600'>('original')
+  const [exportWatermark, setExportWatermark] = useState(false)
   const [exportToast, setExportToast] = useState<string | null>(null)
   const handleExport = async () => {
     if (!photo?.path) return
@@ -247,6 +248,18 @@ export default function Editor() {
         rotation,
         flipH,
         flipV,
+        watermark: exportWatermark ? {
+          templateId: 'minimal-bar',
+          position: 'bottom-center',
+          opacity: 0.92,
+          scale: 1,
+          color: '#ffffff',
+          bgColor: '#000000',
+          fontFamily: 'Inter',
+          showLogo: false,
+          fields: { make: true, model: true, lens: true, aperture: true, shutter: true, iso: true, focalLength: true, dateTime: true, artist: false, location: false },
+          padding: 24,
+        } : null,
       })
       if (result) {
         setExportToast(result)
@@ -497,6 +510,15 @@ export default function Editor() {
             <option value="2400">长边 2400px</option>
             <option value="1600">长边 1600px</option>
           </select>
+          <label className="flex items-center gap-1 text-xxs text-fg-3 cursor-pointer" title="导出时添加 EXIF 水印底栏">
+            <input
+              type="checkbox"
+              checked={exportWatermark}
+              onChange={(e) => setExportWatermark(e.target.checked)}
+              className="accent-brand-amber"
+            />
+            水印
+          </label>
           <button type="button" onClick={handleExport} className="btn-primary btn-xs">
             <Download className="w-3.5 h-3.5" />
             导出

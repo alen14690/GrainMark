@@ -43,6 +43,7 @@ export function registerPhotoIpc() {
       rotation?: number
       flipH?: boolean
       flipV?: boolean
+      watermark?: import('../../shared/types.js').WatermarkStyle | null
     }
     const baseName = path.parse(srcPath).name
 
@@ -113,6 +114,21 @@ export function registerPhotoIpc() {
           img = img.flip() // 垂直翻转
         }
         outBuffer = await img.toBuffer()
+      }
+
+      // 应用水印（在所有变换之后、写文件之前）
+      if (opts.watermark) {
+        const { renderWatermark } = await import('../services/watermark/renderer.js')
+        // renderWatermark 需要文件路径，先写临时文件
+        const tmpPath = path.join(os.tmpdir(), `grainmark-export-${Date.now()}.jpg`)
+        await fsp.writeFile(tmpPath, outBuffer)
+        try {
+          const wmDataUrl = await renderWatermark(tmpPath, opts.watermark)
+          const wmBase64 = wmDataUrl.replace(/^data:image\/\w+;base64,/, '')
+          outBuffer = Buffer.from(wmBase64, 'base64')
+        } finally {
+          await fsp.unlink(tmpPath).catch(() => {})
+        }
       }
 
       await fsp.writeFile(result.filePath, outBuffer)
