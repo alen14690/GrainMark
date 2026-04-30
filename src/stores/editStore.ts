@@ -31,6 +31,7 @@ import type {
   HSLParams,
   HalationParams,
   ToneParams,
+  TransformParams,
   VignetteParams,
   WhiteBalanceParams,
 } from '../../shared/types'
@@ -86,6 +87,7 @@ interface EditState {
   setGrain: (patch: Partial<GrainParams> | null) => void
   setHalation: (patch: Partial<HalationParams> | null) => void
   setCrop: (patch: CropParams | null) => void
+  setTransform: (patch: TransformParams | null) => void
   setClarity: (v: number) => void
   setSaturation: (v: number) => void
   setVibrance: (v: number) => void
@@ -337,6 +339,18 @@ export const useEditStore = create<EditState>()(
         }
         const pipe = ensurePipe(s)
         pipe.crop = patch
+        s._dirty = true
+      })
+    },
+
+    setTransform(patch) {
+      set((s) => {
+        if (patch === null) {
+          if (s.currentPipeline?.transform) { s.currentPipeline.transform = undefined; s._dirty = true }
+          return
+        }
+        const pipe = ensurePipe(s)
+        pipe.transform = patch
         s._dirty = true
       })
     },

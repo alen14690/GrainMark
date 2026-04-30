@@ -42,10 +42,6 @@ export default function Editor() {
   const [compareMode, setCompareMode] = useState(false)
   /** Viewport transform（本地状态，不需要 undo） */
   const [viewport, setViewport] = useState({ zoom: 1, panX: 0, panY: 0 })
-  /** 图片旋转 & 翻转（影响输出，需要 undo） */
-  const [rotation, setRotation] = useState<0 | 90 | 180 | 270>(0)
-  const [flipH, setFlipH] = useState(false)
-  const [flipV, setFlipV] = useState(false)
   /** 拖拽平移状态 */
   const isPanning = useRef(false)
   const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 })
@@ -65,6 +61,10 @@ export default function Editor() {
 
   // ---- editStore 与 activeFilter 同步 ----
   const currentPipeline = useEditStore((s) => s.currentPipeline)
+  /** 图片旋转 & 翻转（从 pipeline 读取，支持 undo） */
+  const rotation = currentPipeline?.transform?.rotation ?? 0
+  const flipH = currentPipeline?.transform?.flipH ?? false
+  const flipV = currentPipeline?.transform?.flipV ?? false
   const baselinePipeline = useEditStore((s) => s.baselinePipeline)
   const dirtyFlag = useEditStore((s) => s._dirty)
   const loadFromPreset = useEditStore((s) => s.loadFromPreset)
@@ -75,6 +75,7 @@ export default function Editor() {
   const canRedoNow = useEditStore((s) => s.future.length > 0)
   const commitHistory = useEditStore((s) => s.commitHistory)
   const setCrop = useEditStore((s) => s.setCrop)
+  const setTransform = useEditStore((s) => s.setTransform)
   const undo = useEditStore((s) => s.undo)
   const redo = useEditStore((s) => s.redo)
 
@@ -151,13 +152,16 @@ export default function Editor() {
       // R = 旋转 90°（无修饰键）
       if (e.key === 'r' && !isCmdOrCtrl && !e.altKey) {
         e.preventDefault()
-        setRotation((r) => ((r + 90) % 360) as 0 | 90 | 180 | 270)
+        const newRot = ((rotation + 90) % 360) as 0 | 90 | 180 | 270
+        setTransform({ rotation: newRot, flipH, flipV })
+        commitHistory('旋转')
         return
       }
       // H = 水平翻转（无修饰键）
       if (e.key === 'h' && !isCmdOrCtrl && !e.altKey) {
         e.preventDefault()
-        setFlipH((f) => !f)
+        setTransform({ rotation, flipH: !flipH, flipV })
+        commitHistory('翻转')
       }
     }
     window.addEventListener('keydown', handler)
@@ -392,7 +396,11 @@ export default function Editor() {
           {/* 旋转 & 翻转 */}
           <button
             type="button"
-            onClick={() => setRotation((r) => ((r + 90) % 360) as 0 | 90 | 180 | 270)}
+            onClick={() => {
+              const newRot = ((rotation + 90) % 360) as 0 | 90 | 180 | 270
+              setTransform({ rotation: newRot, flipH, flipV })
+              commitHistory('旋转')
+            }}
             className="btn-ghost btn-xs"
             title="旋转 90° (R)"
           >
@@ -400,7 +408,10 @@ export default function Editor() {
           </button>
           <button
             type="button"
-            onClick={() => setFlipH((f) => !f)}
+            onClick={() => {
+              setTransform({ rotation, flipH: !flipH, flipV })
+              commitHistory('水平翻转')
+            }}
             className={cn('btn-ghost btn-xs', flipH && 'bg-fg-4/20')}
             title="水平翻转 (H)"
           >
@@ -408,7 +419,10 @@ export default function Editor() {
           </button>
           <button
             type="button"
-            onClick={() => setFlipV((f) => !f)}
+            onClick={() => {
+              setTransform({ rotation, flipH, flipV: !flipV })
+              commitHistory('垂直翻转')
+            }}
             className={cn('btn-ghost btn-xs', flipV && 'bg-fg-4/20')}
             title="垂直翻转"
           >

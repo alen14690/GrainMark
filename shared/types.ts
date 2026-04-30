@@ -86,6 +86,13 @@ export interface VignetteParams {
   feather: number // 0..100
 }
 
+/** 几何变换参数 */
+export interface TransformParams {
+  rotation: 0 | 90 | 180 | 270
+  flipH: boolean
+  flipV: boolean
+}
+
 /** 裁切参数（比例值 0-1，相对原图尺寸） */
 export interface CropParams {
   x: number      // 裁切起点 x（0-1）
@@ -113,6 +120,8 @@ export interface FilterPipeline {
   lutIntensity?: number
   /** 裁切（比例值 0-1） */
   crop?: CropParams
+  /** 几何变换（旋转/翻转） */
+  transform?: TransformParams
 }
 
 /** 滤镜对象（内置/用户/提取统一结构） */
