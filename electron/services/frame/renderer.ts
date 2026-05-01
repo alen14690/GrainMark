@@ -14,6 +14,7 @@ import { type FrameSvgGenerator, renderWithGenerator } from './composite.js'
 import { generateEditorialCaption, generateGallery } from './generators/bottomTextGenerator.js'
 import { generateContaxLabel } from './generators/contaxLabel.js'
 import { generateFilmFullBorder } from './generators/filmFullBorder.js'
+import { generateGenericFallback } from './generators/genericFallback.js'
 import { generateHairline } from './generators/hairline.js'
 import { generateMinimalBar } from './generators/minimalBar.js'
 import { generateNegativeStrip } from './generators/negativeStrip.js'
@@ -23,7 +24,12 @@ import { generateSpineEdition } from './generators/spineEdition.js'
 import { generateSx70Square } from './generators/sx70Square.js'
 import { getFrameStyle } from './registry.js'
 
-/** 风格 id → SVG generator 映射(阶段 2 必保 8 + 阶段 3 可选 4 全部挂齐) */
+/**
+ * 风格 id → SVG generator 映射
+ *
+ *   - 阶段 2(必保 8) + 阶段 3(可选 4) · 各自独立 generator
+ *   - 阶段 5(14 个) · 暂用 genericFallback 跑通数据层契约 · 装饰层由阶段 5b 单独补
+ */
 const GENERATORS: Partial<Record<FrameStyleId, FrameSvgGenerator>> = {
   // 阶段 2 · 必保 8
   'minimal-bar': generateMinimalBar,
@@ -39,6 +45,21 @@ const GENERATORS: Partial<Record<FrameStyleId, FrameSvgGenerator>> = {
   'negative-strip': generateNegativeStrip,
   'point-and-shoot-stamp': generatePointAndShootStamp,
   'contax-label': generateContaxLabel,
+  // 阶段 5 · 14 个高级质感(generator 暂用 genericFallback · 装饰阶段 5b 补)
+  'frosted-glass': generateGenericFallback,
+  'glass-chip': generateGenericFallback,
+  'oil-texture': generateGenericFallback,
+  'watercolor-caption': generateGenericFallback,
+  'ambient-glow': generateGenericFallback,
+  'bokeh-pillar': generateGenericFallback,
+  'cinema-scope': generateGenericFallback,
+  'neon-edge': generateGenericFallback,
+  'swiss-grid': generateGenericFallback,
+  'contact-sheet': generateGenericFallback,
+  'brushed-metal': generateGenericFallback,
+  'medal-plate': generateGenericFallback,
+  'floating-caption': generateGenericFallback,
+  'stamp-corner': generateGenericFallback,
 }
 
 /**

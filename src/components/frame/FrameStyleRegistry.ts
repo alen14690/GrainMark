@@ -17,6 +17,7 @@ import { BottomTextLayout } from './layouts/BottomTextLayout'
 import { ContaxLabelLayout } from './layouts/ContaxLabelLayout'
 import { EditorialCaptionLayout } from './layouts/EditorialCaptionLayout'
 import { FilmFullBorderLayout } from './layouts/FilmFullBorderLayout'
+import { GenericOverlayLayout } from './layouts/GenericOverlayLayout'
 import { HairlineLayout } from './layouts/HairlineLayout'
 import { MinimalBarLayout } from './layouts/MinimalBarLayout'
 import { NegativeStripLayout } from './layouts/NegativeStripLayout'
@@ -44,7 +45,7 @@ export interface FrameLayoutProps {
 }
 
 const LAYOUT_REGISTRY: Partial<Record<FrameStyleId, ComponentType<FrameLayoutProps>>> = {
-  // 阶段 2:必保 8 风格全部实装
+  // 阶段 2:必保 8 风格
   'minimal-bar': MinimalBarLayout,
   'polaroid-classic': PolaroidClassicLayout,
   'film-full-border': FilmFullBorderLayout,
@@ -53,11 +54,27 @@ const LAYOUT_REGISTRY: Partial<Record<FrameStyleId, ComponentType<FrameLayoutPro
   'editorial-caption': EditorialCaptionLayout,
   'spine-edition': SpineEditionLayout,
   hairline: HairlineLayout,
-  // 阶段 3:可选 4 风格全部实装
+  // 阶段 3:可选 4 风格
   'sx70-square': Sx70SquareLayout,
   'negative-strip': NegativeStripLayout,
   'point-and-shoot-stamp': PointAndShootStampLayout,
   'contax-label': ContaxLabelLayout,
+  // 阶段 5:14 个高级质感风格 · 全部走 GenericOverlayLayout
+  // 装饰层由 GenericOverlayLayout 按 style.group 自动分派(CSS 实现)
+  'frosted-glass': GenericOverlayLayout,
+  'glass-chip': GenericOverlayLayout,
+  'oil-texture': GenericOverlayLayout,
+  'watercolor-caption': GenericOverlayLayout,
+  'ambient-glow': GenericOverlayLayout,
+  'bokeh-pillar': GenericOverlayLayout,
+  'cinema-scope': GenericOverlayLayout,
+  'neon-edge': GenericOverlayLayout,
+  'swiss-grid': GenericOverlayLayout,
+  'contact-sheet': GenericOverlayLayout,
+  'brushed-metal': GenericOverlayLayout,
+  'medal-plate': GenericOverlayLayout,
+  'floating-caption': GenericOverlayLayout,
+  'stamp-corner': GenericOverlayLayout,
 }
 
 /** 占位布局导出:给未注册的风格调用方手动 fallback 用(可选) */

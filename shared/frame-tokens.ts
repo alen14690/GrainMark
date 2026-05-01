@@ -40,6 +40,29 @@ export const COLOR = {
   dateStampOrange: '#FF6B00', // 老 LCD 数字戳橙红
   accentRed: '#E53935', // 胶片红字 / 负片帧号
   hairlineStroke: '#202020', // 画廊细线框描边
+  // ===== 阶段 5(2026-05-01)新增 =====
+  // glass(玻璃拟态):半透明白 + iOS 深灰玻璃 · backdrop-filter 后的视觉近似
+  glassLight: 'rgba(255, 255, 255, 0.18)',
+  glassDark: 'rgba(20, 20, 20, 0.48)',
+  glassHilight: 'rgba(255, 255, 255, 0.5)', // 玻璃顶边高光 inset
+  glassBorder: 'rgba(255, 255, 255, 0.3)', // 玻璃描边
+  // oil(油画/水彩):米黄油画纸 + 深棕墨
+  oilPaper: '#F3ECE0',
+  oilInk: '#3A2E1E',
+  oilInkSoft: '#7D6C4E',
+  watercolorPaper: '#FDFAF4',
+  // cinema(电影/霓虹):深紫+琥珀
+  neonAmber: '#E8B86D',
+  neonViolet: '#7C5FE8',
+  cinemaBg: '#0A0612',
+  // metal(金属/徽章):拉丝银 + 金铜
+  brushedSilver: '#8A8A8D',
+  brushedSilverDark: '#1A1A1C',
+  medalGold: '#B8860B',
+  medalGoldLight: '#FFD89B',
+  medalGoldDark: '#6B4500',
+  // ambient(氛围):暗幕叠加(照片 blur 上加一层黑)
+  ambientOverlay: 'rgba(0, 0, 0, 0.35)',
 } as const
 
 // ============================================================================

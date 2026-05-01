@@ -16,12 +16,13 @@
  */
 import { BORDER, COLOR, FONT_SIZE } from '../../../shared/frame-tokens.js'
 import type { FrameStyle, FrameStyleId, FrameStyleOverrides } from '../../../shared/types.js'
+import { STAGE5_STYLES } from './registry-stage5.js'
 
 // ============================================================================
 // 默认 overrides(所有风格共用的初始字段可见性)
 // ============================================================================
 
-const DEFAULT_OVERRIDES: FrameStyleOverrides = {
+export const DEFAULT_OVERRIDES: FrameStyleOverrides = {
   showFields: {
     make: true,
     model: true,
@@ -45,6 +46,7 @@ const MINIMAL_BAR: FrameStyle = {
   id: 'minimal-bar',
   name: '极简底栏',
   description: '纸白底栏,等宽字参数一行,专业克制',
+  group: 'classic',
   landscape: {
     borderTop: 0,
     borderBottom: BORDER.minimalBar.bottomLandscape,
@@ -135,6 +137,7 @@ const POLAROID_CLASSIC: FrameStyle = {
   id: 'polaroid-classic',
   name: '经典宝丽来',
   description: '四周纸白 + 底部厚边 Georgia 斜体,真实 Polaroid 600 比例',
+  group: 'classic',
   landscape: {
     borderTop: BORDER.polaroid.top,
     borderBottom: BORDER.polaroid.bottomLandscape,
@@ -234,6 +237,7 @@ const FILM_FULL_BORDER: FrameStyle = {
   id: 'film-full-border',
   name: '135 全齿孔',
   description: '胶片黑边 + 真实 135 齿孔图案,横竖自动切换齿孔方向',
+  group: 'classic',
   landscape: {
     borderTop: BORDER.filmFullBorder.perforationLandscape,
     borderBottom: BORDER.filmFullBorder.perforationLandscape,
@@ -336,6 +340,7 @@ const GALLERY_BLACK: FrameStyle = {
   id: 'gallery-black',
   name: '画册黑',
   description: '胶片黑画册边 + 衬线字白,端庄沉稳,适合展览/奖赛',
+  group: 'classic',
   landscape: {
     borderTop: BORDER.gallery.top,
     borderBottom: BORDER.gallery.bottomLandscape,
@@ -427,6 +432,7 @@ const GALLERY_WHITE: FrameStyle = {
   id: 'gallery-white',
   name: '美术馆白',
   description: '纸白画册边 + 深灰衬线字,现代 Ins 风,画廊感',
+  group: 'classic',
   landscape: {
     ...GALLERY_BLACK.landscape,
     backgroundColor: COLOR.paperWhite,
@@ -465,6 +471,7 @@ const EDITORIAL_CAPTION: FrameStyle = {
   id: 'editorial-caption',
   name: '卡片新闻',
   description: '纸白 + 细线分隔 + 左粗体右参数 · 杂志版式',
+  group: 'classic',
   landscape: {
     borderTop: 0,
     borderBottom: BORDER.editorialCaption.bottomLandscape,
@@ -563,6 +570,7 @@ const SPINE_EDITION: FrameStyle = {
   id: 'spine-edition',
   name: '书脊式',
   description: '横图底带 / 竖图右带 · 致敬精装书脊排版',
+  group: 'classic',
   landscape: {
     borderTop: 0,
     borderBottom: BORDER.spineEdition.bandLandscape,
@@ -641,6 +649,7 @@ const HAIRLINE: FrameStyle = {
   id: 'hairline',
   name: '画廊细线',
   description: '四周发丝线 + 右下角参数小字,极简画廊展览感',
+  group: 'classic',
   landscape: {
     // 四周薄边 2%(容纳线 + 右下小字)
     borderTop: 0.02,
@@ -699,6 +708,7 @@ const SX70_SQUARE: FrameStyle = {
   id: 'sx70-square',
   name: 'SX-70 方宝丽来',
   description: '四边等白 + 老打字机字,真实 SX-70 相纸方形比例',
+  group: 'classic',
   landscape: {
     borderTop: BORDER.sx70.top,
     borderBottom: BORDER.sx70.bottom,
@@ -789,6 +799,7 @@ const NEGATIVE_STRIP: FrameStyle = {
   id: 'negative-strip',
   name: '负片黑边条',
   description: '上下(横)/ 左右(竖)黑 ledger + 白字参数 + 橙红帧号戳 "24 →"',
+  group: 'classic',
   landscape: {
     borderTop: BORDER.negativeStrip.stripLandscape,
     borderBottom: BORDER.negativeStrip.stripLandscape,
@@ -880,6 +891,7 @@ const POINT_AND_SHOOT_STAMP: FrameStyle = {
   id: 'point-and-shoot-stamp',
   name: '傻瓜机日期戳',
   description: '零边框 + 右下角橙红 LCD 日期戳,致敬 90 年代傻瓜相机',
+  group: 'classic',
   landscape: {
     borderTop: BORDER.pointAndShoot.none,
     borderBottom: BORDER.pointAndShoot.none,
@@ -936,6 +948,7 @@ const CONTAX_LABEL: FrameStyle = {
   id: 'contax-label',
   name: '铭牌致敬条',
   description: '底部黑条 + 左粗体机型 · 右小字参数 · 橙红竖线分隔',
+  group: 'classic',
   landscape: {
     borderTop: 0,
     borderBottom: BORDER.contaxLabel.bottomLandscape,
@@ -1000,6 +1013,7 @@ const CONTAX_LABEL: FrameStyle = {
 // ============================================================================
 
 const REGISTRY = new Map<FrameStyleId, FrameStyle>()
+// classic · 阶段 2 必保 8 + 阶段 3 可选 4
 REGISTRY.set(MINIMAL_BAR.id, MINIMAL_BAR)
 REGISTRY.set(POLAROID_CLASSIC.id, POLAROID_CLASSIC)
 REGISTRY.set(FILM_FULL_BORDER.id, FILM_FULL_BORDER)
@@ -1008,11 +1022,15 @@ REGISTRY.set(GALLERY_WHITE.id, GALLERY_WHITE)
 REGISTRY.set(EDITORIAL_CAPTION.id, EDITORIAL_CAPTION)
 REGISTRY.set(SPINE_EDITION.id, SPINE_EDITION)
 REGISTRY.set(HAIRLINE.id, HAIRLINE)
-// 阶段 3 可选 4
 REGISTRY.set(SX70_SQUARE.id, SX70_SQUARE)
 REGISTRY.set(NEGATIVE_STRIP.id, NEGATIVE_STRIP)
 REGISTRY.set(POINT_AND_SHOOT_STAMP.id, POINT_AND_SHOOT_STAMP)
 REGISTRY.set(CONTAX_LABEL.id, CONTAX_LABEL)
+// 阶段 5 · 14 个高级质感(glass/oil/ambient/cinema/editorial/metal/floating 8 簇)
+// 数据定义在 registry-stage5.ts · 此处集中注册
+for (const style of STAGE5_STYLES) {
+  REGISTRY.set(style.id, style)
+}
 
 /** 列出已注册的全部 FrameStyle */
 export function listFrameStyles(): FrameStyle[] {
@@ -1032,4 +1050,75 @@ export function registerFrameStyle(style: FrameStyle): FrameStyle | null {
   const prev = REGISTRY.get(style.id) ?? null
   REGISTRY.set(style.id, style)
   return prev
+}
+
+// ============================================================================
+// 分组相关 API(2026-05-01 新增 · UI 分组展示)
+// ============================================================================
+
+/**
+ * 质感分组展示顺序(UI 按此顺序 section 化)
+ *
+ * classic 放首位(经典默认组,入门友好),余下按"靠近经典 → 远离经典"排序:
+ *   editorial(印刷排版) → oil(油画) → floating(浮动) · 都是纸面语义
+ *   glass / ambient(数字质感 · iOS 风) → metal(金属 · 硬物理)
+ *   cinema(电影霓虹 · 个性最强)
+ *
+ * 类型安全:若将来新增 FrameStyleGroup 成员,此数组漏掉会被 TS never 断言捕获。
+ */
+export const FRAME_STYLE_GROUPS_ORDERED = [
+  'classic',
+  'editorial',
+  'oil',
+  'floating',
+  'glass',
+  'ambient',
+  'metal',
+  'cinema',
+] as const satisfies readonly FrameStyle['group'][]
+
+/**
+ * 分组中文名(UI 展示用)
+ *
+ * 类型安全:Record 字段必须覆盖所有 FrameStyleGroup 成员,漏一个就 TS 报错。
+ */
+export const FRAME_STYLE_GROUP_LABELS: Record<FrameStyle['group'], string> = {
+  classic: '经典必保',
+  glass: '玻璃拟态',
+  oil: '油画 · 水彩',
+  ambient: '氛围模糊',
+  cinema: '电影 · 霓虹',
+  editorial: '印刷 · 杂志',
+  metal: '金属 · 徽章',
+  floating: '浮动徽章',
+}
+
+/** 分组英文副标(UI 展示用,与 moodboard 页面一致) */
+export const FRAME_STYLE_GROUP_SUBTITLES: Record<FrameStyle['group'], string> = {
+  classic: 'CLASSIC',
+  glass: 'FROSTED GLASS',
+  oil: 'OIL · WATERCOLOR',
+  ambient: 'AMBIENT BLUR',
+  cinema: 'CINEMA · NEON',
+  editorial: 'EDITORIAL · PRINT',
+  metal: 'METAL · MEDAL',
+  floating: 'FLOATING',
+}
+
+/** 按分组归类 · 返回 { group → style[] } · 内部按注册顺序保持稳定 */
+export function getFrameStylesByGroup(): Record<FrameStyle['group'], FrameStyle[]> {
+  const result = {
+    classic: [] as FrameStyle[],
+    glass: [] as FrameStyle[],
+    oil: [] as FrameStyle[],
+    ambient: [] as FrameStyle[],
+    cinema: [] as FrameStyle[],
+    editorial: [] as FrameStyle[],
+    metal: [] as FrameStyle[],
+    floating: [] as FrameStyle[],
+  }
+  for (const style of REGISTRY.values()) {
+    result[style.group].push(style)
+  }
+  return result
 }

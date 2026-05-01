@@ -81,29 +81,46 @@ function FrameTabBody({
 
   return (
     <div className="grid grid-cols-5 gap-5">
-      {/* 风格列表 */}
-      <aside className="col-span-1 card p-3">
-        <div className="text-[11px] text-fg-2 uppercase tracking-wider font-mono px-2 mb-2">
+      {/* 风格列表 · 按质感簇分组展示(2026-05-01) */}
+      <aside className="col-span-1 card p-3 max-h-[calc(100vh-6rem)] overflow-y-auto">
+        <div className="text-[11px] text-fg-2 uppercase tracking-wider font-mono px-2 mb-2 sticky top-0 bg-bg-1 py-1 -my-1 z-10">
           边框风格 · {styles.length}
         </div>
-        <div className="space-y-1">
-          {styles.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => setActiveId(s.id)}
-              data-testid={`frame-style-${s.id}`}
-              className={`w-full text-left px-3 py-2 rounded-lg text-[12.5px] transition-all ${
-                activeId === s.id
-                  ? 'bg-brand-amber/15 text-brand-amber border border-brand-amber/30'
-                  : 'text-fg-2 hover:bg-bg-1 border border-transparent'
-              }`}
-            >
-              <div className="font-medium">{s.name}</div>
-              <div className="text-[10.5px] text-fg-3 mt-0.5">{s.description}</div>
-            </button>
-          ))}
-        </div>
+        {GROUP_ORDER.map((group) => {
+          const inGroup = styles.filter((s) => s.group === group)
+          if (inGroup.length === 0) return null
+          return (
+            <div key={group} className="mb-3">
+              <div
+                className="text-[10px] text-brand-amber uppercase tracking-[0.12em] font-mono px-2 py-1 mt-2 border-b border-brand-amber/15 mb-1 flex items-center justify-between"
+                data-testid={`frame-group-${group}`}
+              >
+                <span>{GROUP_LABELS[group]}</span>
+                <span className="text-fg-3 normal-case tracking-normal text-[9.5px]">
+                  {GROUP_SUBTITLES[group]} · {inGroup.length}
+                </span>
+              </div>
+              <div className="space-y-1">
+                {inGroup.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setActiveId(s.id)}
+                    data-testid={`frame-style-${s.id}`}
+                    className={`w-full text-left px-3 py-2 rounded-lg text-[12.5px] transition-all ${
+                      activeId === s.id
+                        ? 'bg-brand-amber/15 text-brand-amber border border-brand-amber/30'
+                        : 'text-fg-2 hover:bg-bg-1 border border-transparent'
+                    }`}
+                  >
+                    <div className="font-medium">{s.name}</div>
+                    <div className="text-[10.5px] text-fg-3 mt-0.5 line-clamp-2">{s.description}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )
+        })}
       </aside>
 
       {/* 预览(FramePreviewHost 按 style.id 分派组件,彻底根治"切换无效") */}
@@ -197,4 +214,43 @@ function fieldLabel(k: string): string {
     location: '地点',
   }
   return map[k] ?? k
+}
+
+// ============================================================================
+// 质感分组 · 与 electron/services/frame/registry.ts 的 GROUPS_ORDERED/LABELS/SUBTITLES 保持一致
+// 前端不能 import electron/ 代码(AGENTS.md 目录约定),只能复制常量
+// 如何防漂移:tests/unit/frameGroupRegistry.test.ts 会校验两端一致
+// ============================================================================
+
+const GROUP_ORDER: readonly FrameStyle['group'][] = [
+  'classic',
+  'editorial',
+  'oil',
+  'floating',
+  'glass',
+  'ambient',
+  'metal',
+  'cinema',
+] as const
+
+const GROUP_LABELS: Record<FrameStyle['group'], string> = {
+  classic: '经典必保',
+  glass: '玻璃拟态',
+  oil: '油画 · 水彩',
+  ambient: '氛围模糊',
+  cinema: '电影 · 霓虹',
+  editorial: '印刷 · 杂志',
+  metal: '金属 · 徽章',
+  floating: '浮动徽章',
+}
+
+const GROUP_SUBTITLES: Record<FrameStyle['group'], string> = {
+  classic: 'CLASSIC',
+  glass: 'FROSTED GLASS',
+  oil: 'OIL · WATERCOLOR',
+  ambient: 'AMBIENT BLUR',
+  cinema: 'CINEMA · NEON',
+  editorial: 'EDITORIAL · PRINT',
+  metal: 'METAL · MEDAL',
+  floating: 'FLOATING',
 }

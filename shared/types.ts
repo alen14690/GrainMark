@@ -360,6 +360,20 @@ export interface FrameStyle {
   name: string
   /** 一句话描述 */
   description: string
+  /**
+   * 质感分组(2026-05-01 新增):用于 UI 按组展示风格列表 · 给用户更清晰的选择层次
+   *
+   * 8 大簇(源自 artifact/ui-mockups/frame-premium-moodboard.html 调研):
+   *   - classic: 经典必保(minimal/polaroid/gallery/editorial/spine/hairline 等老成员)
+   *   - glass:   玻璃拟态(frosted glass 磨砂 · ios dynamic island)
+   *   - oil:     油画 / 水彩(serif italic · 纸质 noise)
+   *   - ambient: 氛围模糊(照片自身 blur · apple music 歌词卡)
+   *   - cinema:  电影 / 霓虹(黑条幕 · 霓虹辉光边)
+   *   - editorial: 印刷 / 杂志(swiss grid · contact sheet)
+   *   - metal:   金属 / 徽章(拉丝铜铭牌 · 金色奖章)
+   *   - floating: 浮动徽章(外接浮卡 · 角章印戳)
+   */
+  group: FrameStyleGroup
   /** 横图布局(aspectRatio > 1.05 用) */
   landscape: FrameLayout
   /** 竖图布局(aspectRatio < 0.95 用);方形走 landscape */
@@ -367,6 +381,26 @@ export interface FrameStyle {
   /** 可覆盖项:字段可见性 / 作者名 / Logo 路径 / 颜色方案 */
   defaultOverrides: FrameStyleOverrides
 }
+
+/**
+ * 质感分组 enum(2026-05-01)
+ *
+ * 分组用途:
+ *   1. Watermark 路由的风格列表按组 section 展示
+ *   2. 便于用户认知 12+ 种风格的质感差异
+ *   3. registry 可提供 getStylesByGroup() 便捷 API
+ *
+ * 顺序即 UI 展示顺序(classic 作为入门默认组放首位):
+ */
+export type FrameStyleGroup =
+  | 'classic' // 经典必保 —— 老成员(minimal / polaroid / gallery 等)
+  | 'glass' // 玻璃拟态 —— frosted backdrop-filter
+  | 'oil' // 油画 / 水彩 —— serif italic + 纸质 noise
+  | 'ambient' // 氛围模糊 —— 照片自身 blur 作底
+  | 'cinema' // 电影 / 霓虹 —— 黑条幕 · 霓虹辉光
+  | 'editorial' // 印刷 / 杂志 —— swiss grid · contact sheet
+  | 'metal' // 金属 / 徽章 —— 拉丝铜铭牌 · 金色奖章
+  | 'floating' // 浮动徽章 —— 外接浮卡 · 角章印戳
 
 /** 每个 style 实例可被用户调整的部分 */
 export interface FrameStyleOverrides {
@@ -381,18 +415,26 @@ export interface FrameStyleOverrides {
 }
 
 /**
- * 全部内置风格 ID(阶段 1 只注册骨架,阶段 2 起逐个实装)
+ * 全部内置风格 ID
  *
- * 保留策略(2026-05-01 用户确认):
- *   - 必保 8:minimal-bar / hairline / film-full-border / polaroid-classic /
- *            gallery-black / gallery-white / editorial-caption / spine-edition
- *   - 可选 4:sx70-square / negative-strip / point-and-shoot-stamp / contax-label
+ * 分组(与 FrameStyleGroup 对应):
+ *   classic(8):  minimal-bar / hairline / film-full-border / polaroid-classic /
+ *                gallery-black / gallery-white / editorial-caption / spine-edition /
+ *                sx70-square / negative-strip / point-and-shoot-stamp / contax-label
+ *                (M-Frame 必保 8 + 可选 4,阶段 2/3 已实装)
+ *   glass(2):    frosted-glass / glass-chip (阶段 5 · A1/A2)
+ *   oil(2):      oil-texture / watercolor-caption (阶段 5 · B1/B2)
+ *   ambient(2):  ambient-glow / bokeh-pillar (阶段 5 · C1/C2)
+ *   cinema(2):   cinema-scope / neon-edge (阶段 5 · D1/D2)
+ *   editorial(2):swiss-grid / contact-sheet (阶段 5 · E1/E2)
+ *   metal(2):    brushed-metal / medal-plate (阶段 5 · F1/F2)
+ *   floating(2): floating-caption / stamp-corner (阶段 5 · H1/H2)
  *
- * **重要**:此 union **仅代表本系统注册过的 ID**,与旧 `WatermarkTemplateId` 无强制对应。
- * 阶段 4 迁移时会提供映射表。
+ * 注意:阶段 5 的 14 个风格以组合 generator + layout 复用为主;
+ *       数据层差异化表达质感,generator 只在必要时做装饰层(glass bar / neon edge)。
  */
 export type FrameStyleId =
-  // 必保 8
+  // classic(12) · M-Frame 阶段 2/3
   | 'minimal-bar'
   | 'hairline'
   | 'film-full-border'
@@ -401,11 +443,31 @@ export type FrameStyleId =
   | 'gallery-white'
   | 'editorial-caption'
   | 'spine-edition'
-  // 可选 4
   | 'sx70-square'
   | 'negative-strip'
   | 'point-and-shoot-stamp'
   | 'contax-label'
+  // glass(2) · 玻璃拟态 · 阶段 5 · A1/A2
+  | 'frosted-glass'
+  | 'glass-chip'
+  // oil(2) · 油画 / 水彩 · 阶段 5 · B1/B2
+  | 'oil-texture'
+  | 'watercolor-caption'
+  // ambient(2) · 氛围模糊 · 阶段 5 · C1/C2
+  | 'ambient-glow'
+  | 'bokeh-pillar'
+  // cinema(2) · 电影 / 霓虹 · 阶段 5 · D1/D2
+  | 'cinema-scope'
+  | 'neon-edge'
+  // editorial(2) · 印刷 / 杂志 · 阶段 5 · E1/E2
+  | 'swiss-grid'
+  | 'contact-sheet'
+  // metal(2) · 金属 / 徽章 · 阶段 5 · F1/F2
+  | 'brushed-metal'
+  | 'medal-plate'
+  // floating(2) · 浮动徽章 · 阶段 5 · H1/H2
+  | 'floating-caption'
+  | 'stamp-corner'
 
 // ============ AI 能力 ============
 
