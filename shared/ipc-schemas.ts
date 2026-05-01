@@ -222,6 +222,38 @@ export const WatermarkRenderSchema = z.object({
   style: WatermarkStyleSchema,
 })
 
+// ============ 边框系统(M-Frame · 2026-05-01) ============
+//
+// FrameStyleId 走字符串枚举,阶段 1/2 的值会逐步扩充。这里不锁死 z.enum,
+// 用 `z.string().regex()` 限定字母数字-号即可,避免每扩一个风格就改 schema。
+export const FrameStyleIdSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[a-z][a-z0-9-]*$/, 'FrameStyleId 必须为小写字母开头的 kebab-case')
+
+export const FrameExifFieldSchema = z.enum([
+  'make',
+  'model',
+  'lens',
+  'aperture',
+  'shutter',
+  'iso',
+  'focalLength',
+  'dateTime',
+  'artist',
+  'location',
+])
+
+export const FrameStyleOverridesSchema = z.object({
+  showFields: z.record(FrameExifFieldSchema, z.boolean()),
+  artistName: z.string().max(128).optional(),
+  logoPath: PathSchema.optional(),
+  colorScheme: z.enum(['default', 'light', 'dark']).optional(),
+})
+
+export const FrameRenderSchema = z.tuple([PathSchema, FrameStyleIdSchema, FrameStyleOverridesSchema])
+
 // ============ AI ============
 export const AICapabilitySchema = z.enum([
   'denoise',
@@ -377,6 +409,9 @@ export const IPC_SCHEMAS = {
 
   'watermark:templates': null,
   'watermark:render': z.tuple([PathSchema, WatermarkStyleSchema]),
+
+  'frame:templates': null,
+  'frame:render': FrameRenderSchema,
 
   'ai:listModels': null,
   'ai:downloadModel': z.string().min(1).max(128),

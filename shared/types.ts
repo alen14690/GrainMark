@@ -95,9 +95,9 @@ export interface TransformParams {
 
 /** 裁切参数（比例值 0-1，相对原图尺寸） */
 export interface CropParams {
-  x: number      // 裁切起点 x（0-1）
-  y: number      // 裁切起点 y（0-1）
-  width: number  // 裁切宽度（0-1）
+  x: number // 裁切起点 x（0-1）
+  y: number // 裁切起点 y（0-1）
+  width: number // 裁切宽度（0-1）
   height: number // 裁切高度（0-1）
 }
 
@@ -273,6 +273,140 @@ export interface WatermarkTemplate {
   defaultStyle: WatermarkStyle
 }
 
+// ============ 边框系统(M-Frame · 2026-05-01 新增) ============
+//
+// 设计方案:artifact/design/frame-system-2026-05-01.md
+//
+// 与旧 `WatermarkStyle` 的区别:
+//   1. 所有尺寸用 `u = minEdge / 1000` 归一化,不用像素常数(解决高分辨率图字号偏小)
+//   2. 横竖朝向维护独立 `FrameLayout`(解决竖图硬套横布局的视觉灾难)
+//   3. `FrameStyleId` 走字符串注册表,不用紧耦合的 union(解决新风格难扩展)
+//
+// 兼容策略:
+//   - 老 `WatermarkStyle` / `WatermarkTemplate` / `WatermarkTemplateId` 全部保留,
+//     `watermark:render` / Batch `watermarkTemplateId` / Editor `exportWatermark` 不改
+//   - 新系统用 `frame:*` IPC 通道与旧系统并行,直到阶段 4 再做迁移清理
+
+/** EXIF 字段白名单(相机/镜头/参数/日期/作者/地点) */
+export type FrameExifField =
+  | 'make'
+  | 'model'
+  | 'lens'
+  | 'aperture'
+  | 'shutter'
+  | 'iso'
+  | 'focalLength'
+  | 'dateTime'
+  | 'artist'
+  | 'location'
+
+/** 字体栈语义名(具体字体由主进程按平台 fallback 解析) */
+export type FrameFontFamily =
+  | 'inter' // 现代无衬线(UI / 机型)
+  | 'mono' // 等宽(参数 / 数字)
+  | 'georgia' // 衬线(宝丽来手写感 / 画册)
+  | 'courier' // 老打字机 / 日期戳
+  | 'typewriter' // 手敲抖动(Typewriter Strip 风格专用)
+
+/** 内容槽:一个 FrameLayout 可以有多个 slot(机型 / 参数 / 日期 / Logo / 作者) */
+export interface FrameContentSlot {
+  id: 'params' | 'model' | 'date' | 'logo' | 'artist'
+  /** slot 所在边框区域 */
+  area: 'top' | 'bottom' | 'left' | 'right' | 'overlay'
+  /** 归一化坐标(0..1 相对于整个 slot 所在区域的外接矩形),无量纲 */
+  anchor: { x: number; y: number }
+  /** 字号比例(乘 minEdge),典型 0.018~0.035。logo slot 无意义但保留给类型统一 */
+  fontSize: number
+  /** 水平对齐 */
+  align: 'left' | 'center' | 'right'
+  /** 字体族(仅文本 slot 用) */
+  fontFamily: FrameFontFamily
+  /** 可选:该 slot 的独立颜色覆盖;不传则走 FrameLayout.textColor */
+  colorOverride?: string
+}
+
+/**
+ * 横向/纵向独立布局描述 —— 纯数据,不含 JSX,可序列化,可做 snapshot
+ *
+ * 所有几何量都是"比例值",渲染时乘 `u = min(imgW, imgH) / 1000` 得到像素。
+ * 例如 `borderBottom = 0.22` 在 4000px 短边的图上等于 880px。
+ */
+export interface FrameLayout {
+  /** 四周边框比例(单位:minEdge / 1000) */
+  borderTop: number
+  borderBottom: number
+  borderLeft: number
+  borderRight: number
+  /** 边框背景色(hex) */
+  backgroundColor: string
+  /** 默认文字颜色 */
+  textColor: string
+  /** 可选强调色(日期戳 / 胶片红字) */
+  accentColor?: string
+  /** 内容 slot 列表(机型 / 参数 / 日期 / Logo / 作者) */
+  slots: FrameContentSlot[]
+}
+
+/**
+ * 边框风格定义 —— 横竖双布局
+ *
+ * 每个 FrameStyleId 对应一个 FrameStyle,由 registry 分派到对应的 SVG 生成器和
+ * React 预览组件。SDK 使用方通过 `overrides` 修改默认文本字段/Logo/颜色方案,
+ * 不能修改 layout 本身(保持设计一致性)。
+ */
+export interface FrameStyle {
+  id: FrameStyleId
+  /** 用户可见名(中文) */
+  name: string
+  /** 一句话描述 */
+  description: string
+  /** 横图布局(aspectRatio > 1.05 用) */
+  landscape: FrameLayout
+  /** 竖图布局(aspectRatio < 0.95 用);方形走 landscape */
+  portrait: FrameLayout
+  /** 可覆盖项:字段可见性 / 作者名 / Logo 路径 / 颜色方案 */
+  defaultOverrides: FrameStyleOverrides
+}
+
+/** 每个 style 实例可被用户调整的部分 */
+export interface FrameStyleOverrides {
+  /** EXIF 字段可见性(老 WatermarkStyle.fields 的等价物) */
+  showFields: Record<FrameExifField, boolean>
+  /** 覆盖摄影师名(默认走 app 全局 settings) */
+  artistName?: string
+  /** 用户上传 Logo 路径(仅部分风格支持) */
+  logoPath?: string
+  /** 颜色方案:部分风格支持 light/dark 反转(如 Gallery Black / White) */
+  colorScheme?: 'default' | 'light' | 'dark'
+}
+
+/**
+ * 全部内置风格 ID(阶段 1 只注册骨架,阶段 2 起逐个实装)
+ *
+ * 保留策略(2026-05-01 用户确认):
+ *   - 必保 8:minimal-bar / hairline / film-full-border / polaroid-classic /
+ *            gallery-black / gallery-white / editorial-caption / spine-edition
+ *   - 可选 4:sx70-square / negative-strip / point-and-shoot-stamp / contax-label
+ *
+ * **重要**:此 union **仅代表本系统注册过的 ID**,与旧 `WatermarkTemplateId` 无强制对应。
+ * 阶段 4 迁移时会提供映射表。
+ */
+export type FrameStyleId =
+  // 必保 8
+  | 'minimal-bar'
+  | 'hairline'
+  | 'film-full-border'
+  | 'polaroid-classic'
+  | 'gallery-black'
+  | 'gallery-white'
+  | 'editorial-caption'
+  | 'spine-edition'
+  // 可选 4
+  | 'sx70-square'
+  | 'negative-strip'
+  | 'point-and-shoot-stamp'
+  | 'contax-label'
+
 // ============ AI 能力 ============
 
 export type AICapability =
@@ -435,6 +569,19 @@ export interface IpcApi {
   'watermark:templates': () => Promise<WatermarkTemplate[]>
   'watermark:render': (photoPath: string, style: WatermarkStyle) => Promise<string>
 
+  // 边框系统(M-Frame · 2026-05-01 新增,与 watermark 并存;详见 shared/types.ts 内块注释)
+  /** 列出全部内置 FrameStyle(阶段 1 仅含已实装的 id) */
+  'frame:templates': () => Promise<FrameStyle[]>
+  /**
+   * 渲染边框到图片。
+   * @returns base64 data URL(与 watermark:render 一致,方便预览弹窗沿用)
+   */
+  'frame:render': (
+    photoPath: string,
+    styleId: FrameStyleId,
+    overrides: FrameStyleOverrides,
+  ) => Promise<string>
+
   // AI
   'ai:listModels': () => Promise<AIModel[]>
   'ai:downloadModel': (modelId: string) => Promise<void>
@@ -475,7 +622,11 @@ export interface IpcApi {
    *
    * 失败策略：任一环节失败返回 AIAnalysisResult.ok=false + 错误分类；UI 展示友好文案。
    */
-  'llm:analyzePhoto': (photoPath: string, activeFilterName: string | null, activeFilterCategory: string | null) => Promise<AIAnalysisResult>
+  'llm:analyzePhoto': (
+    photoPath: string,
+    activeFilterName: string | null,
+    activeFilterCategory: string | null,
+  ) => Promise<AIAnalysisResult>
 }
 
 // ============ LLM 配置（M5-LLM-A） ============

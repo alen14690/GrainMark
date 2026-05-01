@@ -2,6 +2,7 @@ import { registerAIIpc } from './ai.js'
 import { registerBatchIpc } from './batch.js'
 import { registerExtractIpc } from './extract.js'
 import { registerFilterIpc } from './filter.js'
+import { registerFrameIpc } from './frame.js'
 import { registerLLMIpc } from './llm.js'
 import { registerPerfIpc } from './perf.js'
 import { registerPhotoIpc } from './photo.js'
@@ -18,6 +19,7 @@ export function registerAllIpcHandlers() {
   registerBatchIpc()
   registerExtractIpc()
   registerWatermarkIpc()
+  registerFrameIpc()
   registerAIIpc()
   registerLLMIpc()
   registerTrendingIpc()
