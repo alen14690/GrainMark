@@ -65,11 +65,11 @@ export const BORDER = {
     side: 0.06,
     top: 0.06,
     bottomLandscape: 0.14,
-    bottomPortrait: 0.12,
+    bottomPortrait: 0.16, // 竖图 ↑ 从 0.12 → 0.16 · 三行堆叠需要足够高度避免挤压
   },
   minimalBar: {
     bottomLandscape: 0.08,
-    bottomPortrait: 0.1,
+    bottomPortrait: 0.12, // 竖图 ↑ 让 params + date 左右分置不再挤
   },
   hairline: {
     insetLandscape: 0.015,
@@ -77,7 +77,7 @@ export const BORDER = {
   },
   editorialCaption: {
     bottomLandscape: 0.12,
-    bottomPortrait: 0.1,
+    bottomPortrait: 0.14, // 竖图 ↑ 从 0.10 → 0.14 · 配合两行堆叠的垂直空间
   },
   spineEdition: {
     bandLandscape: 0.1, // 横图:底部带
@@ -93,7 +93,10 @@ export const BORDER = {
     stripPortrait: 0.08,
   },
   pointAndShoot: { none: 0 },
-  contaxLabel: { bottomLandscape: 0.1, bottomPortrait: 0.1 },
+  contaxLabel: {
+    bottomLandscape: 0.1,
+    bottomPortrait: 0.14, // 竖图 ↑ 从 0.10 → 0.14 · 两行堆叠需要更多高度
+  },
 } as const
 
 // ============================================================================

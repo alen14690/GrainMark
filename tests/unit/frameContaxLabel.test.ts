@@ -46,16 +46,19 @@ function renderSvg(imgW: number, imgH: number): string {
 }
 
 describe('Contax Label · 几何契约', () => {
-  it('横竖图都是底边 10% · 其它边 0', () => {
+  it('横图底边 10% · 竖图底边 14%(2026-05-01 竖图加厚以容纳两行堆叠)', () => {
     const style = getStyle()
     const gL = computeFrameGeometry(4000, 3000, style)
     const gP = computeFrameGeometry(3000, 4000, style)
-    // minEdge=3000 · 0.1 × 3000 = 300
-    expect(gL.borderBottomPx).toBe(300)
-    expect(gP.borderBottomPx).toBe(300)
+    // minEdge=3000
+    expect(gL.borderBottomPx).toBe(300) // 0.10 × 3000
+    expect(gP.borderBottomPx).toBe(420) // 0.14 × 3000
     expect(gL.borderTopPx).toBe(0)
     expect(gL.borderLeftPx).toBe(0)
     expect(gL.borderRightPx).toBe(0)
+    expect(gP.borderTopPx).toBe(0)
+    expect(gP.borderLeftPx).toBe(0)
+    expect(gP.borderRightPx).toBe(0)
   })
 })
 
@@ -81,12 +84,32 @@ describe('Contax Label · 橙红分隔线', () => {
     expect(svg.toLowerCase()).toMatch(/<line[^>]+stroke="#ff6b00"/)
   })
 
-  it('分隔线 x 位置随 canvasW 动态计算(横竖不同)', () => {
+  it('横图:橙红竖线 x1==x2(canvasW×0.5),y1!=y2', () => {
     const svgL = renderSvg(4000, 3000)
+    // SVG 属性顺序:x1 y1 x2 y2(生成器里就是这个顺序)
+    const match = svgL.match(/<line x1="(\d+)" y1="(\d+)" x2="(\d+)" y2="(\d+)"/)
+    expect(match).toBeTruthy()
+    if (match) {
+      const [, x1, y1, x2, y2] = match
+      expect(x1).toBe('2000')
+      expect(x2).toBe('2000')
+      expect(y1).not.toBe(y2) // 竖线:y 不同
+    }
+  })
+
+  it('竖图:橙红水平短线 y1==y2,x1!=x2 · 位置在底条左侧(2026-05-01 竖图优化)', () => {
     const svgP = renderSvg(3000, 4000)
-    // 横图 canvasW=4000,x1 应是 2000;竖图 canvasW=3000,x1 应是 1500
-    expect(svgL).toMatch(/<line x1="2000"/)
-    expect(svgP).toMatch(/<line x1="1500"/)
+    const match = svgP.match(/<line x1="(\d+)" y1="(\d+)" x2="(\d+)" y2="(\d+)"/)
+    expect(match).toBeTruthy()
+    if (match) {
+      const [, x1, y1, x2, y2] = match
+      // 水平线:y 相同
+      expect(y1).toBe(y2)
+      // x1 ≠ x2 · x1 应 ≈ canvasW × 0.06 = 3000 × 0.06 = 180
+      expect(Number(x1)).toBeLessThan(Number(x2))
+      expect(Number(x1)).toBeGreaterThan(100)
+      expect(Number(x1)).toBeLessThan(300)
+    }
   })
 })
 

@@ -3,17 +3,17 @@
  *
  * 本 spec 核心价值:**直接证伪老 WatermarkOverlay 的"切换无效果" bug**
  *
- * 契约(AGENTS.md 第 7 条 UI 证据链):
- *   F1:边框 Tab 默认可见 · 能看到 FrameStyleRegistry 里至少 1 个风格
- *   F2:点击不同风格 · 预览 div 的 `data-frame-style-id` 属性真的变化
- *        —— 这是预览 DOM 被**真的重新渲染**的直接证据,不是纯 CSS 样式切换
- *   F3:竖图 / 横图的 `data-frame-orientation` 属性正确分类
- *        —— 但这一条需要 seed 不同尺寸的图,现阶段先只覆盖默认 fixture(横图)
+ * 2026-05-01 下午更新:老水印 Tab UI 已下线,路由只剩边框系统 ——
+ *   - F1:路由进入即 FrameStyleRegistry 可见(不再测 Tab class)
+ *   - F2:点击不同风格 · 预览 div 的 `data-frame-style-id` 属性真的变化
+ *        这仍是预览 DOM 被**真的重新渲染**的直接证据
+ *   - F3:反向断言 —— 老 Tab 按钮不应再出现 · data-frame-style-id 恒在
  *
  * 蓝军 mutation 防护:
  *   - 若有人把 FrameStyleRegistry 重新指回 Placeholder,data-frame-style-id
  *     会永远是"placeholder",F2 会红
  *   - 若 FramePreviewHost 不再按 style.id 分派,data attr 也会停在初始值
+ *   - 若有人复活老水印 Tab,F3 的 `toHaveCount(0)` 会红
  */
 import { expect, test } from '@playwright/test'
 import { type LaunchedApp, launchApp } from './_support/launchApp'
@@ -32,12 +32,11 @@ test.describe('Frame 边框系统 · 用户旅程', () => {
     await launched?.cleanup()
   })
 
-  test('F1 · 导航到水印路由,边框 Tab 默认激活,风格列表非空', async () => {
+  test('F1 · 导航到水印路由,边框风格列表直接可见(无 Tab 切换)', async () => {
     const { page } = launched
     await navItem(page, 'watermark').click()
-    await expect(page.getByTestId('watermark-tab-frame')).toBeVisible()
-    // 默认激活边框 Tab,右侧预览容器出现
-    await expect(page.getByTestId('watermark-tab-frame')).toHaveClass(/brand-amber/)
+    // 进入路由即可见 watermark-route 容器(不再有 Tab)
+    await expect(page.getByTestId('watermark-route')).toBeVisible()
     // 至少 1 个 frame 风格(必保 8 之一)
     const minimalBarBtn = page.getByTestId('frame-style-minimal-bar')
     await expect(minimalBarBtn).toBeVisible()
@@ -87,12 +86,12 @@ test.describe('Frame 边框系统 · 用户旅程', () => {
     await expect(page.locator('[data-frame-status="placeholder"]')).toHaveCount(0)
   })
 
-  test('F3 · Tab 切到老水印系统,data-frame-style-id 消失(边框 Tab 已卸载)', async () => {
+  test('F3 · 老水印 Tab UI 已彻底下线(反向蓝军防复活)', async () => {
     const { page } = launched
-    await page.getByTestId('watermark-tab-watermark').click()
-    await expect(page.getByTestId('watermark-tab-watermark')).toHaveClass(/brand-amber/)
-    // 切到老 Tab 后,边框 Tab 的 DOM 应当卸载 ——
-    // 老水印系统不给 data-frame-style-id,所以应当零计数
-    await expect(page.locator('[data-frame-style-id]')).toHaveCount(0)
+    // 下线的老 Tab 按钮不应再出现
+    await expect(page.getByTestId('watermark-tab-frame')).toHaveCount(0)
+    await expect(page.getByTestId('watermark-tab-watermark')).toHaveCount(0)
+    // 边框预览 DOM 恒在(因为不再有 Tab 切换的卸载分支)
+    await expect(page.locator('[data-frame-style-id]').first()).toBeVisible()
   })
 })

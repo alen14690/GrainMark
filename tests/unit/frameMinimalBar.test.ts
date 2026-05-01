@@ -68,11 +68,11 @@ describe('generateMinimalBar · 语义契约', () => {
     const style = getMinimalBarStyle()
     const gL = computeFrameGeometry(4000, 3000, style)
     const gP = computeFrameGeometry(3000, 4000, style)
-    // Minimal Bar 的 landscape.bottomLandscape=0.08,portrait.bottomPortrait=0.1
-    // → 4000×3000 底栏 0.08×3000=240;3000×4000 底栏 0.1×3000=300
-    // → canvasH 分别 3240 和 4300
+    // Minimal Bar 的 landscape.bottomLandscape=0.08,portrait.bottomPortrait=0.12(2026-05-01 竖图加厚)
+    // → 4000×3000 底栏 0.08×3000=240;3000×4000 底栏 0.12×3000=360
+    // → canvasH 分别 3240 和 4360
     expect(gL.canvasH).toBe(3240)
-    expect(gP.canvasH).toBe(4300)
+    expect(gP.canvasH).toBe(4360)
     // SVG viewBox 也得对得上
     expect(renderSvg(4000, 3000)).toContain(`viewBox="0 0 ${gL.canvasW} ${gL.canvasH}"`)
     expect(renderSvg(3000, 4000)).toContain(`viewBox="0 0 ${gP.canvasW} ${gP.canvasH}"`)

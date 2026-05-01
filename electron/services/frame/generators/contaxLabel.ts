@@ -1,22 +1,19 @@
 /**
- * Contax Label · 相机品牌致敬条 SVG 生成器(阶段 3 · 2026-05-01)
+ * Contax Label · 相机品牌致敬条 SVG 生成器(阶段 3 · 2026-05-01 · 竖图优化)
  *
  * 设计(artifact/design/frame-system-2026-05-01.md · 组 E2):
- *   - 底部 10% 黑条,横竖一致(竖图压缩到 10% 的底边也不强制切到侧)
- *   - 左边:大字 Inter 粗体机型(白字);致敬 Contax/Leica 的排版力度
- *   - 右边:小字 mono 参数(白字);参数按优先级截断
- *   - 中间:一根橙红竖线 `|` 视觉分隔(致敬 Leica 红标 / Contax 红 T*)
- *   - **不内置任何品牌 Logo**(AGENTS.md 🔐 安全红线:不碰商标),Logo 位靠用户
- *     上传(overrides.logoPath);未设置则只显示文字
+ *   - 底部黑条(横 10% / 竖 14%)
+ *   - 横图:左边大字机型(Inter 粗体) · 右边小字参数(mono) · 中间橙红竖线分隔
+ *   - 竖图(2026-05-01 优化):两行堆叠 model + params 同左起点 · 中间短水平橙红线
+ *     分隔两行(致敬 Leica 红标,视觉上与横图的竖线互为对应)
  *
- * 与 Editorial Caption 的区别:
- *   - Editorial Caption:纸白底条 + 细黑线分隔(杂志版式,优雅克制)
- *   - Contax Label:黑底条 + 橙红竖线分隔(品牌致敬,力度强烈)
- *   - Editorial 是"杂志 caption",Contax 是"机身铭牌"
+ * 为什么竖图不强行用竖线:
+ *   - 竖图窄,左右分端会让 model/params 撞车(中间只剩 < 30% 宽可供分隔)
+ *   - 改两行堆叠 + 水平短线后,视觉节奏更安静,品牌感不减
+ *   - 散布阈值:横竖只有"线方向"差异,generator 内部一个 if 按 orientation 分派是合理的
+ *     (所有横竖区分逻辑都统一走 layout 数据 · 本处是"装饰几何"的衍生,不违反第 8 条)
  *
- * 实现:
- *   - 走 slotPlacement 通用渲染(area='bottom'),复用已有逻辑
- *   - 橙红竖线在文字之后手工画一条 <line>(位置固定在 canvas 水平 50%,高度占条的 50%)
+ * 不内置任何品牌 Logo(AGENTS.md 🔐 安全红线)
  */
 import { COLOR, scaleByMinEdge } from '../../../../shared/frame-tokens.js'
 import type { FrameContentSlot } from '../../../../shared/types.js'
@@ -25,7 +22,7 @@ import { escSvgText } from '../typography.js'
 import { renderSlotTextGeneric } from './slotPlacement.js'
 
 export const generateContaxLabel: FrameSvgGenerator = ({ geometry, paramLine, modelLine, style }) => {
-  const { canvasW, canvasH, imgOffsetY, imgH, borderBottomPx, layout } = geometry
+  const { canvasW, canvasH, imgOffsetY, imgH, borderBottomPx, layout, orientation } = geometry
   const bgFill = escSvgText(layout.backgroundColor)
 
   const textParts: string[] = []
@@ -35,20 +32,31 @@ export const generateContaxLabel: FrameSvgGenerator = ({ geometry, paramLine, mo
     textParts.push(renderSlotTextGeneric(slot, text, geometry, layout))
   }
 
-  // 橙红竖线 · 固定在 canvas 水平 50% · 高度占底条 50% · 居中
-  const lineX = Math.round(canvasW * 0.5)
-  const lineH = Math.round(borderBottomPx * 0.5)
-  const lineY0 = imgOffsetY + imgH + Math.round((borderBottomPx - lineH) / 2)
-  const lineY1 = lineY0 + lineH
-  const lineStroke = Math.max(scaleByMinEdge(0.003, geometry.imgW, geometry.imgH), 2)
   const lineColor = escSvgText(COLOR.dateStampOrange)
-  const accentLine =
-    borderBottomPx > 0
-      ? `<line x1="${lineX}" y1="${lineY0}" x2="${lineX}" y2="${lineY1}" stroke="${lineColor}" stroke-width="${lineStroke}" stroke-linecap="round"/>`
-      : ''
+  const lineStroke = Math.max(scaleByMinEdge(0.003, geometry.imgW, geometry.imgH), 2)
+  const barTop = imgOffsetY + imgH
+
+  let accentLine = ''
+  if (borderBottomPx > 0) {
+    if (orientation === 'portrait') {
+      // 竖图:短水平橙红线 · 分隔 model(上行)和 params(下行)
+      //   位置:底条垂直中线 · x 起点 6%(与 model/params 对齐) · 宽 18%(短装饰)
+      const lineY = barTop + Math.round(borderBottomPx * 0.5)
+      const lineX0 = Math.round(canvasW * 0.06)
+      const lineX1 = lineX0 + Math.round(canvasW * 0.18)
+      accentLine = `<line x1="${lineX0}" y1="${lineY}" x2="${lineX1}" y2="${lineY}" stroke="${lineColor}" stroke-width="${lineStroke}" stroke-linecap="round"/>`
+    } else {
+      // 横图:橙红竖线 · 分隔左 model 和右 params · 位置 canvasW×0.5 · 高度占底条 50%
+      const lineX = Math.round(canvasW * 0.5)
+      const lineH = Math.round(borderBottomPx * 0.5)
+      const lineY0 = barTop + Math.round((borderBottomPx - lineH) / 2)
+      const lineY1 = lineY0 + lineH
+      accentLine = `<line x1="${lineX}" y1="${lineY0}" x2="${lineX}" y2="${lineY1}" stroke="${lineColor}" stroke-width="${lineStroke}" stroke-linecap="round"/>`
+    }
+  }
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}" height="${canvasH}" viewBox="0 0 ${canvasW} ${canvasH}">
-  <!-- style=${escSvgText(style.id)} -->
+  <!-- style=${escSvgText(style.id)} orientation=${orientation} -->
   <rect x="0" y="0" width="${canvasW}" height="${canvasH}" fill="${bgFill}"/>
   ${accentLine}
   ${textParts.join('\n  ')}

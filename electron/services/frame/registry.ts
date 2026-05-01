@@ -73,7 +73,8 @@ const MINIMAL_BAR: FrameStyle = {
     ],
   },
   portrait: {
-    // 竖图把底栏稍加厚(按 BORDER.minimalBar.bottomPortrait),其它一致
+    // 竖图把底栏加厚(按 BORDER.minimalBar.bottomPortrait = 0.12),params 字号下调防止
+    // 竖图宽度下与 date 左右分置时挤到一起(landscape 0.022 在竖图会溢出)
     borderTop: 0,
     borderBottom: BORDER.minimalBar.bottomPortrait,
     borderLeft: 0,
@@ -85,7 +86,7 @@ const MINIMAL_BAR: FrameStyle = {
         id: 'params',
         area: 'bottom',
         anchor: { x: 0.04, y: 0.5 },
-        fontSize: FONT_SIZE.params,
+        fontSize: 0.02, // 竖图专属 · 从 0.022 下调到 0.02 给 date 留空间
         align: 'left',
         fontFamily: 'mono',
       },
@@ -93,7 +94,7 @@ const MINIMAL_BAR: FrameStyle = {
         id: 'date',
         area: 'bottom',
         anchor: { x: 0.96, y: 0.5 },
-        fontSize: FONT_SIZE.caption,
+        fontSize: 0.014, // 竖图专属 · 从 0.018 下调 · 右对齐日期更紧凑
         align: 'right',
         fontFamily: 'mono',
         colorOverride: COLOR.softGray,
@@ -354,6 +355,8 @@ const GALLERY_BLACK: FrameStyle = {
     ],
   },
   portrait: {
+    // 竖图底栏加厚到 16%(配合三行堆叠),且主字号下调从 0.028 → 0.024
+    // 避免在竖图窄画幅下字太大破坏端庄感
     borderTop: BORDER.gallery.top,
     borderBottom: BORDER.gallery.bottomPortrait,
     borderLeft: BORDER.gallery.side,
@@ -364,15 +367,15 @@ const GALLERY_BLACK: FrameStyle = {
       {
         id: 'model',
         area: 'bottom',
-        anchor: { x: 0.5, y: 0.35 },
-        fontSize: FONT_SIZE.mainTitle,
+        anchor: { x: 0.5, y: 0.28 },
+        fontSize: 0.024, // 竖图专属 · 从 0.028 下调
         align: 'center',
         fontFamily: 'georgia',
       },
       {
         id: 'artist',
         area: 'bottom',
-        anchor: { x: 0.5, y: 0.62 },
+        anchor: { x: 0.5, y: 0.58 },
         fontSize: FONT_SIZE.caption,
         align: 'center',
         fontFamily: 'georgia',
@@ -380,7 +383,7 @@ const GALLERY_BLACK: FrameStyle = {
       {
         id: 'date',
         area: 'bottom',
-        anchor: { x: 0.5, y: 0.82 },
+        anchor: { x: 0.5, y: 0.85 },
         fontSize: FONT_SIZE.smallLabel,
         align: 'center',
         fontFamily: 'mono',
@@ -483,6 +486,8 @@ const EDITORIAL_CAPTION: FrameStyle = {
     ],
   },
   portrait: {
+    // 竖图专属:两行堆叠(model 上 · params 下) · 避免左右分端在窄画幅挤压
+    // 底栏 14%(token 已上调),两行 + 中间留气口
     borderTop: 0,
     borderBottom: BORDER.editorialCaption.bottomPortrait,
     borderLeft: 0,
@@ -491,27 +496,30 @@ const EDITORIAL_CAPTION: FrameStyle = {
     textColor: COLOR.inkGray,
     slots: [
       {
+        // 机型:上行左对齐 · 字号从 0.028 → 0.024 · 竖图主标题紧凑一些
         id: 'model',
         area: 'bottom',
-        anchor: { x: 0.05, y: 0.45 },
-        fontSize: FONT_SIZE.mainTitle,
+        anchor: { x: 0.05, y: 0.3 },
+        fontSize: 0.024,
         align: 'left',
         fontFamily: 'inter',
       },
       {
+        // 参数:下行左对齐 · 与 model 同起点保持左对齐视觉轴
         id: 'params',
         area: 'bottom',
-        anchor: { x: 0.95, y: 0.45 },
+        anchor: { x: 0.05, y: 0.62 },
         fontSize: FONT_SIZE.caption,
-        align: 'right',
+        align: 'left',
         fontFamily: 'mono',
       },
       {
+        // 日期:右下小字 softGray · 与 params 同行但右对齐
         id: 'date',
         area: 'bottom',
-        anchor: { x: 0.5, y: 0.8 },
+        anchor: { x: 0.95, y: 0.85 },
         fontSize: FONT_SIZE.smallLabel,
-        align: 'center',
+        align: 'right',
         fontFamily: 'mono',
         colorOverride: COLOR.softGray,
       },
@@ -939,6 +947,8 @@ const CONTAX_LABEL: FrameStyle = {
     ],
   },
   portrait: {
+    // 竖图专属:两行堆叠(model 上 · params 下) · 与 Editorial 对称但背景为黑
+    // 底栏 14%(token 已上调),两行同左起点建立视觉轴
     borderTop: 0,
     borderBottom: BORDER.contaxLabel.bottomPortrait,
     borderLeft: 0,
@@ -949,17 +959,17 @@ const CONTAX_LABEL: FrameStyle = {
       {
         id: 'model',
         area: 'bottom',
-        anchor: { x: 0.06, y: 0.55 },
-        fontSize: FONT_SIZE.mainTitle,
+        anchor: { x: 0.06, y: 0.3 },
+        fontSize: 0.024, // 竖图主标题从 0.028 → 0.024
         align: 'left',
         fontFamily: 'inter',
       },
       {
         id: 'params',
         area: 'bottom',
-        anchor: { x: 0.94, y: 0.55 },
+        anchor: { x: 0.06, y: 0.68 },
         fontSize: FONT_SIZE.caption,
-        align: 'right',
+        align: 'left',
         fontFamily: 'mono',
       },
     ],
