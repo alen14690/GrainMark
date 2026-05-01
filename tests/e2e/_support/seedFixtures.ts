@@ -5,12 +5,19 @@
  *   - 从 tests/fixtures/images/*.jpg 挑选 N 张
  *   - 拷贝到 launchApp 返回的 tmpDir/work/photos/ 下（随机子目录避免同名冲突）
  *   - 通过 IPC photo:import 注入到主进程 photoStore
+ *   - 可选：触发渲染进程 reload 让 zustand store 感知新 photos（默认 reload）
  *   - 返回注入后的 Photo 列表（供 spec assert id / path）
  *
  * 为什么不直接读 fixtures 源路径注入：
  *   - fixtures 在仓库路径下，不一定在 PathGuard 白名单里（repo root 可能在 Desktop 外）
  *   - 拷到 os.tmpdir() 下能命中 main.ts 默认白名单（app.getPath('temp')）
  *   - 这也更贴近真实使用：用户导入的图通常是运行时目录
+ *
+ * 为什么默认 reload：
+ *   - 渲染进程 appStore 只在首次 init() 时拉 photo:list；seed 发生在 init 之后
+ *     的 IPC 写入，store 状态不会自动同步
+ *   - reload 后 App 重新 init() → 重新拉 photo:list → 看到 seed 进的照片
+ *   - 附带验证：photos.json 持久化 + 下一次启动正确加载（也是一条重要契约）
  */
 import * as fs from 'node:fs'
 import * as path from 'node:path'
@@ -40,6 +47,11 @@ export interface SeedPhotosOptions {
   names?: readonly string[]
   /** 目标工作目录（通常是 launchApp 的 tmpDir）下的子目录名，默认 'work/photos' */
   subdir?: string
+  /**
+   * 注入后是否 reload 渲染进程让 zustand store 感知（默认 true）。
+   * 传 false 只做 IPC 层注入，适合只需要验证主进程状态的 spec。
+   */
+  reloadRenderer?: boolean
 }
 
 /**
@@ -56,6 +68,7 @@ export async function seedPhotos(
 ): Promise<SeededPhoto[]> {
   const names = options.names ?? DEFAULT_FIXTURE_NAMES
   const subdir = options.subdir ?? 'work/photos'
+  const reloadRenderer = options.reloadRenderer ?? true
   const destDir = path.join(tmpDir, subdir)
   fs.mkdirSync(destDir, { recursive: true })
 
@@ -77,5 +90,18 @@ export async function seedPhotos(
   if (!Array.isArray(imported) || imported.length === 0) {
     throw new Error(`[seedPhotos] photo:import 返回空数组。copiedPaths=${copiedPaths.join(',')}`)
   }
+
+  if (reloadRenderer) {
+    // 让渲染进程重新 init() → appStore 拉 photo:list 看到新数据
+    await page.evaluate(() => {
+      window.location.reload()
+    })
+    await page.waitForLoadState('domcontentloaded')
+    await page.waitForFunction(() => {
+      const g = (window as unknown as { grain?: { invoke?: unknown } }).grain
+      return !!g && typeof g.invoke === 'function'
+    })
+  }
+
   return imported
 }
