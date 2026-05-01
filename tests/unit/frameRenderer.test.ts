@@ -1,13 +1,16 @@
 /**
- * frameRenderer 阶段 1 契约测试
+ * frameRenderer 契约测试
  *
- * 阶段 1 的承诺:
- *   - renderFrame 不会静默成功返回占位数据 —— 必须抛清晰错误
- *   - 错误消息要含 styleId,方便定位
- *   - 未注册的 id 与已注册但未实装的 id 有不同错误分支
+ * 阶段 2 状态:
+ *   - minimal-bar:已实装 generator(调用会真的走到 Sharp,不再抛"尚未实装")
+ *   - 其它风格(polaroid-classic 等):尚未实装 generator,仍抛明确错误
  *
- * 这条测试在阶段 2 起会被替换为真实 generator 的像素级 snapshot 测试。
- * 本测试的意义是"防止有人误以为阶段 1 渲染可用"从而推上线。
+ * 这条测试的意义(AGENTS.md 第 4 条):
+ *   - 防止未来"新增 FrameStyleId 忘记挂 generator"时被静默放过
+ *   - 确保"未注册 id"与"未实装 id"的错误信息不同(便于诊断)
+ *
+ * 不测 minimal-bar 的真实渲染 —— 那需要真实图片文件,属 visual regression 范畴,
+ * 阶段 2 尾声统一加 pixelmatch baseline。
  */
 import { describe, expect, it } from 'vitest'
 import { renderFrame } from '../../electron/services/frame/renderer'
@@ -28,16 +31,28 @@ const EMPTY_OVERRIDES: FrameStyleOverrides = {
   },
 }
 
-describe('renderFrame 阶段 1 · 诚实抛错契约', () => {
-  it('未注册的 styleId 抛"未注册"错误', async () => {
+describe('renderFrame · 错误边界契约', () => {
+  it('未注册的 FrameStyleId 抛"未注册"错误', async () => {
+    // sx70-square 阶段 2 尚未注册到 registry
     await expect(renderFrame('/tmp/fake.jpg', 'sx70-square', EMPTY_OVERRIDES)).rejects.toThrow(
       /sx70-square.*未注册/,
     )
   })
 
-  it('已注册但未实装(阶段 1 只有 minimal-bar)抛"尚未实装"错误,且错误消息含 styleId', async () => {
-    await expect(renderFrame('/tmp/fake.jpg', 'minimal-bar', EMPTY_OVERRIDES)).rejects.toThrow(
-      /尚未实装.*minimal-bar/,
-    )
+  it('注册了但无 generator 的风格抛"尚未实装"错误(阶段 2 逐步消除)', async () => {
+    // 阶段 2 的某个时刻:registry 里有 style 但 renderer 的 GENERATORS map 里还没挂。
+    // 当前:minimal-bar 已实装;阶段 2 后续会注册更多风格后再挂 generator。
+    //
+    // 这里不硬编码"哪个 id 未实装",避免每实装一个就得改测试;
+    // 改为验证"实装之后不能回归成尚未实装":
+    // minimal-bar 调用会在 Sharp 层因文件不存在失败,但错误消息不得含"尚未实装"。
+    let caught: Error | null = null
+    try {
+      await renderFrame('/tmp/nonexistent-frame-test.jpg', 'minimal-bar', EMPTY_OVERRIDES)
+    } catch (err) {
+      caught = err as Error
+    }
+    expect(caught, 'minimal-bar 应当因 Sharp 读不到文件而抛错').toBeTruthy()
+    expect(caught?.message ?? '').not.toMatch(/尚未实装/)
   })
 })

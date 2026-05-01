@@ -13,6 +13,7 @@ import type { ComponentType } from 'react'
  */
 import type { FrameStyle, FrameStyleId, FrameStyleOverrides } from '../../../shared/types'
 import type { Photo } from '../../../shared/types'
+import { MinimalBarLayout } from './layouts/MinimalBarLayout'
 import { PlaceholderFrameLayout } from './layouts/PlaceholderFrameLayout'
 
 /** 每个 layout 组件接收的标准 props */
@@ -33,10 +34,15 @@ export interface FrameLayoutProps {
 }
 
 const LAYOUT_REGISTRY: Partial<Record<FrameStyleId, ComponentType<FrameLayoutProps>>> = {
-  // 阶段 1 占位 —— minimal-bar 指向一个"明确告知尚未实装"的占位组件。
-  // 阶段 2 起会替换为真实 `MinimalBarLayout` 等。
-  'minimal-bar': PlaceholderFrameLayout,
+  // 阶段 2:Minimal Bar 已实装(SVG generator + CSS 预览双端对齐)
+  'minimal-bar': MinimalBarLayout,
+  // 阶段 2 后续会替换:polaroid-classic / film-full-border / gallery-black /
+  // gallery-white / editorial-caption / spine-edition / hairline
+  // 在各自 commit 中加入对应 layout,未加入前 FramePreviewHost 会走"尚未实装"友好 fallback
 }
+
+/** 占位布局导出:给未注册的风格调用方手动 fallback 用(可选) */
+export { PlaceholderFrameLayout }
 
 /**
  * 查前端布局组件。
