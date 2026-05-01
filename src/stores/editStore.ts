@@ -456,8 +456,25 @@ export const useEditStore = create<EditState>()(
   })),
 )
 
-// E2E 测试钩子：将 store 挂到 window 供 Playwright page.evaluate 访问
-// 仅在 development / test 模式下注入，生产环境不暴露
-if (typeof window !== 'undefined' && (import.meta.env.DEV || import.meta.env.MODE === 'test')) {
-  ;(window as unknown as { __grainEditStore?: unknown }).__grainEditStore = useEditStore
+// E2E 测试钩子:将 store 挂到 window 供 Playwright page.evaluate 访问
+//
+// 挂载条件(2026-05-01 修订):
+//   - 优先走 preload 暴露的 `window.grain.testMode`——只有主进程启动时设置了
+//     `GRAINMARK_TEST=1`(launchApp / packaged smoke 都会注入)才为 true
+//   - 兜底保留 `import.meta.env.DEV` 走本地 vite dev server 调试
+//
+// 为什么不能只用 `import.meta.env.DEV || MODE === 'test'`:
+//   - E2E 实际跑的是 `npm run build` 产出的 production 构建,DEV/MODE 都 false
+//   - 旧条件会让 __grainEditStore 在 E2E 下恒不存在,"滤镜 pipeline 真生效"的断言
+//     无法读 store 状态,只能退回纯 DOM 断言 —— 这正是 2026-05-01 E2E 审计
+//     定位的"伪绿根因"
+//
+// 生产环境用户完全不会有 GRAINMARK_TEST 环境变量,这里不会暴露。
+if (typeof window !== 'undefined') {
+  const grain = (window as unknown as { grain?: { testMode?: boolean } }).grain
+  const testModeByPreload = grain?.testMode === true
+  const isDevBuild = import.meta.env.DEV || import.meta.env.MODE === 'test'
+  if (testModeByPreload || isDevBuild) {
+    ;(window as unknown as { __grainEditStore?: unknown }).__grainEditStore = useEditStore
+  }
 }

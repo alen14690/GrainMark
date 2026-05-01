@@ -22,6 +22,16 @@ import { contextBridge, ipcRenderer } from 'electron'
 const CHANNEL_PATTERN =
   /^(filter|photo|preview|batch|extract|watermark|ai|llm|trending|sync|settings|dialog|app|perf):([a-zA-Z]+|[a-zA-Z]+:[a-zA-Z-]+)$/
 
+/**
+ * testMode 标志:仅当主进程启动时设置了 `GRAINMARK_TEST=1` 才为 true。
+ * - E2E 测试环境(launchApp 会注入该环境变量)下暴露,供渲染进程判定是否挂载
+ *   `__grainEditStore` 等调试钩子
+ * - 生产构建默认不会有此环境变量 → testMode=false → 调试钩子不挂载
+ * - 替代掉 `import.meta.env.DEV || MODE === 'test'` 条件:那只在 vite dev 服务器下为真,
+ *   `npm run build` 产物里恒为 false,导致 E2E(跑的就是 build 产物)无法访问 store
+ */
+const testMode = process.env.GRAINMARK_TEST === '1'
+
 const api = {
   invoke: (channel: string, ...args: unknown[]) => {
     if (typeof channel !== 'string' || !CHANNEL_PATTERN.test(channel)) {
@@ -40,6 +50,7 @@ const api = {
   },
 
   platform: process.platform,
+  testMode,
 }
 
 contextBridge.exposeInMainWorld('grain', api)
