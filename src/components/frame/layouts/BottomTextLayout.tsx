@@ -11,9 +11,13 @@ import { DEFAULT_FRAME_SHOW_FIELDS, buildFrameParamLine } from '../../../../shar
  *   - Georgia 字体族自动 italic
  *   - 字号 scaleByMinEdge(slot.fontSize, container)
  *
- * Polaroid Classic 之前已经有单独的 PolaroidClassicLayout.tsx,本组件不接管它
- * (本 commit 只加 Gallery/Editorial 用;Polaroid 的独立实现保持不动,避免
- * 回归风险;后续阶段可考虑统一)。
+ * 2026-05-01 修订:
+ *   - 参数行去重:有 model slot → buildFrameParamLine 的 excludeModelMake=true
+ *     避免 "SONY · ILCE-7SM3 · FE 70-200mm..."(model 和主标题重复)
+ *   - 默认关闭 dateTime slot(用户反馈"拍摄时间不要了")
+ *   - 加 max-width + text-overflow:ellipsis · 防参数过长溢出盒子(截图反馈场景)
+ *
+ * Polaroid Classic 有单独组件,本组件不接管;Gallery / Editorial 共享本组件。
  */
 import { FONT_STACK, classifyOrientation, scaleByMinEdge } from '../../../../shared/frame-tokens'
 import type { FrameContentSlot } from '../../../../shared/types'
@@ -36,8 +40,9 @@ export function BottomTextLayout({
   const borderRight = scaleByMinEdge(layout.borderRight, containerWidth, containerHeight)
 
   const showFields = overrides.showFields ?? DEFAULT_FRAME_SHOW_FIELDS
+  const hasModelSlot = layout.slots.some((s) => s.id === 'model')
   const modelLine = [photo.exif.make, photo.exif.model].filter(Boolean).join(' ')
-  const paramLine = buildFrameParamLine(photo.exif, showFields)
+  const paramLine = buildFrameParamLine(photo.exif, showFields, { excludeModelMake: hasModelSlot })
   const dateLine = showFields.dateTime ? (photo.exif.dateTimeOriginal ?? '') : ''
   const artistLine = showFields.artist ? (overrides.artistName ?? photo.exif.artist ?? '') : ''
 
@@ -119,6 +124,22 @@ function SlotText({
   const left = slot.anchor.x * containerWidth
   const translateX = slot.align === 'center' ? '-50%' : slot.align === 'right' ? '-100%' : '0'
   const italic = slot.fontFamily === 'georgia' || slot.fontFamily === 'typewriter'
+
+  // 计算可用宽度(从 anchor 点到盒子边,按 align 方向;留 4% 安全边距避免贴边)
+  //   align=left:从 anchor.x 到盒子右边
+  //   align=right:从盒子左边到 anchor.x
+  //   align=center:取左右较短距离的 2 倍(对称可用宽度)
+  const safetyMargin = containerWidth * 0.04
+  let maxW: number
+  if (slot.align === 'left') {
+    maxW = containerWidth - left - safetyMargin
+  } else if (slot.align === 'right') {
+    maxW = left - safetyMargin
+  } else {
+    maxW = Math.min(left, containerWidth - left) * 2 - safetyMargin
+  }
+  maxW = Math.max(maxW, 40) // 至少 40px 避免退化为 0
+
   return (
     <div
       style={{
@@ -132,6 +153,9 @@ function SlotText({
         fontStyle: italic ? 'italic' : 'normal',
         whiteSpace: 'nowrap',
         lineHeight: 1.2,
+        maxWidth: `${maxW}px`,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
       }}
     >
       {text}

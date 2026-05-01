@@ -70,7 +70,14 @@ export async function renderWithGenerator(
   const geometry = computeFrameGeometry(imgW, imgH, style)
 
   // 构建文本行(调用方的 generator 不直接读 EXIF,避免散布)
-  const paramLine = buildFrameParamLine(exif, overrides.showFields)
+  //
+  // 去重策略(2026-05-01):
+  //   layout.slots 里若有独立 'model' slot → 参数行跳过 make/model · 避免重复
+  //   仅 minimal-bar 横图等"无 model slot"的风格保留 make/model 在参数行
+  const hasModelSlot = geometry.layout.slots.some((s) => s.id === 'model')
+  const paramLine = buildFrameParamLine(exif, overrides.showFields, {
+    excludeModelMake: hasModelSlot,
+  })
   const modelLine = [exif.make, exif.model].filter(Boolean).join(' ')
   const dateLine = overrides.showFields.dateTime ? (exif.dateTimeOriginal ?? '') : ''
   // artist 字段:overrides.artistName 优先(用户显式传入),兜底 exif.artist

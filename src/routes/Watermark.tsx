@@ -129,22 +129,26 @@ function FrameTabBody({
         <div>
           <div className="text-[11px] text-fg-2 uppercase tracking-wider font-mono mb-1.5">显示字段</div>
           <div className="space-y-1 text-[12px]">
-            {(Object.keys(overrides.showFields) as (keyof FrameStyleOverrides['showFields'])[]).map((k) => (
-              <label key={k} className="flex items-center justify-between gap-2 py-0.5 cursor-pointer">
-                <span className="text-fg-2 capitalize">{fieldLabel(k)}</span>
-                <input
-                  type="checkbox"
-                  checked={overrides.showFields[k]}
-                  onChange={(e) =>
-                    setOverrides((o) => ({
-                      ...o,
-                      showFields: { ...o.showFields, [k]: e.target.checked },
-                    }))
-                  }
-                  className="accent-brand-amber"
-                />
-              </label>
-            ))}
+            {(Object.keys(overrides.showFields) as (keyof FrameStyleOverrides['showFields'])[])
+              // 2026-05-01 用户反馈"拍摄时间不要了" · UI 不展示该字段
+              //   在 Overrides 类型里保留以兼容老数据 · 但 UI + 默认值双闭环关闭
+              .filter((k) => k !== 'dateTime')
+              .map((k) => (
+                <label key={k} className="flex items-center justify-between gap-2 py-0.5 cursor-pointer">
+                  <span className="text-fg-2 capitalize">{fieldLabel(k)}</span>
+                  <input
+                    type="checkbox"
+                    checked={overrides.showFields[k]}
+                    onChange={(e) =>
+                      setOverrides((o) => ({
+                        ...o,
+                        showFields: { ...o.showFields, [k]: e.target.checked },
+                      }))
+                    }
+                    className="accent-brand-amber"
+                  />
+                </label>
+              ))}
           </div>
         </div>
 
@@ -186,7 +190,9 @@ function fieldLabel(k: string): string {
     shutter: '快门',
     iso: 'ISO',
     focalLength: '焦距',
-    dateTime: '拍摄时间',
+    // dateTime: '拍摄时间', — 2026-05-01 用户反馈"拍摄时间不要了" · UI 隐藏此选项
+    //   默认关闭(DEFAULT_FRAME_SHOW_FIELDS.dateTime=false)
+    //   仍保留在 Record 类型里以兼容老 override 数据 · 不崩
     artist: '摄影师',
     location: '地点',
   }

@@ -13,6 +13,19 @@
  */
 import type { FrameStyleOverrides, PhotoExif } from './types.js'
 
+/** buildFrameParamLine 可选行为 */
+export interface FrameParamLineOptions {
+  /**
+   * 设 true 时:参数行跳过 make 和 model · 适合有独立 model slot 的 layout
+   *
+   * 用户反馈(2026-05-01):"上面已经显示了机型,下面详细参数就不要重复了"
+   * 有独立 model slot 的 layout(Polaroid / Gallery / Editorial / Contax / Minimal
+   * Bar 竖图 / Film Full Border)传 true,参数行只保留镜头 + 光学/感光参数,
+   * 避免 "SONY ILCE-7SM3" 在主标题和参数行里重复出现。
+   */
+  excludeModelMake?: boolean
+}
+
 /**
  * 按 showFields 设置和 EXIF 字段构建参数行文本。
  *
@@ -24,10 +37,17 @@ import type { FrameStyleOverrides, PhotoExif } from './types.js'
  *   - 比 " · " 更有呼吸感
  *   - 比 " | " 更少金属感,符合胶片摄影调性
  */
-export function buildFrameParamLine(exif: PhotoExif, showFields: FrameStyleOverrides['showFields']): string {
+export function buildFrameParamLine(
+  exif: PhotoExif,
+  showFields: FrameStyleOverrides['showFields'],
+  options: FrameParamLineOptions = {},
+): string {
   const parts: string[] = []
-  if (showFields.make && exif.make) parts.push(exif.make)
-  if (showFields.model && exif.model) parts.push(exif.model)
+  const excludeModelMake = options.excludeModelMake === true
+  if (!excludeModelMake) {
+    if (showFields.make && exif.make) parts.push(exif.make)
+    if (showFields.model && exif.model) parts.push(exif.model)
+  }
   if (showFields.lens && exif.lensModel) parts.push(exif.lensModel)
   if (showFields.focalLength && exif.focalLength) parts.push(`${exif.focalLength}mm`)
   if (showFields.aperture && exif.fNumber) parts.push(`f/${exif.fNumber}`)
@@ -36,7 +56,14 @@ export function buildFrameParamLine(exif: PhotoExif, showFields: FrameStyleOverr
   return parts.join('  ·  ')
 }
 
-/** 默认全开的 showFields(阶段 2 UI 未接通时预览用) */
+/**
+ * 默认 showFields。
+ *
+ * 2026-05-01 修订:dateTime 改为 false ——
+ *   用户反馈"拍摄时间不要了"。EXIF 日期戳通常与照片本身的美学无关,
+ *   且常带时区错漂(手机拍的标 UTC,相机拍的标本地),默认展示会造成困扰。
+ *   需要的用户可通过 FrameStyleOverrides.showFields.dateTime=true 手动开启。
+ */
 export const DEFAULT_FRAME_SHOW_FIELDS: FrameStyleOverrides['showFields'] = {
   make: true,
   model: true,
@@ -45,7 +72,7 @@ export const DEFAULT_FRAME_SHOW_FIELDS: FrameStyleOverrides['showFields'] = {
   shutter: true,
   iso: true,
   focalLength: true,
-  dateTime: true,
+  dateTime: false,
   artist: false,
   location: false,
 }

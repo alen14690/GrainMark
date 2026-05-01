@@ -35,9 +35,11 @@ export function MinimalBarLayout({
   const dateSlot = layout.slots.find((s) => s.id === 'date')
 
   // 文本内容 · 统一走 shared/frame-text 的单源
+  // 去重:有 model slot(竖图)→ 参数行跳过 make/model · 横图单行 params 不受影响
   const showFields = overrides.showFields ?? DEFAULT_FRAME_SHOW_FIELDS
+  const hasModelSlot = layout.slots.some((s) => s.id === 'model')
   const modelLine = [photo.exif.make, photo.exif.model].filter(Boolean).join(' ')
-  const paramLine = buildFrameParamLine(photo.exif, showFields)
+  const paramLine = buildFrameParamLine(photo.exif, showFields, { excludeModelMake: hasModelSlot })
   const dateLine = showFields.dateTime ? (photo.exif.dateTimeOriginal ?? '') : ''
 
   const bg = layout.backgroundColor
@@ -123,6 +125,20 @@ function AbsSlot({
   const top = slot.anchor.y * barH - fontPx * 0.5
   const left = slot.anchor.x * containerWidth
   const translateX = slot.align === 'center' ? '-50%' : slot.align === 'right' ? '-100%' : '0'
+
+  // 按 align 计算"从 anchor 到盒子边"的可用宽度 · 留 4% 安全边距
+  //   left:从 anchor.x 到右边;right:从左边到 anchor.x;center:左右较短的 2 倍
+  const safety = containerWidth * 0.04
+  let maxW: number
+  if (slot.align === 'left') {
+    maxW = containerWidth - left - safety
+  } else if (slot.align === 'right') {
+    maxW = left - safety
+  } else {
+    maxW = Math.min(left, containerWidth - left) * 2 - safety
+  }
+  maxW = Math.max(maxW, 40)
+
   return (
     <div
       style={{
@@ -135,7 +151,7 @@ function AbsSlot({
         fontFamily: FONT_STACK[slot.fontFamily].css,
         whiteSpace: 'nowrap',
         lineHeight: 1.2,
-        maxWidth: `${containerWidth - 20}px`,
+        maxWidth: `${maxW}px`,
         overflow: 'hidden',
         textOverflow: 'ellipsis',
       }}

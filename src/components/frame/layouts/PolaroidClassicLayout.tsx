@@ -28,8 +28,9 @@ export function PolaroidClassicLayout({
   const borderRight = scaleByMinEdge(layout.borderRight, containerWidth, containerHeight)
 
   const showFields = overrides.showFields ?? DEFAULT_FRAME_SHOW_FIELDS
+  const hasModelSlot = layout.slots.some((s) => s.id === 'model')
   const modelLine = [photo.exif.make, photo.exif.model].filter(Boolean).join(' ')
-  const paramLine = buildFrameParamLine(photo.exif, showFields)
+  const paramLine = buildFrameParamLine(photo.exif, showFields, { excludeModelMake: hasModelSlot })
   const dateLine = showFields.dateTime ? (photo.exif.dateTimeOriginal ?? '') : ''
 
   const modelSlot = layout.slots.find((s) => s.id === 'model')

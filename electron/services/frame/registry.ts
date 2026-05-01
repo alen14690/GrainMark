@@ -30,7 +30,7 @@ const DEFAULT_OVERRIDES: FrameStyleOverrides = {
     shutter: true,
     iso: true,
     focalLength: true,
-    dateTime: true,
+    dateTime: false, // 2026-05-01 用户反馈"拍摄时间不要了" · 默认关闭
     artist: false,
     location: false,
   },
