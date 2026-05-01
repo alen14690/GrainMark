@@ -94,4 +94,25 @@ test.describe('Frame 边框系统 · 用户旅程', () => {
     // 边框预览 DOM 恒在(因为不再有 Tab 切换的卸载分支)
     await expect(page.locator('[data-frame-style-id]').first()).toBeVisible()
   })
+
+  test('F4 · 照片盒子(data-frame-photo-box)存在且 layout 在盒内渲染(2026-05-01 · 照片贴合)', async () => {
+    const { page } = launched
+    // 切到 Minimal Bar · 预览应当出现 data-frame-photo-box
+    await page.getByTestId('frame-style-minimal-bar').click()
+    const photoBox = page.locator('[data-frame-photo-box="true"]')
+    await expect(photoBox).toBeVisible({ timeout: 3000 })
+
+    // 盒子内部应当有 data-frame-style-id 节点(layout 真的挂在盒子内)
+    const inner = photoBox.locator('[data-frame-style-id]').first()
+    await expect(inner).toHaveAttribute('data-frame-style-id', 'minimal-bar')
+
+    // 盒子在容器里居中 · 至少能取到非零的 boundingBox
+    const box = await photoBox.boundingBox()
+    expect(box).toBeTruthy()
+    if (box) {
+      // 盒子有实际 size(不是 0)
+      expect(box.width).toBeGreaterThan(10)
+      expect(box.height).toBeGreaterThan(10)
+    }
+  })
 })
