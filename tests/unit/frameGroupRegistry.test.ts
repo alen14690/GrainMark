@@ -2,19 +2,19 @@
  * frameGroupRegistry — 阶段 5 · 分组元数据契约测试(2026-05-01)
  *
  * 2026-05-01 重要变更(用户反馈"经典那部分不要了"):
- *   - UI 层只展示阶段 5 的 14 个新风格(7 簇)
+ *   - UI 层只展示阶段 5 的 20 个新风格(6 簇)
  *   - classic 12 风格保留注册但不在公共列表
- *   - FRAME_STYLE_GROUPS_ORDERED 不含 'classic' · 只 7 个
+ *   - FRAME_STYLE_GROUPS_ORDERED 不含 'classic' · 只 6 个
  *
  * 覆盖:
  *   G1 全部风格都必须有 group 字段
- *   G2 7 个公共 group 都必须有 style 挂载(不得有空组)
- *   G3 FRAME_STYLE_GROUPS_ORDERED 覆盖 7 个公共 group · 不含 classic
+ *   G2 6 个公共 group 都必须有 style 挂载(不得有空组)
+ *   G3 FRAME_STYLE_GROUPS_ORDERED 覆盖 6 个公共 group · 不含 classic
  *   G4 LABELS/SUBTITLES 对所有 FrameStyleGroup 都提供文案(含 classic 兜底)
  *   G5 getFrameStylesByGroup()默认过滤 classic · includeClassic:true 含全部
  *   G6 listPublicFrameStyles 总数 = 14(阶段 5 公开 · 防多/少注册)
- *   G7 阶段 5 的 14 个新 id 都已注册并归到对应 group
- *   G8 listFrameStyles 含 classic 的 26 个(12 老 + 14 新 · 防老 style 被误删)
+ *   G7 阶段 5 的 20 个新 id 都已注册并归到对应 group
+ *   G8 listFrameStyles 含 classic 的 26 个(12 老 + 20 新 · 防老 style 被误删)
  *   G9 蓝军:每个公共 group style 的竖图底栏专业水准 · 零边框风格豁免
  *   G10 蓝军:列表排序稳定
  *   G11 蓝军:registry 无 ESM 循环依赖(stage5 defaultOverrides 可读)
@@ -45,7 +45,7 @@ describe('FrameStyle 分组注册契约(阶段 5 · 2026-05-01)', () => {
     }
   })
 
-  it('G2 · 7 个公共 group 都必须至少有 1 个 style 挂载(无空组)', () => {
+  it('G2 · 6 个公共 group 都必须至少有 1 个 style 挂载(无空组)', () => {
     const byGroup = getFrameStylesByGroup()
     for (const group of FRAME_STYLE_GROUPS_ORDERED) {
       expect(
@@ -55,9 +55,9 @@ describe('FrameStyle 分组注册契约(阶段 5 · 2026-05-01)', () => {
     }
   })
 
-  it('G3 · FRAME_STYLE_GROUPS_ORDERED 覆盖 7 个公共 group · 不含 classic · 无重复', () => {
-    // 7 个(editorial/oil/floating/glass/ambient/metal/cinema)
-    expect(FRAME_STYLE_GROUPS_ORDERED.length).toBe(7)
+  it('G3 · FRAME_STYLE_GROUPS_ORDERED 覆盖 6 个公共 group · 不含 classic · 无重复', () => {
+    // 7 个(editorial/oil/floating/glass/ambient/cinema)
+    expect(FRAME_STYLE_GROUPS_ORDERED.length).toBe(6)
     const unique = new Set(FRAME_STYLE_GROUPS_ORDERED)
     expect(unique.size, '分组顺序数组有重复').toBe(FRAME_STYLE_GROUPS_ORDERED.length)
     // 不含 classic
@@ -72,7 +72,7 @@ describe('FrameStyle 分组注册契约(阶段 5 · 2026-05-01)', () => {
       'ambient',
       'cinema',
       'editorial',
-      'metal',
+
       'floating',
     ]
     for (const g of expected) {
@@ -89,7 +89,7 @@ describe('FrameStyle 分组注册契约(阶段 5 · 2026-05-01)', () => {
       'ambient',
       'cinema',
       'editorial',
-      'metal',
+
       'floating',
     ]
     for (const group of allGroups) {
@@ -110,10 +110,10 @@ describe('FrameStyle 分组注册契约(阶段 5 · 2026-05-01)', () => {
   })
 
   it('G6 · listPublicFrameStyles 总数 = 14(阶段 5 公开数量 · 防漂移)', () => {
-    expect(listPublicFrameStyles().length).toBe(14)
+    expect(listPublicFrameStyles().length).toBe(20)
   })
 
-  it('G7 · 阶段 5 的 14 个新 id 都已注册并归到对应 group', () => {
+  it('G7 · 阶段 5 的 20 个新 id 都已注册并归到对应 group', () => {
     const byId = new Map(listFrameStyles().map((s) => [s.id, s]))
     const expectedStage5: Array<[FrameStyleId, FrameStyle['group']]> = [
       ['frosted-glass', 'glass'],
@@ -126,8 +126,6 @@ describe('FrameStyle 分组注册契约(阶段 5 · 2026-05-01)', () => {
       ['neon-edge', 'cinema'],
       ['swiss-grid', 'editorial'],
       ['contact-sheet', 'editorial'],
-      ['brushed-metal', 'metal'],
-      ['medal-plate', 'metal'],
       ['floating-caption', 'floating'],
       ['stamp-corner', 'floating'],
     ]
@@ -141,7 +139,7 @@ describe('FrameStyle 分组注册契约(阶段 5 · 2026-05-01)', () => {
   })
 
   it('G8 · listFrameStyles 总数 = 26(12 classic + 14 stage5 · 内部兼容老调用方)', () => {
-    expect(listFrameStyles().length).toBe(26)
+    expect(listFrameStyles().length).toBe(32)
   })
 
   it('G9 · 蓝军:每个公共 group style 竖图要么零边框 overlay 要么有真实边框', () => {
@@ -151,7 +149,6 @@ describe('FrameStyle 分组注册契约(阶段 5 · 2026-05-01)', () => {
         const total =
           s.portrait.borderBottom + s.portrait.borderTop + s.portrait.borderLeft + s.portrait.borderRight
         // total = 0 仅允许纯 overlay 风格(glass / floating / metal-medal / stamp / neon 等)
-        // 条状风格(oil/editorial/cinema/brushed-metal)必须有边框给文字留空间
         if (total === 0) {
           // 纯 overlay:必须有 overlay slot
           expect(
@@ -178,7 +175,7 @@ describe('FrameStyle 分组注册契约(阶段 5 · 2026-05-01)', () => {
 
   it('G11 · 蓝军:registry 模块加载无 ESM 循环依赖(stage5 的 defaultOverrides 可读)', async () => {
     const { STAGE5_STYLES } = await import('../../electron/services/frame/registry-stage5')
-    expect(STAGE5_STYLES.length).toBe(14)
+    expect(STAGE5_STYLES.length).toBe(20)
     for (const s of STAGE5_STYLES) {
       expect(
         s.defaultOverrides,

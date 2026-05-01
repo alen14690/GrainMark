@@ -230,13 +230,12 @@ function fieldLabel(k: string): string {
 // ============================================================================
 
 const GROUP_ORDER: readonly Exclude<FrameStyle['group'], 'classic'>[] = [
-  'editorial',
-  'oil',
-  'floating',
   'glass',
   'ambient',
-  'metal',
   'cinema',
+  'oil',
+  'editorial',
+  'floating',
 ] as const
 
 const GROUP_LABELS: Record<Exclude<FrameStyle['group'], 'classic'>, string> = {
@@ -245,7 +244,6 @@ const GROUP_LABELS: Record<Exclude<FrameStyle['group'], 'classic'>, string> = {
   ambient: '氛围模糊',
   cinema: '电影 · 霓虹',
   editorial: '印刷 · 杂志',
-  metal: '金属 · 徽章',
   floating: '浮动徽章',
 }
 
@@ -255,6 +253,5 @@ const GROUP_SUBTITLES: Record<Exclude<FrameStyle['group'], 'classic'>, string> =
   ambient: 'AMBIENT BLUR',
   cinema: 'CINEMA · NEON',
   editorial: 'EDITORIAL · PRINT',
-  metal: 'METAL · MEDAL',
   floating: 'FLOATING',
 }

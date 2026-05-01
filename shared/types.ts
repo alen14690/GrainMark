@@ -393,13 +393,12 @@ export interface FrameStyle {
  * 顺序即 UI 展示顺序(classic 作为入门默认组放首位):
  */
 export type FrameStyleGroup =
-  | 'classic' // 经典必保 —— 老成员(minimal / polaroid / gallery 等)
+  | 'classic' // 经典必保 —— 老成员(minimal / polaroid / gallery 等) · UI 不展示
   | 'glass' // 玻璃拟态 —— frosted backdrop-filter
   | 'oil' // 油画 / 水彩 —— serif italic + 纸质 noise
   | 'ambient' // 氛围模糊 —— 照片自身 blur 作底
   | 'cinema' // 电影 / 霓虹 —— 黑条幕 · 霓虹辉光
   | 'editorial' // 印刷 / 杂志 —— swiss grid · contact sheet
-  | 'metal' // 金属 / 徽章 —— 拉丝铜铭牌 · 金色奖章
   | 'floating' // 浮动徽章 —— 外接浮卡 · 角章印戳
 
 /** 每个 style 实例可被用户调整的部分 */
@@ -434,7 +433,7 @@ export interface FrameStyleOverrides {
  *       数据层差异化表达质感,generator 只在必要时做装饰层(glass bar / neon edge)。
  */
 export type FrameStyleId =
-  // classic(12) · M-Frame 阶段 2/3
+  // classic(12) · M-Frame 阶段 2/3(UI 不展示 · 保留兼容)
   | 'minimal-bar'
   | 'hairline'
   | 'film-full-border'
@@ -447,25 +446,30 @@ export type FrameStyleId =
   | 'negative-strip'
   | 'point-and-shoot-stamp'
   | 'contax-label'
-  // glass(2) · 玻璃拟态 · 阶段 5 · A1/A2
+  // glass(4) · 玻璃拟态
   | 'frosted-glass'
   | 'glass-chip'
-  // oil(2) · 油画 / 水彩 · 阶段 5 · B1/B2
+  | 'glass-gradient'
+  | 'glass-minimal'
+  // oil(3) · 油画 / 水彩
   | 'oil-texture'
   | 'watercolor-caption'
-  // ambient(2) · 氛围模糊 · 阶段 5 · C1/C2
+  | 'oil-classic'
+  // ambient(4) · 氛围模糊
   | 'ambient-glow'
   | 'bokeh-pillar'
-  // cinema(2) · 电影 / 霓虹 · 阶段 5 · D1/D2
+  | 'ambient-vinyl'
+  | 'ambient-aura'
+  // cinema(4) · 电影 / 霓虹
   | 'cinema-scope'
   | 'neon-edge'
-  // editorial(2) · 印刷 / 杂志 · 阶段 5 · E1/E2
+  | 'cinema-letterbox'
+  | 'cinema-timestamp'
+  // editorial(3) · 印刷 / 杂志
   | 'swiss-grid'
   | 'contact-sheet'
-  // metal(2) · 金属 / 徽章 · 阶段 5 · F1/F2
-  | 'brushed-metal'
-  | 'medal-plate'
-  // floating(2) · 浮动徽章 · 阶段 5 · H1/H2
+  | 'editorial-minimal'
+  // floating(2) · 浮动徽章
   | 'floating-caption'
   | 'stamp-corner'
 

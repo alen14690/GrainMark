@@ -1079,13 +1079,12 @@ export function registerFrameStyle(style: FrameStyle): FrameStyle | null {
  * 注:'classic' 仍在 FrameStyleGroup 类型里(老 style 兼容),但不在公共展示顺序里。
  */
 export const FRAME_STYLE_GROUPS_ORDERED = [
-  'editorial',
-  'oil',
-  'floating',
   'glass',
   'ambient',
-  'metal',
   'cinema',
+  'oil',
+  'editorial',
+  'floating',
 ] as const satisfies readonly Exclude<FrameStyle['group'], 'classic'>[]
 
 /**
@@ -1101,7 +1100,6 @@ export const FRAME_STYLE_GROUP_LABELS: Record<FrameStyle['group'], string> = {
   ambient: '氛围模糊',
   cinema: '电影 · 霓虹',
   editorial: '印刷 · 杂志',
-  metal: '金属 · 徽章',
   floating: '浮动徽章',
 }
 
@@ -1113,7 +1111,6 @@ export const FRAME_STYLE_GROUP_SUBTITLES: Record<FrameStyle['group'], string> = 
   ambient: 'AMBIENT BLUR',
   cinema: 'CINEMA · NEON',
   editorial: 'EDITORIAL · PRINT',
-  metal: 'METAL · MEDAL',
   floating: 'FLOATING',
 }
 
@@ -1134,7 +1131,6 @@ export function getFrameStylesByGroup(
     ambient: [] as FrameStyle[],
     cinema: [] as FrameStyle[],
     editorial: [] as FrameStyle[],
-    metal: [] as FrameStyle[],
     floating: [] as FrameStyle[],
   }
   const source = opts.includeClassic ? listFrameStyles() : listPublicFrameStyles()

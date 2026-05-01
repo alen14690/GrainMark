@@ -709,104 +709,113 @@ const CONTACT_SHEET: FrameStyle = {
 }
 
 // ============================================================================
-// METAL(2) · 金属 / 徽章
+// GLASS 扩展(+2) · 玻璃拟态变体
 // ============================================================================
 
-const BRUSHED_METAL: FrameStyle = {
-  id: 'brushed-metal',
-  name: '拉丝金属铭牌',
-  description: '照片下方拉丝银色铭牌 · Times 刻字 · 徕卡/蔡司风',
-  group: 'metal',
+/**
+ * glass-gradient · 渐变玻璃底条
+ *
+ * 视觉:照片底部一条从左到右的彩虹渐变磨砂玻璃条 · 更活泼年轻
+ */
+const GLASS_GRADIENT: FrameStyle = {
+  id: 'glass-gradient',
+  name: '渐变玻璃条',
+  description: '彩虹渐变磨砂底条 · 活泼年轻 · 适合社交分享',
+  group: 'glass',
   landscape: {
     borderTop: 0,
-    borderBottom: 0.14,
+    borderBottom: 0,
     borderLeft: 0,
     borderRight: 0,
-    backgroundColor: COLOR.brushedSilver, // generator 在此基础上画拉丝纹
-    textColor: '#1A1A1A',
-    accentColor: COLOR.brushedSilverDark,
+    backgroundColor: '#000000',
+    textColor: '#ffffff',
     slots: [
       {
         id: 'model',
-        area: 'bottom',
-        anchor: { x: 0.06, y: 0.5 },
-        fontSize: 0.02,
+        area: 'overlay',
+        anchor: { x: 0.05, y: 0.86 },
+        fontSize: GLASS_MODEL_FONT,
         align: 'left',
-        fontFamily: 'georgia',
+        fontFamily: 'inter',
+        colorOverride: '#ffffff',
       },
       {
         id: 'params',
-        area: 'bottom',
-        anchor: { x: 0.94, y: 0.5 },
-        fontSize: 0.014,
-        align: 'right',
+        area: 'overlay',
+        anchor: { x: 0.05, y: 0.92 },
+        fontSize: GLASS_PARAMS_FONT,
+        align: 'left',
         fontFamily: 'mono',
-        colorOverride: 'rgba(26,26,26,0.7)',
+        colorOverride: 'rgba(255,255,255,0.88)',
       },
     ],
   },
   portrait: {
     borderTop: 0,
-    borderBottom: 0.2,
+    borderBottom: 0,
     borderLeft: 0,
     borderRight: 0,
-    backgroundColor: COLOR.brushedSilver,
-    textColor: '#1A1A1A',
-    accentColor: COLOR.brushedSilverDark,
+    backgroundColor: '#000000',
+    textColor: '#ffffff',
     slots: [
       {
         id: 'model',
-        area: 'bottom',
-        anchor: { x: 0.06, y: 0.35 },
-        fontSize: FONT_SIZE.mainTitlePortrait,
+        area: 'overlay',
+        anchor: { x: 0.05, y: 0.87 },
+        fontSize: GLASS_MODEL_FONT_PORTRAIT,
         align: 'left',
-        fontFamily: 'georgia',
+        fontFamily: 'inter',
+        colorOverride: '#ffffff',
       },
       {
         id: 'params',
-        area: 'bottom',
-        anchor: { x: 0.06, y: 0.72 },
-        fontSize: FONT_SIZE.captionPortrait,
+        area: 'overlay',
+        anchor: { x: 0.05, y: 0.93 },
+        fontSize: GLASS_PARAMS_FONT_PORTRAIT,
         align: 'left',
         fontFamily: 'mono',
-        colorOverride: 'rgba(26,26,26,0.7)',
+        colorOverride: 'rgba(255,255,255,0.88)',
       },
     ],
   },
   defaultOverrides: DEFAULT_OVERRIDES,
 }
 
-const MEDAL_PLATE: FrameStyle = {
-  id: 'medal-plate',
-  name: '金色圆章',
-  description: '右下角金色浮雕圆章 · 徕卡红点式辨识度 · 零边框 overlay',
-  group: 'metal',
+/**
+ * glass-minimal · 极简玻璃角标
+ *
+ * 视觉:照片无边 · 左下角一个极小的半透明玻璃标签 · 只有一行参数
+ */
+const GLASS_MINIMAL: FrameStyle = {
+  id: 'glass-minimal',
+  name: '极简玻璃标',
+  description: '左下角极小磨砂标签 · 不干扰画面 · 记录拍摄参数',
+  group: 'glass',
   landscape: {
     borderTop: 0,
     borderBottom: 0,
     borderLeft: 0,
     borderRight: 0,
-    backgroundColor: COLOR.filmBlack,
-    textColor: '#3A2500',
-    accentColor: COLOR.medalGold,
+    backgroundColor: '#000000',
+    textColor: '#ffffff',
     slots: [
       {
         id: 'model',
         area: 'overlay',
-        anchor: { x: 0.92, y: 0.87 },
-        fontSize: 0.016,
-        align: 'center',
-        fontFamily: 'georgia',
-        colorOverride: '#3A2500',
+        anchor: { x: 0.04, y: 0.92 },
+        fontSize: 0.013,
+        align: 'left',
+        fontFamily: 'mono',
+        colorOverride: 'rgba(255,255,255,0.9)',
       },
       {
         id: 'params',
         area: 'overlay',
-        anchor: { x: 0.92, y: 0.92 },
+        anchor: { x: 0.04, y: 0.96 },
         fontSize: 0.011,
-        align: 'center',
+        align: 'left',
         fontFamily: 'mono',
-        colorOverride: '#3A2500',
+        colorOverride: 'rgba(255,255,255,0.7)',
       },
     ],
   },
@@ -815,27 +824,456 @@ const MEDAL_PLATE: FrameStyle = {
     borderBottom: 0,
     borderLeft: 0,
     borderRight: 0,
-    backgroundColor: COLOR.filmBlack,
-    textColor: '#3A2500',
-    accentColor: COLOR.medalGold,
+    backgroundColor: '#000000',
+    textColor: '#ffffff',
     slots: [
       {
         id: 'model',
         area: 'overlay',
-        anchor: { x: 0.88, y: 0.88 },
-        fontSize: 0.02,
-        align: 'center',
-        fontFamily: 'georgia',
-        colorOverride: '#3A2500',
+        anchor: { x: 0.04, y: 0.93 },
+        fontSize: 0.015,
+        align: 'left',
+        fontFamily: 'mono',
+        colorOverride: 'rgba(255,255,255,0.9)',
       },
       {
         id: 'params',
         area: 'overlay',
-        anchor: { x: 0.88, y: 0.92 },
+        anchor: { x: 0.04, y: 0.97 },
+        fontSize: 0.012,
+        align: 'left',
+        fontFamily: 'mono',
+        colorOverride: 'rgba(255,255,255,0.7)',
+      },
+    ],
+  },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+// ============================================================================
+// OIL 扩展(+1) · 油画经典
+// ============================================================================
+
+/**
+ * oil-classic · 经典厚框油画
+ *
+ * 视觉:宽厚的暖白边框 · 底部小衬线字 · 像一幅装裱的油画
+ */
+const OIL_CLASSIC: FrameStyle = {
+  id: 'oil-classic',
+  name: '经典油画框',
+  description: '宽厚暖白边框 · 底部小字署名 · 画廊装裱质感',
+  group: 'oil',
+  landscape: {
+    borderTop: 0.06,
+    borderBottom: 0.14,
+    borderLeft: 0.06,
+    borderRight: 0.06,
+    backgroundColor: '#F5F0E6',
+    textColor: COLOR.oilInk,
+    slots: [
+      {
+        id: 'model',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.4 },
+        fontSize: 0.02,
+        align: 'center',
+        fontFamily: 'georgia',
+        colorOverride: COLOR.oilInk,
+      },
+      {
+        id: 'params',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.7 },
+        fontSize: 0.013,
+        align: 'center',
+        fontFamily: 'georgia',
+        colorOverride: COLOR.oilInkSoft,
+      },
+    ],
+  },
+  portrait: {
+    borderTop: 0.05,
+    borderBottom: 0.18,
+    borderLeft: 0.05,
+    borderRight: 0.05,
+    backgroundColor: '#F5F0E6',
+    textColor: COLOR.oilInk,
+    slots: [
+      {
+        id: 'model',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.35 },
+        fontSize: 0.024,
+        align: 'center',
+        fontFamily: 'georgia',
+        colorOverride: COLOR.oilInk,
+      },
+      {
+        id: 'params',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.65 },
+        fontSize: 0.015,
+        align: 'center',
+        fontFamily: 'georgia',
+        colorOverride: COLOR.oilInkSoft,
+      },
+    ],
+  },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+// ============================================================================
+// AMBIENT 扩展(+2) · 氛围模糊变体
+// ============================================================================
+
+/**
+ * ambient-vinyl · 黑胶唱片风
+ *
+ * 视觉:照片 blur 作底 · 中间圆形照片 · 底部白字 · 像一张唱片封面
+ */
+const AMBIENT_VINYL: FrameStyle = {
+  id: 'ambient-vinyl',
+  name: '黑胶唱片',
+  description: '照片圆形裁切居中 · 模糊底色 · 音乐专辑封面风格',
+  group: 'ambient',
+  landscape: {
+    borderTop: 0.06,
+    borderBottom: 0.16,
+    borderLeft: 0.1,
+    borderRight: 0.1,
+    backgroundColor: '#0A0A0A',
+    textColor: '#ffffff',
+    slots: [
+      {
+        id: 'model',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.35 },
+        fontSize: 0.02,
+        align: 'center',
+        fontFamily: 'inter',
+        colorOverride: 'rgba(255,255,255,0.95)',
+      },
+      {
+        id: 'params',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.7 },
         fontSize: 0.014,
         align: 'center',
         fontFamily: 'mono',
-        colorOverride: '#3A2500',
+        colorOverride: 'rgba(255,255,255,0.7)',
+      },
+    ],
+  },
+  portrait: {
+    borderTop: 0.06,
+    borderBottom: 0.2,
+    borderLeft: 0.08,
+    borderRight: 0.08,
+    backgroundColor: '#0A0A0A',
+    textColor: '#ffffff',
+    slots: [
+      {
+        id: 'model',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.3 },
+        fontSize: 0.024,
+        align: 'center',
+        fontFamily: 'inter',
+        colorOverride: 'rgba(255,255,255,0.95)',
+      },
+      {
+        id: 'params',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.65 },
+        fontSize: 0.016,
+        align: 'center',
+        fontFamily: 'mono',
+        colorOverride: 'rgba(255,255,255,0.7)',
+      },
+    ],
+  },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+/**
+ * ambient-aura · 光晕氛围
+ *
+ * 视觉:中心照片四周弥散出彩色光晕(取色自照片) · 苹果音乐歌词卡风
+ */
+const AMBIENT_AURA: FrameStyle = {
+  id: 'ambient-aura',
+  name: '光晕弥散',
+  description: '照片四周彩色光晕弥散 · Apple Music 歌词卡风格',
+  group: 'ambient',
+  landscape: {
+    borderTop: 0.08,
+    borderBottom: 0.16,
+    borderLeft: 0.08,
+    borderRight: 0.08,
+    backgroundColor: '#0A0A0A',
+    textColor: '#ffffff',
+    slots: [
+      {
+        id: 'model',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.35 },
+        fontSize: 0.02,
+        align: 'center',
+        fontFamily: 'inter',
+        colorOverride: 'rgba(255,255,255,0.95)',
+      },
+      {
+        id: 'params',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.7 },
+        fontSize: 0.014,
+        align: 'center',
+        fontFamily: 'mono',
+        colorOverride: 'rgba(255,255,255,0.75)',
+      },
+    ],
+  },
+  portrait: {
+    borderTop: 0.06,
+    borderBottom: 0.2,
+    borderLeft: 0.06,
+    borderRight: 0.06,
+    backgroundColor: '#0A0A0A',
+    textColor: '#ffffff',
+    slots: [
+      {
+        id: 'model',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.3 },
+        fontSize: 0.024,
+        align: 'center',
+        fontFamily: 'inter',
+        colorOverride: 'rgba(255,255,255,0.95)',
+      },
+      {
+        id: 'params',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.65 },
+        fontSize: 0.016,
+        align: 'center',
+        fontFamily: 'mono',
+        colorOverride: 'rgba(255,255,255,0.75)',
+      },
+    ],
+  },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+// ============================================================================
+// CINEMA 扩展(+2) · 电影变体
+// ============================================================================
+
+/**
+ * cinema-letterbox · 宽银幕信箱
+ *
+ * 视觉:2.35:1 宽银幕比例上下黑边 · 底部中间白字机型 · 电影感
+ */
+const CINEMA_LETTERBOX: FrameStyle = {
+  id: 'cinema-letterbox',
+  name: '宽银幕信箱',
+  description: '2.35:1 宽银幕比例 · 纯黑上下条 · 底部中间白字',
+  group: 'cinema',
+  landscape: {
+    borderTop: 0.12,
+    borderBottom: 0.12,
+    borderLeft: 0,
+    borderRight: 0,
+    backgroundColor: '#000000',
+    textColor: '#ffffff',
+    slots: [
+      {
+        id: 'model',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.4 },
+        fontSize: 0.016,
+        align: 'center',
+        fontFamily: 'courier',
+        colorOverride: 'rgba(255,255,255,0.85)',
+      },
+      {
+        id: 'params',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.75 },
+        fontSize: 0.012,
+        align: 'center',
+        fontFamily: 'courier',
+        colorOverride: 'rgba(255,255,255,0.6)',
+      },
+    ],
+  },
+  portrait: {
+    borderTop: 0.14,
+    borderBottom: 0.2,
+    borderLeft: 0,
+    borderRight: 0,
+    backgroundColor: '#000000',
+    textColor: '#ffffff',
+    slots: [
+      {
+        id: 'model',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.35 },
+        fontSize: 0.02,
+        align: 'center',
+        fontFamily: 'courier',
+        colorOverride: 'rgba(255,255,255,0.85)',
+      },
+      {
+        id: 'params',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.7 },
+        fontSize: 0.014,
+        align: 'center',
+        fontFamily: 'courier',
+        colorOverride: 'rgba(255,255,255,0.6)',
+      },
+    ],
+  },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+/**
+ * cinema-timestamp · 电影时码
+ *
+ * 视觉:照片无边 · 左下角绿色时码风 monospace 小字(模拟 SMPTE 时间码)
+ */
+const CINEMA_TIMESTAMP: FrameStyle = {
+  id: 'cinema-timestamp',
+  name: '电影时码',
+  description: '左下角绿色时码字 · 监视器/DIT 风格 · 极简',
+  group: 'cinema',
+  landscape: {
+    borderTop: 0,
+    borderBottom: 0,
+    borderLeft: 0,
+    borderRight: 0,
+    backgroundColor: '#000000',
+    textColor: '#00FF66',
+    slots: [
+      {
+        id: 'model',
+        area: 'overlay',
+        anchor: { x: 0.03, y: 0.92 },
+        fontSize: 0.014,
+        align: 'left',
+        fontFamily: 'courier',
+        colorOverride: '#00FF66',
+      },
+      {
+        id: 'params',
+        area: 'overlay',
+        anchor: { x: 0.03, y: 0.96 },
+        fontSize: 0.011,
+        align: 'left',
+        fontFamily: 'courier',
+        colorOverride: 'rgba(0,255,102,0.7)',
+      },
+    ],
+  },
+  portrait: {
+    borderTop: 0,
+    borderBottom: 0,
+    borderLeft: 0,
+    borderRight: 0,
+    backgroundColor: '#000000',
+    textColor: '#00FF66',
+    slots: [
+      {
+        id: 'model',
+        area: 'overlay',
+        anchor: { x: 0.03, y: 0.93 },
+        fontSize: 0.016,
+        align: 'left',
+        fontFamily: 'courier',
+        colorOverride: '#00FF66',
+      },
+      {
+        id: 'params',
+        area: 'overlay',
+        anchor: { x: 0.03, y: 0.97 },
+        fontSize: 0.012,
+        align: 'left',
+        fontFamily: 'courier',
+        colorOverride: 'rgba(0,255,102,0.7)',
+      },
+    ],
+  },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+// ============================================================================
+// EDITORIAL 扩展(+1) · 印刷变体
+// ============================================================================
+
+/**
+ * editorial-minimal · 极简印刷
+ *
+ * 视觉:纯白底 · 照片居中 · 底部一行小字(机型 + 参数) · 无多余装饰
+ */
+const EDITORIAL_MINIMAL: FrameStyle = {
+  id: 'editorial-minimal',
+  name: '极简印刷',
+  description: '纯白底 · 底部单行小字 · 干净利落的杂志排版',
+  group: 'editorial',
+  landscape: {
+    borderTop: 0.04,
+    borderBottom: 0.12,
+    borderLeft: 0.04,
+    borderRight: 0.04,
+    backgroundColor: '#FFFFFF',
+    textColor: '#1A1A1A',
+    slots: [
+      {
+        id: 'model',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.45 },
+        fontSize: 0.014,
+        align: 'center',
+        fontFamily: 'inter',
+        colorOverride: '#1A1A1A',
+      },
+      {
+        id: 'params',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.75 },
+        fontSize: 0.011,
+        align: 'center',
+        fontFamily: 'mono',
+        colorOverride: '#888888',
+      },
+    ],
+  },
+  portrait: {
+    borderTop: 0.04,
+    borderBottom: 0.18,
+    borderLeft: 0.04,
+    borderRight: 0.04,
+    backgroundColor: '#FFFFFF',
+    textColor: '#1A1A1A',
+    slots: [
+      {
+        id: 'model',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.35 },
+        fontSize: 0.018,
+        align: 'center',
+        fontFamily: 'inter',
+        colorOverride: '#1A1A1A',
+      },
+      {
+        id: 'params',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.65 },
+        fontSize: 0.013,
+        align: 'center',
+        fontFamily: 'mono',
+        colorOverride: '#888888',
       },
     ],
   },
@@ -981,24 +1419,29 @@ const STAMP_CORNER: FrameStyle = {
 // ============================================================================
 
 export const STAGE5_STYLES: readonly FrameStyle[] = [
-  // glass(2)
+  // glass(4)
   FROSTED_GLASS,
   GLASS_CHIP,
-  // oil(2)
+  GLASS_GRADIENT,
+  GLASS_MINIMAL,
+  // oil(3)
   OIL_TEXTURE,
   WATERCOLOR_CAPTION,
-  // ambient(2)
+  OIL_CLASSIC,
+  // ambient(4)
   AMBIENT_GLOW,
   BOKEH_PILLAR,
-  // cinema(2)
+  AMBIENT_VINYL,
+  AMBIENT_AURA,
+  // cinema(4)
   CINEMA_SCOPE,
   NEON_EDGE,
-  // editorial(2)
+  CINEMA_LETTERBOX,
+  CINEMA_TIMESTAMP,
+  // editorial(3)
   SWISS_GRID,
   CONTACT_SHEET,
-  // metal(2)
-  BRUSHED_METAL,
-  MEDAL_PLATE,
+  EDITORIAL_MINIMAL,
   // floating(2)
   FLOATING_CAPTION,
   STAMP_CORNER,

@@ -16,16 +16,22 @@
 import { describe, expect, it } from 'vitest'
 import type { FrameGeneratorContext } from '../../electron/services/frame/composite'
 import {
+  generateAmbientAura,
   generateAmbientGlow,
+  generateAmbientVinyl,
   generateBokehPillar,
-  generateBrushedMetal,
+  generateCinemaLetterbox,
   generateCinemaScope,
+  generateCinemaTimestamp,
   generateContactSheet,
+  generateEditorialMinimal,
   generateFloatingCaption,
   generateFrostedGlass,
   generateGlassChip,
-  generateMedalPlate,
+  generateGlassGradient,
+  generateGlassMinimal,
   generateNeonEdge,
+  generateOilClassic,
   generateOilTexture,
   generateStampCorner,
   generateSwissGrid,
@@ -33,7 +39,7 @@ import {
 } from '../../electron/services/frame/generators/stage5Generators'
 import { computeFrameGeometry } from '../../electron/services/frame/layoutEngine'
 import { getFrameStyle } from '../../electron/services/frame/registry'
-import type { PhotoExif } from '../../shared/types'
+import type { FrameStyleId, PhotoExif } from '../../shared/types'
 
 const EXIF: PhotoExif = {
   make: 'SONY',
@@ -51,25 +57,7 @@ const PARAM_LINE = '70-200mm F2.8 · 200mm · f/5.6 · 1/125s · ISO 200'
 /**
  * 构造一个 FrameGeneratorContext (模拟 composite 生成)
  */
-function makeCtx(
-  styleId:
-    | 'frosted-glass'
-    | 'glass-chip'
-    | 'oil-texture'
-    | 'watercolor-caption'
-    | 'ambient-glow'
-    | 'bokeh-pillar'
-    | 'cinema-scope'
-    | 'neon-edge'
-    | 'swiss-grid'
-    | 'contact-sheet'
-    | 'brushed-metal'
-    | 'medal-plate'
-    | 'floating-caption'
-    | 'stamp-corner',
-  imgW: number,
-  imgH: number,
-): FrameGeneratorContext {
+function makeCtx(styleId: FrameStyleId, imgW: number, imgH: number): FrameGeneratorContext {
   const style = getFrameStyle(styleId)
   if (!style) throw new Error(`style ${styleId} not registered`)
   const geometry = computeFrameGeometry(imgW, imgH, style)
@@ -86,34 +74,17 @@ function makeCtx(
 }
 
 interface GenCase {
-  id:
-    | 'frosted-glass'
-    | 'glass-chip'
-    | 'oil-texture'
-    | 'watercolor-caption'
-    | 'ambient-glow'
-    | 'bokeh-pillar'
-    | 'cinema-scope'
-    | 'neon-edge'
-    | 'swiss-grid'
-    | 'contact-sheet'
-    | 'brushed-metal'
-    | 'medal-plate'
-    | 'floating-caption'
-    | 'stamp-corner'
+  id: FrameStyleId
   gen: (ctx: FrameGeneratorContext) => string
-  /**
-   * 该风格是否在最终 SVG 里显示机型(model)字符串(而非单独拆开 make/model)
-   * 例如 medal-plate 拆成 SONY + ILCE-7SM3 两行 · modelLine 不会直接出现
-   */
   expectsModelInSvg: boolean
-  /** 是否显示参数行 · cinema/contact-sheet 等会显示 */
   expectsParamInSvg: boolean
 }
 
 const CASES: GenCase[] = [
   { id: 'frosted-glass', gen: generateFrostedGlass, expectsModelInSvg: true, expectsParamInSvg: true },
   { id: 'glass-chip', gen: generateGlassChip, expectsModelInSvg: true, expectsParamInSvg: true },
+  { id: 'glass-gradient', gen: generateGlassGradient, expectsModelInSvg: true, expectsParamInSvg: true },
+  { id: 'glass-minimal', gen: generateGlassMinimal, expectsModelInSvg: true, expectsParamInSvg: true },
   { id: 'oil-texture', gen: generateOilTexture, expectsModelInSvg: true, expectsParamInSvg: true },
   {
     id: 'watercolor-caption',
@@ -121,14 +92,23 @@ const CASES: GenCase[] = [
     expectsModelInSvg: true,
     expectsParamInSvg: true,
   },
+  { id: 'oil-classic', gen: generateOilClassic, expectsModelInSvg: true, expectsParamInSvg: true },
   { id: 'ambient-glow', gen: generateAmbientGlow, expectsModelInSvg: true, expectsParamInSvg: true },
   { id: 'bokeh-pillar', gen: generateBokehPillar, expectsModelInSvg: true, expectsParamInSvg: true },
+  { id: 'ambient-vinyl', gen: generateAmbientVinyl, expectsModelInSvg: true, expectsParamInSvg: true },
+  { id: 'ambient-aura', gen: generateAmbientAura, expectsModelInSvg: true, expectsParamInSvg: true },
   { id: 'cinema-scope', gen: generateCinemaScope, expectsModelInSvg: true, expectsParamInSvg: true },
   { id: 'neon-edge', gen: generateNeonEdge, expectsModelInSvg: true, expectsParamInSvg: true },
+  { id: 'cinema-letterbox', gen: generateCinemaLetterbox, expectsModelInSvg: true, expectsParamInSvg: true },
+  { id: 'cinema-timestamp', gen: generateCinemaTimestamp, expectsModelInSvg: true, expectsParamInSvg: true },
   { id: 'swiss-grid', gen: generateSwissGrid, expectsModelInSvg: true, expectsParamInSvg: true },
   { id: 'contact-sheet', gen: generateContactSheet, expectsModelInSvg: true, expectsParamInSvg: false },
-  { id: 'brushed-metal', gen: generateBrushedMetal, expectsModelInSvg: true, expectsParamInSvg: true },
-  { id: 'medal-plate', gen: generateMedalPlate, expectsModelInSvg: false, expectsParamInSvg: false }, // 拆为 make + model
+  {
+    id: 'editorial-minimal',
+    gen: generateEditorialMinimal,
+    expectsModelInSvg: true,
+    expectsParamInSvg: true,
+  },
   { id: 'floating-caption', gen: generateFloatingCaption, expectsModelInSvg: true, expectsParamInSvg: true },
   { id: 'stamp-corner', gen: generateStampCorner, expectsModelInSvg: true, expectsParamInSvg: true },
 ]

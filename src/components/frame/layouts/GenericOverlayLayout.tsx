@@ -111,37 +111,47 @@ function renderByStyleId(ctx: StageFiveContext): React.ReactNode {
       return renderFrostedGlass(ctx)
     case 'glass-chip':
       return renderGlassChip(ctx)
+    case 'glass-gradient':
+      return renderGlassGradient(ctx)
+    case 'glass-minimal':
+      return renderGlassMinimal(ctx)
     // oil
     case 'oil-texture':
       return renderOilTexture(ctx)
     case 'watercolor-caption':
       return renderWatercolorCaption(ctx)
+    case 'oil-classic':
+      return renderOilClassic(ctx)
     // ambient
     case 'ambient-glow':
       return renderAmbientGlow(ctx)
     case 'bokeh-pillar':
       return renderBokehPillar(ctx)
+    case 'ambient-vinyl':
+      return renderAmbientVinyl(ctx)
+    case 'ambient-aura':
+      return renderAmbientAura(ctx)
     // cinema
     case 'cinema-scope':
       return renderCinemaScope(ctx)
     case 'neon-edge':
       return renderNeonEdge(ctx)
+    case 'cinema-letterbox':
+      return renderCinemaLetterbox(ctx)
+    case 'cinema-timestamp':
+      return renderCinemaTimestamp(ctx)
     // editorial
     case 'swiss-grid':
       return renderSwissGrid(ctx)
     case 'contact-sheet':
       return renderContactSheet(ctx)
-    // metal
-    case 'brushed-metal':
-      return renderBrushedMetal(ctx)
-    case 'medal-plate':
-      return renderMedalPlate(ctx)
+    case 'editorial-minimal':
+      return renderEditorialMinimal(ctx)
     // floating
     case 'floating-caption':
       return renderFloatingCaption(ctx)
     case 'stamp-corner':
       return renderStampCorner(ctx)
-    // 老 classic 风格在 stage5 layout 里不应出现 · 若出现兜底图
     default:
       return renderPlainPhoto(ctx)
   }
@@ -997,59 +1007,201 @@ function shortLens(lens?: string): string {
 }
 
 // ============================================================================
-// METAL · 金属 / 徽章
+// GLASS 扩展 · glass-gradient / glass-minimal
 // ============================================================================
 
-function renderBrushedMetal(ctx: StageFiveContext) {
-  const { containerWidth, containerHeight, orientation } = ctx
-  const plateH = (orientation === 'portrait' ? 0.2 : 0.14) * containerHeight
+function renderGlassGradient(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight } = ctx
+  const padX = containerWidth * 0.05
   return (
-    <div style={{ position: 'absolute', inset: 0, background: '#1A1A1C' }}>
-      {/* 照片(顶满 · 底部给铭牌让位) */}
+    <>
+      <PhotoCover src={ctx.imageSrc} />
       <div
         style={{
           position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: plateH,
+          left: `${padX}px`,
+          right: `${padX}px`,
+          bottom: `${containerHeight * 0.05}px`,
+          padding: `${scale(0.018, ctx)}px ${scale(0.022, ctx)}px`,
+          borderRadius: 14,
+          background:
+            'linear-gradient(90deg, rgba(120,80,220,0.25), rgba(80,180,220,0.2), rgba(220,120,80,0.25))',
+          backdropFilter: 'blur(24px) saturate(160%)',
+          WebkitBackdropFilter: 'blur(24px) saturate(160%)',
+          border: '1px solid rgba(255, 255, 255, 0.3)',
+          boxShadow: '0 8px 28px rgba(0,0,0,0.35)',
+          color: '#ffffff',
+          zIndex: 10,
+        }}
+      >
+        <GlassLine size={scale(0.022, ctx)} weight={600}>
+          {ctx.modelText || '—'}
+        </GlassLine>
+        <GlassLine size={scale(0.016, ctx)} color="rgba(255,255,255,0.88)" mono mt={3}>
+          {ctx.paramText || '—'}
+        </GlassLine>
+      </div>
+    </>
+  )
+}
+
+function renderGlassMinimal(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight } = ctx
+  return (
+    <>
+      <PhotoCover src={ctx.imageSrc} />
+      <div
+        style={{
+          position: 'absolute',
+          left: `${containerWidth * 0.04}px`,
+          bottom: `${containerHeight * 0.04}px`,
+          maxWidth: `${containerWidth * 0.4}px`,
+          padding: `${scale(0.008, ctx)}px ${scale(0.012, ctx)}px`,
+          borderRadius: 6,
+          background: 'rgba(255,255,255,0.12)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          border: '0.5px solid rgba(255,255,255,0.2)',
+          color: '#ffffff',
+          zIndex: 10,
+          fontFamily: "'JetBrains Mono', monospace",
+        }}
+      >
+        <GlassLine size={scale(0.013, ctx)} color="rgba(255,255,255,0.9)">
+          {ctx.modelText || '—'}
+        </GlassLine>
+        <GlassLine size={scale(0.011, ctx)} color="rgba(255,255,255,0.7)" mt={1}>
+          {ctx.paramText || '—'}
+        </GlassLine>
+      </div>
+    </>
+  )
+}
+
+// ============================================================================
+// OIL 扩展 · oil-classic
+// ============================================================================
+
+function renderOilClassic(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight, orientation } = ctx
+  const frame = 0.06
+  const captionH = orientation === 'portrait' ? 0.18 : 0.14
+  return (
+    <div style={{ position: 'absolute', inset: 0, background: '#F5F0E6' }}>
+      <OilPaperTexture />
+      <div
+        style={{
+          position: 'absolute',
+          top: containerHeight * frame,
+          left: containerWidth * frame,
+          right: containerWidth * frame,
+          bottom: containerHeight * captionH,
           overflow: 'hidden',
           zIndex: 1,
           backgroundColor: '#000',
+          boxShadow: 'inset 0 0 0 1px rgba(140,110,70,0.2)',
         }}
       >
         <PhotoCover src={ctx.imageSrc} />
       </div>
-      {/* 金属拉丝铭牌 */}
       <div
         style={{
           position: 'absolute',
-          bottom: 0,
           left: 0,
           right: 0,
-          height: plateH,
-          background:
-            'linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(0,0,0,0.2) 100%), ' +
-            'repeating-linear-gradient(90deg, #8a8a8d 0px, #9a9a9d 1px, #7a7a7d 2px), #8a8a8d',
-          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 0 rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: `0 ${containerWidth * 0.06}px`,
-          zIndex: 2,
-          gap: 16,
+          bottom: containerHeight * 0.04,
+          textAlign: 'center',
+          color: '#3A2E1E',
+          zIndex: 5,
+          padding: '0 10%',
         }}
       >
         <div
           style={{
-            fontFamily: "'Georgia', 'Times New Roman', serif",
-            fontSize: `${scale(orientation === 'portrait' ? 0.034 : 0.022, ctx)}px`,
-            fontWeight: 700,
-            letterSpacing: '0.08em',
-            color: '#1A1A1A',
-            textShadow: '0 1px 0 rgba(255,255,255,0.4), 0 -1px 0 rgba(0,0,0,0.2)',
-            flex: 1,
-            minWidth: 0,
+            fontFamily: "'Georgia', serif",
+            fontStyle: 'italic',
+            fontSize: `${scale(0.02, ctx)}px`,
+            marginBottom: 3,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {ctx.modelText || '—'}
+        </div>
+        <div
+          style={{
+            fontFamily: "'Georgia', serif",
+            fontSize: `${scale(0.013, ctx)}px`,
+            color: '#7D6C4E',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {ctx.paramText || '—'}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// AMBIENT 扩展 · ambient-vinyl / ambient-aura
+// ============================================================================
+
+function renderAmbientVinyl(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight, orientation, imageSrc } = ctx
+  return (
+    <>
+      {imageSrc && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: `url(${imageSrc})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            filter: 'blur(50px) saturate(120%)',
+            transform: 'scale(1.4)',
+            zIndex: 0,
+          }}
+        />
+      )}
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1 }} />
+      {/* 圆形照片居中 */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -55%)',
+          width: `${Math.min(containerWidth, containerHeight) * 0.6}px`,
+          height: `${Math.min(containerWidth, containerHeight) * 0.6}px`,
+          borderRadius: '50%',
+          overflow: 'hidden',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+          zIndex: 2,
+          backgroundColor: '#000',
+        }}
+      >
+        <PhotoCover src={imageSrc} />
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          left: '10%',
+          right: '10%',
+          bottom: `${containerHeight * 0.06}px`,
+          textAlign: 'center',
+          color: '#fff',
+          zIndex: 5,
+        }}
+      >
+        <div
+          style={{
+            fontSize: `${scale(orientation === 'portrait' ? 0.024 : 0.02, ctx)}px`,
+            fontWeight: 500,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -1061,10 +1213,156 @@ function renderBrushedMetal(ctx: StageFiveContext) {
           style={{
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: `${scale(0.014, ctx)}px`,
-            color: 'rgba(26,26,26,0.7)',
-            letterSpacing: '0.15em',
-            flexShrink: 0,
+            opacity: 0.7,
+            marginTop: 3,
             whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {ctx.paramText || '—'}
+        </div>
+      </div>
+    </>
+  )
+}
+
+function renderAmbientAura(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight, orientation, imageSrc } = ctx
+  const photoSide = orientation === 'portrait' ? 0.06 : 0.08
+  return (
+    <>
+      {imageSrc && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: `url(${imageSrc})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            filter: 'blur(80px) saturate(180%) brightness(0.8)',
+            transform: 'scale(1.6)',
+            zIndex: 0,
+          }}
+        />
+      )}
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.2)', zIndex: 1 }} />
+      <div
+        style={{
+          position: 'absolute',
+          top: containerHeight * 0.08,
+          left: containerWidth * photoSide,
+          right: containerWidth * photoSide,
+          bottom: containerHeight * (orientation === 'portrait' ? 0.2 : 0.16),
+          boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
+          borderRadius: 4,
+          overflow: 'hidden',
+          zIndex: 2,
+          backgroundColor: '#000',
+        }}
+      >
+        <PhotoCover src={imageSrc} />
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          left: '8%',
+          right: '8%',
+          bottom: `${containerHeight * 0.05}px`,
+          textAlign: 'center',
+          color: 'rgba(255,255,255,0.95)',
+          zIndex: 5,
+        }}
+      >
+        <div
+          style={{
+            fontSize: `${scale(orientation === 'portrait' ? 0.024 : 0.02, ctx)}px`,
+            fontWeight: 500,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {ctx.modelText || '—'}
+        </div>
+        <div
+          style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: `${scale(0.014, ctx)}px`,
+            opacity: 0.75,
+            marginTop: 3,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {ctx.paramText || '—'}
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ============================================================================
+// CINEMA 扩展 · cinema-letterbox / cinema-timestamp
+// ============================================================================
+
+function renderCinemaLetterbox(ctx: StageFiveContext) {
+  const { containerHeight, orientation } = ctx
+  const barH = (orientation === 'portrait' ? 0.14 : 0.12) * containerHeight
+  return (
+    <div style={{ position: 'absolute', inset: 0, background: '#000' }}>
+      <div
+        style={{
+          position: 'absolute',
+          top: barH,
+          bottom: barH,
+          left: 0,
+          right: 0,
+          overflow: 'hidden',
+          zIndex: 1,
+        }}
+      >
+        <PhotoCover src={ctx.imageSrc} />
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: barH,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'rgba(255,255,255,0.85)',
+          fontFamily: "'Courier New', monospace",
+          zIndex: 5,
+          gap: 2,
+        }}
+      >
+        <div
+          style={{
+            fontSize: `${scale(0.016, ctx)}px`,
+            letterSpacing: '0.1em',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxWidth: '80%',
+          }}
+        >
+          {ctx.modelText || '—'}
+        </div>
+        <div
+          style={{
+            fontSize: `${scale(0.012, ctx)}px`,
+            opacity: 0.6,
+            letterSpacing: '0.08em',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxWidth: '80%',
           }}
         >
           {ctx.paramText || '—'}
@@ -1074,68 +1372,113 @@ function renderBrushedMetal(ctx: StageFiveContext) {
   )
 }
 
-function renderMedalPlate(ctx: StageFiveContext) {
-  const { containerWidth, containerHeight, orientation } = ctx
-  const medalSize = Math.min(containerWidth, containerHeight) * (orientation === 'portrait' ? 0.17 : 0.14)
+function renderCinemaTimestamp(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight } = ctx
   return (
     <>
       <PhotoCover src={ctx.imageSrc} />
-      {/* 右下角金色圆章 */}
       <div
         style={{
           position: 'absolute',
-          right: `${containerWidth * 0.05}px`,
-          bottom: `${containerHeight * 0.05}px`,
-          width: medalSize,
-          height: medalSize,
-          borderRadius: '50%',
-          background: 'radial-gradient(circle at 30% 30%, #ffd89b, #b8860b 45%, #6b4500 100%)',
-          boxShadow:
-            '0 6px 18px rgba(0,0,0,0.55), inset 0 2px 0 rgba(255,255,255,0.4), inset 0 -2px 0 rgba(0,0,0,0.3)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#3A2500',
+          left: `${containerWidth * 0.03}px`,
+          bottom: `${containerHeight * 0.04}px`,
+          maxWidth: '60%',
+          fontFamily: "'Courier New', monospace",
+          color: '#00FF66',
           zIndex: 10,
-          padding: `0 ${medalSize * 0.1}px`,
+          textShadow: '0 0 4px rgba(0,255,102,0.4)',
         }}
       >
         <div
           style={{
-            fontFamily: "'Times New Roman', serif",
-            fontWeight: 700,
-            fontSize: `${medalSize * 0.16}px`,
-            letterSpacing: '0.05em',
-            textAlign: 'center',
+            fontSize: `${scale(0.014, ctx)}px`,
+            letterSpacing: '0.08em',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            maxWidth: '90%',
-            lineHeight: 1,
           }}
         >
-          {ctx.exif.make || '—'}
+          {ctx.modelText || '—'}
         </div>
         <div
           style={{
-            fontFamily: "'Courier New', monospace",
-            fontSize: `${medalSize * 0.11}px`,
-            letterSpacing: '0.05em',
-            marginTop: 3,
-            opacity: 0.85,
+            fontSize: `${scale(0.011, ctx)}px`,
+            opacity: 0.7,
+            marginTop: 1,
+            letterSpacing: '0.06em',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            maxWidth: '90%',
-            textAlign: 'center',
-            lineHeight: 1,
           }}
         >
-          {ctx.exif.model || '—'}
+          {ctx.paramText || '—'}
         </div>
       </div>
     </>
+  )
+}
+
+// ============================================================================
+// EDITORIAL 扩展 · editorial-minimal
+// ============================================================================
+
+function renderEditorialMinimal(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight, orientation } = ctx
+  const captionH = (orientation === 'portrait' ? 0.18 : 0.12) * containerHeight
+  const pad = containerWidth * 0.04
+  return (
+    <div style={{ position: 'absolute', inset: 0, background: '#FFFFFF' }}>
+      <div
+        style={{
+          position: 'absolute',
+          top: containerHeight * 0.04,
+          left: pad,
+          right: pad,
+          bottom: captionH,
+          overflow: 'hidden',
+          zIndex: 1,
+          backgroundColor: '#000',
+        }}
+      >
+        <PhotoCover src={ctx.imageSrc} />
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          left: pad,
+          right: pad,
+          bottom: containerHeight * 0.04,
+          textAlign: 'center',
+          color: '#1A1A1A',
+          zIndex: 5,
+        }}
+      >
+        <div
+          style={{
+            fontFamily: "'Inter', system-ui, sans-serif",
+            fontSize: `${scale(0.014, ctx)}px`,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {ctx.modelText || '—'}
+        </div>
+        <div
+          style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: `${scale(0.011, ctx)}px`,
+            color: '#888',
+            marginTop: 2,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {ctx.paramText || '—'}
+        </div>
+      </div>
+    </div>
   )
 }
 
