@@ -29,6 +29,17 @@ export function resolveSvgFontStack(family: FrameFontFamily): string {
 }
 
 /**
+ * SVG text-anchor 只有 start/middle/end,对应 layout.slot.align 的 left/center/right。
+ *
+ * 所有 generator 都要用,集中在此避免散布(AGENTS.md 第 8 条)。
+ */
+export function alignToSvgAnchor(align: 'left' | 'center' | 'right'): 'start' | 'middle' | 'end' {
+  if (align === 'left') return 'start'
+  if (align === 'right') return 'end'
+  return 'middle'
+}
+
+/**
  * 按优先级省略字段,直到文本宽度估算值 < maxWidthPx。
  *
  * 字体宽度估算:等宽字按 `fontSize * 0.6`,其它字体按 `fontSize * 0.55`。

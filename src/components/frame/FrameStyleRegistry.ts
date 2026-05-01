@@ -15,6 +15,7 @@ import type { FrameStyle, FrameStyleId, FrameStyleOverrides } from '../../../sha
 import type { Photo } from '../../../shared/types'
 import { MinimalBarLayout } from './layouts/MinimalBarLayout'
 import { PlaceholderFrameLayout } from './layouts/PlaceholderFrameLayout'
+import { PolaroidClassicLayout } from './layouts/PolaroidClassicLayout'
 
 /** 每个 layout 组件接收的标准 props */
 export interface FrameLayoutProps {
@@ -34,11 +35,12 @@ export interface FrameLayoutProps {
 }
 
 const LAYOUT_REGISTRY: Partial<Record<FrameStyleId, ComponentType<FrameLayoutProps>>> = {
-  // 阶段 2:Minimal Bar 已实装(SVG generator + CSS 预览双端对齐)
+  // 阶段 2:实装风格
   'minimal-bar': MinimalBarLayout,
-  // 阶段 2 后续会替换:polaroid-classic / film-full-border / gallery-black /
-  // gallery-white / editorial-caption / spine-edition / hairline
-  // 在各自 commit 中加入对应 layout,未加入前 FramePreviewHost 会走"尚未实装"友好 fallback
+  'polaroid-classic': PolaroidClassicLayout,
+  // 阶段 2 后续会替换:film-full-border / gallery-black / gallery-white /
+  // editorial-caption / spine-edition / hairline
+  // 未实装时 FramePreviewHost 会走"尚未实装"友好 fallback
 }
 
 /** 占位布局导出:给未注册的风格调用方手动 fallback 用(可选) */

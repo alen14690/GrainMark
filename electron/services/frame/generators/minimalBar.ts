@@ -18,7 +18,7 @@
  */
 import { scaleByMinEdge } from '../../../../shared/frame-tokens.js'
 import type { FrameSvgGenerator } from '../composite.js'
-import { escSvgText, resolveSvgFontStack } from '../typography.js'
+import { alignToSvgAnchor, escSvgText, resolveSvgFontStack } from '../typography.js'
 
 export const generateMinimalBar: FrameSvgGenerator = ({ geometry, paramLine, dateLine, style }) => {
   const { canvasW, canvasH, imgOffsetY, imgH, borderBottomPx, layout, imgW } = geometry
@@ -56,18 +56,11 @@ export const generateMinimalBar: FrameSvgGenerator = ({ geometry, paramLine, dat
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}" height="${canvasH}" viewBox="0 0 ${canvasW} ${canvasH}">
   <!-- style=${escSvgText(style.id)} -->
   <rect x="0" y="${barTop}" width="${canvasW}" height="${barH}" fill="${escSvgText(layout.backgroundColor)}"/>
-  <text x="${paramsX}" y="${textBaselineY}" font-family="${paramsFontStack}" font-size="${paramsFontPx}" fill="${textColor}" text-anchor="${alignToAnchor(paramsSlot.align)}">${escSvgText(paramLine)}</text>
+  <text x="${paramsX}" y="${textBaselineY}" font-family="${paramsFontStack}" font-size="${paramsFontPx}" fill="${textColor}" text-anchor="${alignToSvgAnchor(paramsSlot.align)}">${escSvgText(paramLine)}</text>
   ${
     dateLine && dateSlot
-      ? `<text x="${dateX}" y="${textBaselineY}" font-family="${dateFontStack}" font-size="${dateFontPx}" fill="${dateColor}" text-anchor="${alignToAnchor(dateSlot.align)}">${escSvgText(dateLine)}</text>`
+      ? `<text x="${dateX}" y="${textBaselineY}" font-family="${dateFontStack}" font-size="${dateFontPx}" fill="${dateColor}" text-anchor="${alignToSvgAnchor(dateSlot.align)}">${escSvgText(dateLine)}</text>`
       : ''
   }
 </svg>`
-}
-
-/** SVG text-anchor 只有 start/middle/end,对应 layout.slot.align 的 left/center/right */
-function alignToAnchor(align: 'left' | 'center' | 'right'): 'start' | 'middle' | 'end' {
-  if (align === 'left') return 'start'
-  if (align === 'right') return 'end'
-  return 'middle'
 }
