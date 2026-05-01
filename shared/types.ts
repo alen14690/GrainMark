@@ -455,11 +455,14 @@ export type FrameStyleId =
   | 'oil-texture'
   | 'watercolor-caption'
   | 'oil-classic'
-  // ambient(4) · 氛围模糊
+  // ambient(7) · 氛围模糊
   | 'ambient-glow'
   | 'bokeh-pillar'
   | 'ambient-vinyl'
   | 'ambient-aura'
+  | 'ambient-soft'
+  | 'ambient-dark'
+  | 'ambient-gradient'
   // cinema(4) · 电影 / 霓虹
   | 'cinema-scope'
   | 'neon-edge'

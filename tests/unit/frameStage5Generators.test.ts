@@ -17,7 +17,10 @@ import { describe, expect, it } from 'vitest'
 import type { FrameGeneratorContext } from '../../electron/services/frame/composite'
 import {
   generateAmbientAura,
+  generateAmbientDark,
   generateAmbientGlow,
+  generateAmbientGradient,
+  generateAmbientSoft,
   generateAmbientVinyl,
   generateBokehPillar,
   generateCinemaLetterbox,
@@ -97,6 +100,9 @@ const CASES: GenCase[] = [
   { id: 'bokeh-pillar', gen: generateBokehPillar, expectsModelInSvg: true, expectsParamInSvg: true },
   { id: 'ambient-vinyl', gen: generateAmbientVinyl, expectsModelInSvg: true, expectsParamInSvg: true },
   { id: 'ambient-aura', gen: generateAmbientAura, expectsModelInSvg: true, expectsParamInSvg: true },
+  { id: 'ambient-soft', gen: generateAmbientSoft, expectsModelInSvg: true, expectsParamInSvg: true },
+  { id: 'ambient-dark', gen: generateAmbientDark, expectsModelInSvg: true, expectsParamInSvg: true },
+  { id: 'ambient-gradient', gen: generateAmbientGradient, expectsModelInSvg: true, expectsParamInSvg: true },
   { id: 'cinema-scope', gen: generateCinemaScope, expectsModelInSvg: true, expectsParamInSvg: true },
   { id: 'neon-edge', gen: generateNeonEdge, expectsModelInSvg: true, expectsParamInSvg: true },
   { id: 'cinema-letterbox', gen: generateCinemaLetterbox, expectsModelInSvg: true, expectsParamInSvg: true },

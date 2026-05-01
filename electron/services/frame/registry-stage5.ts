@@ -1065,6 +1065,213 @@ const AMBIENT_AURA: FrameStyle = {
   defaultOverrides: DEFAULT_OVERRIDES,
 }
 
+/**
+ * ambient-soft · 柔光氛围
+ *
+ * 视觉:照片四周渐淡到乳白色 · 梦幻柔焦感 · 文艺清新
+ */
+const AMBIENT_SOFT: FrameStyle = {
+  id: 'ambient-soft',
+  name: '柔光氛围',
+  description: '照片四周渐淡到乳白 · 梦幻柔焦 · 文艺清新感',
+  group: 'ambient',
+  landscape: {
+    borderTop: 0.08,
+    borderBottom: 0.16,
+    borderLeft: 0.08,
+    borderRight: 0.08,
+    backgroundColor: '#F8F6F2',
+    textColor: '#2A2A2A',
+    slots: [
+      {
+        id: 'model',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.35 },
+        fontSize: 0.018,
+        align: 'center',
+        fontFamily: 'inter',
+        colorOverride: '#2A2A2A',
+      },
+      {
+        id: 'params',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.7 },
+        fontSize: 0.013,
+        align: 'center',
+        fontFamily: 'mono',
+        colorOverride: '#888888',
+      },
+    ],
+  },
+  portrait: {
+    borderTop: 0.06,
+    borderBottom: 0.2,
+    borderLeft: 0.06,
+    borderRight: 0.06,
+    backgroundColor: '#F8F6F2',
+    textColor: '#2A2A2A',
+    slots: [
+      {
+        id: 'model',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.3 },
+        fontSize: 0.022,
+        align: 'center',
+        fontFamily: 'inter',
+        colorOverride: '#2A2A2A',
+      },
+      {
+        id: 'params',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.65 },
+        fontSize: 0.015,
+        align: 'center',
+        fontFamily: 'mono',
+        colorOverride: '#888888',
+      },
+    ],
+  },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+/**
+ * ambient-dark · 暗夜氛围
+ *
+ * 视觉:纯深黑模糊底色 · 照片浮在暗色雾气中 · 底部极细白字 · 高级感
+ */
+const AMBIENT_DARK: FrameStyle = {
+  id: 'ambient-dark',
+  name: '暗夜氛围',
+  description: '深黑雾气底 · 照片悬浮 · 底部极细白字 · 沉稳高级',
+  group: 'ambient',
+  landscape: {
+    borderTop: 0.06,
+    borderBottom: 0.14,
+    borderLeft: 0.06,
+    borderRight: 0.06,
+    backgroundColor: '#050505',
+    textColor: '#ffffff',
+    slots: [
+      {
+        id: 'model',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.4 },
+        fontSize: 0.016,
+        align: 'center',
+        fontFamily: 'inter',
+        colorOverride: 'rgba(255,255,255,0.85)',
+      },
+      {
+        id: 'params',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.75 },
+        fontSize: 0.012,
+        align: 'center',
+        fontFamily: 'mono',
+        colorOverride: 'rgba(255,255,255,0.5)',
+      },
+    ],
+  },
+  portrait: {
+    borderTop: 0.05,
+    borderBottom: 0.18,
+    borderLeft: 0.05,
+    borderRight: 0.05,
+    backgroundColor: '#050505',
+    textColor: '#ffffff',
+    slots: [
+      {
+        id: 'model',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.35 },
+        fontSize: 0.02,
+        align: 'center',
+        fontFamily: 'inter',
+        colorOverride: 'rgba(255,255,255,0.85)',
+      },
+      {
+        id: 'params',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.7 },
+        fontSize: 0.014,
+        align: 'center',
+        fontFamily: 'mono',
+        colorOverride: 'rgba(255,255,255,0.5)',
+      },
+    ],
+  },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+/**
+ * ambient-gradient · 渐变氛围
+ *
+ * 视觉:照片底部向暖色渐变模糊 · 日落余晖风 · 暖调治愈
+ */
+const AMBIENT_GRADIENT: FrameStyle = {
+  id: 'ambient-gradient',
+  name: '渐变氛围',
+  description: '底部暖色渐变模糊 · 日落余晖感 · 暖调治愈',
+  group: 'ambient',
+  landscape: {
+    borderTop: 0.06,
+    borderBottom: 0.18,
+    borderLeft: 0.06,
+    borderRight: 0.06,
+    backgroundColor: '#1A0F08',
+    textColor: '#ffffff',
+    slots: [
+      {
+        id: 'model',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.35 },
+        fontSize: 0.018,
+        align: 'center',
+        fontFamily: 'inter',
+        colorOverride: 'rgba(255,255,255,0.92)',
+      },
+      {
+        id: 'params',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.7 },
+        fontSize: 0.013,
+        align: 'center',
+        fontFamily: 'mono',
+        colorOverride: 'rgba(255,220,180,0.75)',
+      },
+    ],
+  },
+  portrait: {
+    borderTop: 0.05,
+    borderBottom: 0.2,
+    borderLeft: 0.05,
+    borderRight: 0.05,
+    backgroundColor: '#1A0F08',
+    textColor: '#ffffff',
+    slots: [
+      {
+        id: 'model',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.3 },
+        fontSize: 0.022,
+        align: 'center',
+        fontFamily: 'inter',
+        colorOverride: 'rgba(255,255,255,0.92)',
+      },
+      {
+        id: 'params',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.65 },
+        fontSize: 0.015,
+        align: 'center',
+        fontFamily: 'mono',
+        colorOverride: 'rgba(255,220,180,0.75)',
+      },
+    ],
+  },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
 // ============================================================================
 // CINEMA 扩展(+2) · 电影变体
 // ============================================================================
@@ -1428,11 +1635,14 @@ export const STAGE5_STYLES: readonly FrameStyle[] = [
   OIL_TEXTURE,
   WATERCOLOR_CAPTION,
   OIL_CLASSIC,
-  // ambient(4)
+  // ambient(7)
   AMBIENT_GLOW,
   BOKEH_PILLAR,
   AMBIENT_VINYL,
   AMBIENT_AURA,
+  AMBIENT_SOFT,
+  AMBIENT_DARK,
+  AMBIENT_GRADIENT,
   // cinema(4)
   CINEMA_SCOPE,
   NEON_EDGE,

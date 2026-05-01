@@ -131,6 +131,12 @@ function renderByStyleId(ctx: StageFiveContext): React.ReactNode {
       return renderAmbientVinyl(ctx)
     case 'ambient-aura':
       return renderAmbientAura(ctx)
+    case 'ambient-soft':
+      return renderAmbientSoft(ctx)
+    case 'ambient-dark':
+      return renderAmbientDark(ctx)
+    case 'ambient-gradient':
+      return renderAmbientGradient(ctx)
     // cinema
     case 'cinema-scope':
       return renderCinemaScope(ctx)
@@ -1290,6 +1296,254 @@ function renderAmbientAura(ctx: StageFiveContext) {
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: `${scale(0.014, ctx)}px`,
             opacity: 0.75,
+            marginTop: 3,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {ctx.paramText || '—'}
+        </div>
+      </div>
+    </>
+  )
+}
+
+function renderAmbientSoft(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight, orientation, imageSrc } = ctx
+  const photoSide = orientation === 'portrait' ? 0.06 : 0.08
+  return (
+    <>
+      {/* 乳白柔光底色 */}
+      <div style={{ position: 'absolute', inset: 0, background: '#F8F6F2', zIndex: 0 }} />
+      {imageSrc && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: `url(${imageSrc})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            filter: 'blur(60px) saturate(80%) brightness(1.3)',
+            transform: 'scale(1.4)',
+            opacity: 0.3,
+            zIndex: 1,
+          }}
+        />
+      )}
+      <div
+        style={{
+          position: 'absolute',
+          top: containerHeight * 0.08,
+          left: containerWidth * photoSide,
+          right: containerWidth * photoSide,
+          bottom: containerHeight * (orientation === 'portrait' ? 0.2 : 0.16),
+          boxShadow: '0 16px 48px rgba(0,0,0,0.1)',
+          borderRadius: 3,
+          overflow: 'hidden',
+          zIndex: 2,
+          backgroundColor: '#000',
+        }}
+      >
+        <PhotoCover src={imageSrc} />
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          left: '10%',
+          right: '10%',
+          bottom: `${containerHeight * 0.05}px`,
+          textAlign: 'center',
+          color: '#2A2A2A',
+          zIndex: 5,
+        }}
+      >
+        <div
+          style={{
+            fontSize: `${scale(orientation === 'portrait' ? 0.022 : 0.018, ctx)}px`,
+            fontWeight: 500,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {ctx.modelText || '—'}
+        </div>
+        <div
+          style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: `${scale(0.013, ctx)}px`,
+            color: '#888',
+            marginTop: 3,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {ctx.paramText || '—'}
+        </div>
+      </div>
+    </>
+  )
+}
+
+function renderAmbientDark(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight, orientation, imageSrc } = ctx
+  const photoSide = orientation === 'portrait' ? 0.05 : 0.06
+  return (
+    <>
+      {imageSrc && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: `url(${imageSrc})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            filter: 'blur(80px) brightness(0.3) saturate(60%)',
+            transform: 'scale(1.5)',
+            zIndex: 0,
+          }}
+        />
+      )}
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(5,5,5,0.75)', zIndex: 1 }} />
+      <div
+        style={{
+          position: 'absolute',
+          top: containerHeight * 0.06,
+          left: containerWidth * photoSide,
+          right: containerWidth * photoSide,
+          bottom: containerHeight * (orientation === 'portrait' ? 0.18 : 0.14),
+          boxShadow: '0 20px 60px rgba(0,0,0,0.7)',
+          borderRadius: 2,
+          overflow: 'hidden',
+          zIndex: 2,
+          backgroundColor: '#000',
+        }}
+      >
+        <PhotoCover src={imageSrc} />
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          left: '10%',
+          right: '10%',
+          bottom: `${containerHeight * 0.04}px`,
+          textAlign: 'center',
+          zIndex: 5,
+        }}
+      >
+        <div
+          style={{
+            color: 'rgba(255,255,255,0.85)',
+            fontSize: `${scale(orientation === 'portrait' ? 0.02 : 0.016, ctx)}px`,
+            fontWeight: 400,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {ctx.modelText || '—'}
+        </div>
+        <div
+          style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: `${scale(0.012, ctx)}px`,
+            color: 'rgba(255,255,255,0.5)',
+            marginTop: 3,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {ctx.paramText || '—'}
+        </div>
+      </div>
+    </>
+  )
+}
+
+function renderAmbientGradient(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight, orientation, imageSrc } = ctx
+  const photoSide = orientation === 'portrait' ? 0.05 : 0.06
+  return (
+    <>
+      {/* 暖色渐变底 */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(180deg, #1A0F08 0%, #3D1F0A 50%, #1A0F08 100%)',
+          zIndex: 0,
+        }}
+      />
+      {imageSrc && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: `url(${imageSrc})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            filter: 'blur(70px) saturate(150%) brightness(0.6)',
+            transform: 'scale(1.5)',
+            opacity: 0.5,
+            zIndex: 1,
+          }}
+        />
+      )}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background:
+            'linear-gradient(180deg, rgba(26,15,8,0.3) 0%, rgba(200,100,30,0.15) 70%, rgba(26,15,8,0.7) 100%)',
+          zIndex: 2,
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          top: containerHeight * 0.06,
+          left: containerWidth * photoSide,
+          right: containerWidth * photoSide,
+          bottom: containerHeight * (orientation === 'portrait' ? 0.2 : 0.18),
+          boxShadow: '0 20px 56px rgba(0,0,0,0.5), 0 0 80px rgba(200,100,30,0.15)',
+          borderRadius: 3,
+          overflow: 'hidden',
+          zIndex: 3,
+          backgroundColor: '#000',
+        }}
+      >
+        <PhotoCover src={imageSrc} />
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          left: '10%',
+          right: '10%',
+          bottom: `${containerHeight * 0.05}px`,
+          textAlign: 'center',
+          zIndex: 5,
+        }}
+      >
+        <div
+          style={{
+            color: 'rgba(255,255,255,0.92)',
+            fontSize: `${scale(orientation === 'portrait' ? 0.022 : 0.018, ctx)}px`,
+            fontWeight: 500,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {ctx.modelText || '—'}
+        </div>
+        <div
+          style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: `${scale(0.013, ctx)}px`,
+            color: 'rgba(255,220,180,0.75)',
             marginTop: 3,
             whiteSpace: 'nowrap',
             overflow: 'hidden',

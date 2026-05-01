@@ -708,6 +708,79 @@ const generateAmbientAura: FrameSvgGenerator = (ctx: FrameGeneratorContext) => {
 </svg>`
 }
 
+const generateAmbientSoft: FrameSvgGenerator = (ctx: FrameGeneratorContext) => {
+  const { geometry, modelLine, paramLine, style } = ctx
+  const { canvasW, canvasH, borderBottomPx, imgOffsetY, imgH } = geometry
+  const me = minEdge(geometry)
+  const fontModel = me * 0.018
+  const fontParam = me * 0.013
+  const plateTop = imgOffsetY + imgH
+  const centerY = plateTop + borderBottomPx / 2
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}" height="${canvasH}" viewBox="0 0 ${canvasW} ${canvasH}">
+  <!-- style=${ESC(style.id)} -->
+  <rect x="0" y="0" width="${canvasW}" height="${canvasH}" fill="#F8F6F2"/>
+  <defs>
+    <radialGradient id="soft-glow" cx="50%" cy="40%" r="55%">
+      <stop offset="0" stop-color="rgba(255,250,240,0)"/>
+      <stop offset="1" stop-color="rgba(248,246,242,0.9)"/>
+    </radialGradient>
+  </defs>
+  <rect x="0" y="0" width="${canvasW}" height="${canvasH}" fill="url(#soft-glow)"/>
+  ${drawText({ x: canvasW / 2, y: centerY - fontModel * 0.8, text: truncateByWidth(modelLine, canvasW * 0.8, fontModel), fontSizePx: fontModel, fontFamily: 'inter', color: '#2A2A2A', weight: 500, align: 'center' })}
+  ${drawText({ x: canvasW / 2, y: centerY + fontParam * 0.5, text: truncateByWidth(paramLine, canvasW * 0.8, fontParam), fontSizePx: fontParam, fontFamily: 'mono', color: '#888888', align: 'center' })}
+</svg>`
+}
+
+const generateAmbientDark: FrameSvgGenerator = (ctx: FrameGeneratorContext) => {
+  const { geometry, modelLine, paramLine, style } = ctx
+  const { canvasW, canvasH, borderBottomPx, imgOffsetY, imgH } = geometry
+  const me = minEdge(geometry)
+  const fontModel = me * 0.016
+  const fontParam = me * 0.012
+  const plateTop = imgOffsetY + imgH
+  const centerY = plateTop + borderBottomPx / 2
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}" height="${canvasH}" viewBox="0 0 ${canvasW} ${canvasH}">
+  <!-- style=${ESC(style.id)} -->
+  <rect x="0" y="0" width="${canvasW}" height="${canvasH}" fill="#050505"/>
+  <defs>
+    <radialGradient id="dark-fog" cx="50%" cy="35%" r="65%">
+      <stop offset="0" stop-color="rgba(40,35,30,0.3)"/>
+      <stop offset="1" stop-color="rgba(5,5,5,0.8)"/>
+    </radialGradient>
+  </defs>
+  <rect x="0" y="0" width="${canvasW}" height="${canvasH}" fill="url(#dark-fog)"/>
+  ${drawText({ x: canvasW / 2, y: centerY - fontModel * 0.8, text: truncateByWidth(modelLine, canvasW * 0.8, fontModel), fontSizePx: fontModel, fontFamily: 'inter', color: 'rgba(255,255,255,0.85)', weight: 400, align: 'center' })}
+  ${drawText({ x: canvasW / 2, y: centerY + fontParam * 0.5, text: truncateByWidth(paramLine, canvasW * 0.8, fontParam), fontSizePx: fontParam, fontFamily: 'mono', color: 'rgba(255,255,255,0.5)', align: 'center' })}
+</svg>`
+}
+
+const generateAmbientGradient: FrameSvgGenerator = (ctx: FrameGeneratorContext) => {
+  const { geometry, modelLine, paramLine, style } = ctx
+  const { canvasW, canvasH, borderBottomPx, imgOffsetY, imgH } = geometry
+  const me = minEdge(geometry)
+  const fontModel = me * 0.018
+  const fontParam = me * 0.013
+  const plateTop = imgOffsetY + imgH
+  const centerY = plateTop + borderBottomPx / 2
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}" height="${canvasH}" viewBox="0 0 ${canvasW} ${canvasH}">
+  <!-- style=${ESC(style.id)} -->
+  <rect x="0" y="0" width="${canvasW}" height="${canvasH}" fill="#1A0F08"/>
+  <defs>
+    <linearGradient id="warm-grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="rgba(200,120,50,0.15)"/>
+      <stop offset="0.5" stop-color="rgba(180,80,30,0.25)"/>
+      <stop offset="1" stop-color="rgba(26,15,8,0.8)"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="${canvasW}" height="${canvasH}" fill="url(#warm-grad)"/>
+  ${drawText({ x: canvasW / 2, y: centerY - fontModel * 0.8, text: truncateByWidth(modelLine, canvasW * 0.8, fontModel), fontSizePx: fontModel, fontFamily: 'inter', color: 'rgba(255,255,255,0.92)', weight: 500, align: 'center' })}
+  ${drawText({ x: canvasW / 2, y: centerY + fontParam * 0.5, text: truncateByWidth(paramLine, canvasW * 0.8, fontParam), fontSizePx: fontParam, fontFamily: 'mono', color: 'rgba(255,220,180,0.75)', align: 'center' })}
+</svg>`
+}
+
 // ============================================================================
 // CINEMA 扩展
 // ============================================================================
@@ -865,6 +938,9 @@ export const STAGE5_GENERATORS = {
   'bokeh-pillar': generateBokehPillar,
   'ambient-vinyl': generateAmbientVinyl,
   'ambient-aura': generateAmbientAura,
+  'ambient-soft': generateAmbientSoft,
+  'ambient-dark': generateAmbientDark,
+  'ambient-gradient': generateAmbientGradient,
   'cinema-scope': generateCinemaScope,
   'neon-edge': generateNeonEdge,
   'cinema-letterbox': generateCinemaLetterbox,
@@ -888,6 +964,9 @@ export {
   generateBokehPillar,
   generateAmbientVinyl,
   generateAmbientAura,
+  generateAmbientSoft,
+  generateAmbientDark,
+  generateAmbientGradient,
   generateCinemaScope,
   generateNeonEdge,
   generateCinemaLetterbox,
