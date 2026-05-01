@@ -63,10 +63,21 @@ function drawText(opts: DrawTextOpts): string {
   return `<text x="${Math.round(opts.x)}" y="${y}" font-family="${fontFamily}" font-size="${opts.fontSizePx}" fill="${ESC(opts.color)}" text-anchor="${anchor}"${weight}${italic}${ls}${filter}>${ESC(opts.text)}</text>`
 }
 
-/** 简单按字符宽度估算截断(SVG 没法真实测量 · 用 0.55 × fontSize 作每字符近似) */
-function truncateByWidth(text: string, maxPx: number, fontSizePx: number): string {
+/**
+ * 简单按字符宽度估算截断
+ *
+ * SVG 没法真实测量字宽 · 用保守的 charWidthRatio × fontSize 做近似
+ *   - 0.62 适合 Inter/system-ui(比例字体平均)
+ *   - monospace(Courier/JetBrains Mono)字宽约 0.6 · 但 letter-spacing 会额外加宽
+ *   - letterSpacing 参数:SVG letter-spacing 是在每字符后追加的像素值
+ *
+ * 宁可多截一字也不能溢出!
+ */
+function truncateByWidth(text: string, maxPx: number, fontSizePx: number, letterSpacing = 0): string {
   if (!text) return ''
-  const maxChars = Math.floor(maxPx / (fontSizePx * 0.55))
+  // 每字符实际占宽 = 字形宽(0.62 × fontSize) + letter-spacing
+  const charW = fontSizePx * 0.62 + letterSpacing
+  const maxChars = Math.floor(maxPx / charW)
   if (text.length <= maxChars) return text
   if (maxChars <= 3) return text.slice(0, Math.max(1, maxChars))
   return `${text.slice(0, maxChars - 1)}…`
@@ -214,7 +225,7 @@ const generateOilTexture: FrameSvgGenerator = (ctx: FrameGeneratorContext) => {
   ${drawText({
     x: canvasW / 2,
     y: canvasH - captionBottom - fontSub,
-    text: truncateByWidth(paramLine, canvasW * 0.85, fontSub),
+    text: truncateByWidth(paramLine, canvasW * 0.85, fontSub, fontSub * 0.12),
     fontSizePx: fontSub,
     fontFamily: 'georgia',
     color: '#7D6C4E',
@@ -314,8 +325,8 @@ const generateBokehPillar: FrameSvgGenerator = (ctx: FrameGeneratorContext) => {
   const me = minEdge(geometry)
   const fontPx = me * 0.014
   const pad = canvasW * 0.04
-  const modelTrunc = truncateByWidth(modelLine, canvasW * 0.4, fontPx)
-  const paramTrunc = truncateByWidth(paramLine, canvasW * 0.4, fontPx)
+  const modelTrunc = truncateByWidth(modelLine, canvasW * 0.4, fontPx, fontPx * 0.08)
+  const paramTrunc = truncateByWidth(paramLine, canvasW * 0.4, fontPx, fontPx * 0.08)
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}" height="${canvasH}" viewBox="0 0 ${canvasW} ${canvasH}">
   <!-- style=${ESC(style.id)} bg=${ESC(layout.backgroundColor)} -->
   <rect x="0" y="0" width="${canvasW}" height="${canvasH}" fill="#050505"/>
@@ -368,7 +379,7 @@ const generateCinemaScope: FrameSvgGenerator = (ctx: FrameGeneratorContext) => {
   ${drawText({
     x: padX + me * 0.025,
     y: barH * 0.5 - fontTop * 0.5,
-    text: truncateByWidth(`REC · ${modelLine}`, canvasW - padX * 2 - me * 0.025, fontTop),
+    text: truncateByWidth(`REC · ${modelLine}`, canvasW - padX * 2 - me * 0.025, fontTop, fontTop * 0.15),
     fontSizePx: fontTop,
     fontFamily: 'courier',
     color: 'rgba(255,255,255,0.95)',
@@ -378,7 +389,7 @@ const generateCinemaScope: FrameSvgGenerator = (ctx: FrameGeneratorContext) => {
   ${drawText({
     x: canvasW / 2,
     y: canvasH - barH * 0.5 - fontBot * 0.5,
-    text: truncateByWidth(paramLine, canvasW - padX * 2, fontBot),
+    text: truncateByWidth(paramLine, canvasW - padX * 2, fontBot, fontBot * 0.3),
     fontSizePx: fontBot,
     fontFamily: 'courier',
     color: 'rgba(255,255,255,0.85)',
@@ -407,7 +418,7 @@ const generateNeonEdge: FrameSvgGenerator = (ctx: FrameGeneratorContext) => {
   ${drawText({
     x: imgOffsetX + imgW - cornerPadX,
     y: imgOffsetY + imgH - cornerPadY - fontModel - fontParam * 1.3,
-    text: truncateByWidth(modelLine, imgW * 0.55, fontModel),
+    text: truncateByWidth(modelLine, imgW * 0.55, fontModel, fontModel * 0.05),
     fontSizePx: fontModel,
     fontFamily: 'mono',
     color: '#ffffff',
@@ -417,7 +428,7 @@ const generateNeonEdge: FrameSvgGenerator = (ctx: FrameGeneratorContext) => {
   ${drawText({
     x: imgOffsetX + imgW - cornerPadX,
     y: imgOffsetY + imgH - cornerPadY - fontParam * 0.5,
-    text: truncateByWidth(paramLine, imgW * 0.55, fontParam),
+    text: truncateByWidth(paramLine, imgW * 0.55, fontParam, fontParam * 0.08),
     fontSizePx: fontParam,
     fontFamily: 'mono',
     color: '#E8B86D',
@@ -460,7 +471,7 @@ const generateSwissGrid: FrameSvgGenerator = (ctx: FrameGeneratorContext) => {
   ${drawText({
     x: pad,
     y: canvasH - captionBottom - fontLens,
-    text: truncateByWidth(lensText, canvasW * 0.6 - pad, fontLens),
+    text: truncateByWidth(lensText, canvasW * 0.6 - pad, fontLens, fontLens * 0.14),
     fontSizePx: fontLens,
     fontFamily: 'inter',
     color: '#666666',
@@ -470,7 +481,7 @@ const generateSwissGrid: FrameSvgGenerator = (ctx: FrameGeneratorContext) => {
   ${drawText({
     x: canvasW - pad,
     y: canvasH - captionBottom - fontParam,
-    text: truncateByWidth(paramLine, canvasW * 0.38, fontParam),
+    text: truncateByWidth(paramLine, canvasW * 0.38, fontParam, fontParam * 0.06),
     fontSizePx: fontParam,
     fontFamily: 'mono',
     color: '#444444',
@@ -543,7 +554,7 @@ const generateContactSheet: FrameSvgGenerator = (ctx: FrameGeneratorContext) => 
   ${drawText({
     x: canvasW / 2,
     y: kodakBandH * 0.5 - fontKodak * 0.5,
-    text: truncateByWidth(`KODAK GOLD 200 · ${modelLine}`, canvasW - 20, fontKodak),
+    text: truncateByWidth(`KODAK GOLD 200 · ${modelLine}`, canvasW * 0.85, fontKodak, fontKodak * 0.3),
     fontSizePx: fontKodak,
     fontFamily: 'courier',
     color: '#3A2A00',
@@ -712,8 +723,8 @@ const generateCinemaLetterbox: FrameSvgGenerator = (ctx: FrameGeneratorContext) 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}" height="${canvasH}" viewBox="0 0 ${canvasW} ${canvasH}">
   <!-- style=${ESC(style.id)} -->
   <rect x="0" y="0" width="${canvasW}" height="${canvasH}" fill="#000000"/>
-  ${drawText({ x: canvasW / 2, y: centerBot - fontModel * 0.8, text: truncateByWidth(modelLine, canvasW * 0.8, fontModel), fontSizePx: fontModel, fontFamily: 'courier', color: 'rgba(255,255,255,0.85)', align: 'center', letterSpacing: fontModel * 0.1 })}
-  ${drawText({ x: canvasW / 2, y: centerBot + fontParam * 0.3, text: truncateByWidth(paramLine, canvasW * 0.8, fontParam), fontSizePx: fontParam, fontFamily: 'courier', color: 'rgba(255,255,255,0.6)', align: 'center', letterSpacing: fontParam * 0.08 })}
+  ${drawText({ x: canvasW / 2, y: centerBot - fontModel * 0.8, text: truncateByWidth(modelLine, canvasW * 0.8, fontModel, fontModel * 0.1), fontSizePx: fontModel, fontFamily: 'courier', color: 'rgba(255,255,255,0.85)', align: 'center', letterSpacing: fontModel * 0.1 })}
+  ${drawText({ x: canvasW / 2, y: centerBot + fontParam * 0.3, text: truncateByWidth(paramLine, canvasW * 0.8, fontParam, fontParam * 0.08), fontSizePx: fontParam, fontFamily: 'courier', color: 'rgba(255,255,255,0.6)', align: 'center', letterSpacing: fontParam * 0.08 })}
 </svg>`
 }
 
@@ -729,8 +740,8 @@ const generateCinemaTimestamp: FrameSvgGenerator = (ctx: FrameGeneratorContext) 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}" height="${canvasH}" viewBox="0 0 ${canvasW} ${canvasH}">
   <!-- style=${ESC(style.id)} -->
   <rect x="0" y="0" width="${canvasW}" height="${canvasH}" fill="${ESC(layout.backgroundColor)}"/>
-  ${drawText({ x: padX, y: canvasH - padY - fontParam * 1.4 - fontModel, text: truncateByWidth(modelLine, canvasW * 0.6, fontModel), fontSizePx: fontModel, fontFamily: 'courier', color: '#00FF66', letterSpacing: fontModel * 0.08 })}
-  ${drawText({ x: padX, y: canvasH - padY - fontParam * 0.2, text: truncateByWidth(paramLine, canvasW * 0.6, fontParam), fontSizePx: fontParam, fontFamily: 'courier', color: 'rgba(0,255,102,0.7)', letterSpacing: fontParam * 0.06 })}
+  ${drawText({ x: padX, y: canvasH - padY - fontParam * 1.4 - fontModel, text: truncateByWidth(modelLine, canvasW * 0.6, fontModel, fontModel * 0.08), fontSizePx: fontModel, fontFamily: 'courier', color: '#00FF66', letterSpacing: fontModel * 0.08 })}
+  ${drawText({ x: padX, y: canvasH - padY - fontParam * 0.2, text: truncateByWidth(paramLine, canvasW * 0.6, fontParam, fontParam * 0.06), fontSizePx: fontParam, fontFamily: 'courier', color: 'rgba(0,255,102,0.7)', letterSpacing: fontParam * 0.06 })}
 </svg>`
 }
 
@@ -816,7 +827,7 @@ const generateStampCorner: FrameSvgGenerator = (ctx: FrameGeneratorContext) => {
   ${drawText({
     x: canvasW - padX,
     y: canvasH - padY - fontParam * 1.4 - fontModel,
-    text: truncateByWidth(modelLine, canvasW * 0.6, fontModel),
+    text: truncateByWidth(modelLine, canvasW * 0.6, fontModel, fontModel * 0.05),
     fontSizePx: fontModel,
     fontFamily: 'courier',
     color: '#FF6B00',
@@ -827,7 +838,7 @@ const generateStampCorner: FrameSvgGenerator = (ctx: FrameGeneratorContext) => {
   ${drawText({
     x: canvasW - padX,
     y: canvasH - padY - fontParam * 0.2,
-    text: truncateByWidth(paramLine, canvasW * 0.6, fontParam),
+    text: truncateByWidth(paramLine, canvasW * 0.6, fontParam, fontParam * 0.1),
     fontSizePx: fontParam,
     fontFamily: 'courier',
     color: '#FF6B00',
