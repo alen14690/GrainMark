@@ -39,12 +39,15 @@ export const generateContaxLabel: FrameSvgGenerator = ({ geometry, paramLine, mo
   let accentLine = ''
   if (borderBottomPx > 0) {
     if (orientation === 'portrait') {
-      // 竖图:短水平橙红线 · 分隔 model(上行)和 params(下行)
-      //   位置:底条垂直中线 · x 起点 6%(与 model/params 对齐) · 宽 18%(短装饰)
-      const lineY = barTop + Math.round(borderBottomPx * 0.5)
-      const lineX0 = Math.round(canvasW * 0.06)
-      const lineX1 = lineX0 + Math.round(canvasW * 0.18)
-      accentLine = `<line x1="${lineX0}" y1="${lineY}" x2="${lineX1}" y2="${lineY}" stroke="${lineColor}" stroke-width="${lineStroke}" stroke-linecap="round"/>`
+      // 竖图专业装饰(2026-05-01 · 专业重设计):
+      //   左侧粗橙红竖线 · 贯穿两行文字形成视觉轴
+      //   位置:canvasW × 0.05(左侧) · 从 model 上沿到 params 下沿
+      //   粗度:比横图稍粗(0.005 vs 0.003) · 作为视觉主角
+      const lineX = Math.round(canvasW * 0.05)
+      const lineY0 = barTop + Math.round(borderBottomPx * 0.22) // 从 model 上沿
+      const lineY1 = barTop + Math.round(borderBottomPx * 0.8) // 到 params 下沿
+      const lineStrokePortrait = Math.max(scaleByMinEdge(0.005, geometry.imgW, geometry.imgH), 3)
+      accentLine = `<line x1="${lineX}" y1="${lineY0}" x2="${lineX}" y2="${lineY1}" stroke="${lineColor}" stroke-width="${lineStrokePortrait}" stroke-linecap="round"/>`
     } else {
       // 横图:橙红竖线 · 分隔左 model 和右 params · 位置 canvasW×0.5 · 高度占底条 50%
       const lineX = Math.round(canvasW * 0.5)

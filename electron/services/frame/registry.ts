@@ -73,8 +73,12 @@ const MINIMAL_BAR: FrameStyle = {
     ],
   },
   portrait: {
-    // 竖图把底栏加厚(按 BORDER.minimalBar.bottomPortrait = 0.12),params 字号下调防止
-    // 竖图宽度下与 date 左右分置时挤到一起(landscape 0.022 在竖图会溢出)
+    // 竖图专业重设计(2026-05-01):
+    //   底栏 20% 短边(过去 10~12% 过浅,观感像"压条")
+    //   二层堆叠:
+    //     - 第 1 行:机型大字 · 专业视觉主体 · anchor.y=0.32
+    //     - 第 2 行:参数行 · 保持等宽小字 · anchor.y=0.68
+    //     - 日期移到参数行末(由 paramLine 自带),不再单独 slot · 避免三元素挤压
     borderTop: 0,
     borderBottom: BORDER.minimalBar.bottomPortrait,
     borderLeft: 0,
@@ -83,18 +87,29 @@ const MINIMAL_BAR: FrameStyle = {
     textColor: COLOR.inkGray,
     slots: [
       {
+        // 机型大字独占第 1 行 · 左对齐 · Inter 家族增加现代感
+        id: 'model',
+        area: 'bottom',
+        anchor: { x: 0.04, y: 0.32 },
+        fontSize: FONT_SIZE.mainTitlePortrait, // 0.034 · 真的大
+        align: 'left',
+        fontFamily: 'inter',
+      },
+      {
+        // 参数第 2 行 · 左对齐 mono · 作为机型的元数据
         id: 'params',
         area: 'bottom',
-        anchor: { x: 0.04, y: 0.5 },
-        fontSize: 0.02, // 竖图专属 · 从 0.022 下调到 0.02 给 date 留空间
+        anchor: { x: 0.04, y: 0.7 },
+        fontSize: FONT_SIZE.paramsPortrait, // 0.024
         align: 'left',
         fontFamily: 'mono',
       },
       {
+        // 日期右下小字 softGray · 作为参数的"右尾"
         id: 'date',
         area: 'bottom',
-        anchor: { x: 0.96, y: 0.5 },
-        fontSize: 0.014, // 竖图专属 · 从 0.018 下调 · 右对齐日期更紧凑
+        anchor: { x: 0.96, y: 0.7 },
+        fontSize: FONT_SIZE.captionPortrait,
         align: 'right',
         fontFamily: 'mono',
         colorOverride: COLOR.softGray,
@@ -160,8 +175,10 @@ const POLAROID_CLASSIC: FrameStyle = {
     ],
   },
   portrait: {
+    // 竖图修订(2026-05-01):底边与横图同 22% · 保持 Polaroid 600 真实物理比例
+    // 主标题字号用 mainTitlePortrait = 0.034 · 给竖图更充足视觉权重
     borderTop: BORDER.polaroid.top,
-    borderBottom: BORDER.polaroid.bottomPortrait, // 竖图压到 18%
+    borderBottom: BORDER.polaroid.bottomPortrait, // 0.22 · 与横图一致
     borderLeft: BORDER.polaroid.side,
     borderRight: BORDER.polaroid.side,
     backgroundColor: COLOR.paperWhite,
@@ -170,16 +187,16 @@ const POLAROID_CLASSIC: FrameStyle = {
       {
         id: 'model',
         area: 'bottom',
-        anchor: { x: 0.5, y: 0.45 },
-        fontSize: FONT_SIZE.mainTitle,
+        anchor: { x: 0.5, y: 0.38 },
+        fontSize: FONT_SIZE.mainTitlePortrait, // 竖图放大到 0.034
         align: 'center',
         fontFamily: 'georgia',
       },
       {
         id: 'params',
         area: 'bottom',
-        anchor: { x: 0.5, y: 0.78 },
-        fontSize: FONT_SIZE.caption,
+        anchor: { x: 0.5, y: 0.7 },
+        fontSize: FONT_SIZE.captionPortrait, // 0.020
         align: 'center',
         fontFamily: 'mono',
         colorOverride: COLOR.softGray,
@@ -187,8 +204,8 @@ const POLAROID_CLASSIC: FrameStyle = {
       {
         id: 'date',
         area: 'bottom',
-        anchor: { x: 0.95, y: 0.92 },
-        fontSize: FONT_SIZE.smallLabel,
+        anchor: { x: 0.94, y: 0.9 },
+        fontSize: FONT_SIZE.smallLabelPortrait,
         align: 'right',
         fontFamily: 'courier',
         colorOverride: COLOR.dateStampOrange,
@@ -355,10 +372,11 @@ const GALLERY_BLACK: FrameStyle = {
     ],
   },
   portrait: {
-    // 竖图底栏加厚到 16%(配合三行堆叠),且主字号下调从 0.028 → 0.024
-    // 避免在竖图窄画幅下字太大破坏端庄感
+    // 竖图专业重设计(2026-05-01):
+    //   底栏 24% · 三行堆叠需要充分高度 · 主字号放大到 mainTitlePortrait
+    //   y 分布 0.3 / 0.55 / 0.82 给三行足够呼吸感 · 最后一行日期偏下
     borderTop: BORDER.gallery.top,
-    borderBottom: BORDER.gallery.bottomPortrait,
+    borderBottom: BORDER.gallery.bottomPortrait, // 0.24
     borderLeft: BORDER.gallery.side,
     borderRight: BORDER.gallery.side,
     backgroundColor: COLOR.filmBlack,
@@ -367,24 +385,24 @@ const GALLERY_BLACK: FrameStyle = {
       {
         id: 'model',
         area: 'bottom',
-        anchor: { x: 0.5, y: 0.28 },
-        fontSize: 0.024, // 竖图专属 · 从 0.028 下调
+        anchor: { x: 0.5, y: 0.3 },
+        fontSize: FONT_SIZE.mainTitlePortrait, // 0.034
         align: 'center',
         fontFamily: 'georgia',
       },
       {
         id: 'artist',
         area: 'bottom',
-        anchor: { x: 0.5, y: 0.58 },
-        fontSize: FONT_SIZE.caption,
+        anchor: { x: 0.5, y: 0.55 },
+        fontSize: FONT_SIZE.paramsPortrait, // 0.024 · 比之前 caption 大
         align: 'center',
         fontFamily: 'georgia',
       },
       {
         id: 'date',
         area: 'bottom',
-        anchor: { x: 0.5, y: 0.85 },
-        fontSize: FONT_SIZE.smallLabel,
+        anchor: { x: 0.5, y: 0.82 },
+        fontSize: FONT_SIZE.captionPortrait, // 0.020
         align: 'center',
         fontFamily: 'mono',
         colorOverride: COLOR.softGray,
@@ -486,39 +504,37 @@ const EDITORIAL_CAPTION: FrameStyle = {
     ],
   },
   portrait: {
-    // 竖图专属:两行堆叠(model 上 · params 下) · 避免左右分端在窄画幅挤压
-    // 底栏 14%(token 已上调),两行 + 中间留气口
+    // 竖图专业重设计(2026-05-01):
+    //   底栏 22% · 两行堆叠 + 日期底角 · 主字号 mainTitlePortrait 给足视觉权重
+    //   y 分布:model 0.28 / params 0.58 / date 0.85 · 三行明确分层
     borderTop: 0,
-    borderBottom: BORDER.editorialCaption.bottomPortrait,
+    borderBottom: BORDER.editorialCaption.bottomPortrait, // 0.22
     borderLeft: 0,
     borderRight: 0,
     backgroundColor: COLOR.paperWhite,
     textColor: COLOR.inkGray,
     slots: [
       {
-        // 机型:上行左对齐 · 字号从 0.028 → 0.024 · 竖图主标题紧凑一些
         id: 'model',
         area: 'bottom',
-        anchor: { x: 0.05, y: 0.3 },
-        fontSize: 0.024,
+        anchor: { x: 0.05, y: 0.28 },
+        fontSize: FONT_SIZE.mainTitlePortrait, // 0.034
         align: 'left',
         fontFamily: 'inter',
       },
       {
-        // 参数:下行左对齐 · 与 model 同起点保持左对齐视觉轴
         id: 'params',
         area: 'bottom',
-        anchor: { x: 0.05, y: 0.62 },
-        fontSize: FONT_SIZE.caption,
+        anchor: { x: 0.05, y: 0.58 },
+        fontSize: FONT_SIZE.paramsPortrait, // 0.024
         align: 'left',
         fontFamily: 'mono',
       },
       {
-        // 日期:右下小字 softGray · 与 params 同行但右对齐
         id: 'date',
         area: 'bottom',
         anchor: { x: 0.95, y: 0.85 },
-        fontSize: FONT_SIZE.smallLabel,
+        fontSize: FONT_SIZE.smallLabelPortrait,
         align: 'right',
         fontFamily: 'mono',
         colorOverride: COLOR.softGray,
@@ -658,7 +674,7 @@ const HAIRLINE: FrameStyle = {
         id: 'params',
         area: 'overlay',
         anchor: { x: 0.97, y: 0.97 },
-        fontSize: FONT_SIZE.smallLabel,
+        fontSize: FONT_SIZE.smallLabelPortrait, // 0.016 · 竖图稍大(过去 0.014 肉眼几乎看不见)
         align: 'right',
         fontFamily: 'mono',
         colorOverride: COLOR.softGray,
@@ -947,10 +963,12 @@ const CONTAX_LABEL: FrameStyle = {
     ],
   },
   portrait: {
-    // 竖图专属:两行堆叠(model 上 · params 下) · 与 Editorial 对称但背景为黑
-    // 底栏 14%(token 已上调),两行同左起点建立视觉轴
+    // 竖图专业重设计(2026-05-01):
+    //   底栏 22% · 两行堆叠(model 上 params 下)
+    //   视觉轴:左侧一根橙红粗竖线贯穿两行(在 generator 里手绘,此处只定义文字)
+    //   slot x 起点 0.1 给竖线留空间
     borderTop: 0,
-    borderBottom: BORDER.contaxLabel.bottomPortrait,
+    borderBottom: BORDER.contaxLabel.bottomPortrait, // 0.22
     borderLeft: 0,
     borderRight: 0,
     backgroundColor: COLOR.filmBlack,
@@ -959,16 +977,16 @@ const CONTAX_LABEL: FrameStyle = {
       {
         id: 'model',
         area: 'bottom',
-        anchor: { x: 0.06, y: 0.3 },
-        fontSize: 0.024, // 竖图主标题从 0.028 → 0.024
+        anchor: { x: 0.1, y: 0.3 },
+        fontSize: FONT_SIZE.mainTitlePortrait, // 0.034
         align: 'left',
         fontFamily: 'inter',
       },
       {
         id: 'params',
         area: 'bottom',
-        anchor: { x: 0.06, y: 0.68 },
-        fontSize: FONT_SIZE.caption,
+        anchor: { x: 0.1, y: 0.68 },
+        fontSize: FONT_SIZE.paramsPortrait, // 0.024
         align: 'left',
         fontFamily: 'mono',
       },

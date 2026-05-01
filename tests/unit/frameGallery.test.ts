@@ -53,12 +53,12 @@ describe('Gallery 兄弟风格 · Black 版契约', () => {
     expect(svg.toLowerCase()).toMatch(/<text[^>]+fill="#f8f5ee"/)
   })
 
-  it('横 14% / 竖 16% 底边 · borderTop=side=6%', () => {
+  it('横 14% / 竖 24% 底边(2026-05-01 专业重设计) · borderTop=side=6%', () => {
     const styleL = getFrameStyle('gallery-black')!
     const gL = computeFrameGeometry(4000, 3000, styleL)
     const gP = computeFrameGeometry(3000, 4000, styleL)
     expect(gL.borderBottomPx).toBe(420) // 0.14 × 3000
-    expect(gP.borderBottomPx).toBe(480) // 0.16 × 3000(2026-05-01 竖图加厚以容纳三行堆叠)
+    expect(gP.borderBottomPx).toBe(720) // 0.24 × 3000 · 竖图三行堆叠需要充分呼吸空间
     expect(gL.borderTopPx).toBe(180) // 0.06 × 3000
   })
 

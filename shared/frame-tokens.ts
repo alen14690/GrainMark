@@ -50,12 +50,26 @@ export const COLOR = {
 //   - Polaroid 比例参考真实 Polaroid 600 卡片(86×108mm,底边 22mm ≈ 20%)
 //   - Gallery Black 比例参考画册印刷惯例(标准 6-8% 边距 + 14% 底栏)
 //   - Film Full Border 参考 135 胶卷实际齿孔区比例(8% 上下)
+// ============================================================================
+// 边框比例 Token(单位:相对于 minEdge 的百分比)
+// ============================================================================
+//
+// 2026-05-01 · 专业竖图修订:
+//   行业专业 EXIF 边框 APP(ShotOn / Mark Foto / Fujifilm Ink Studio)在竖图
+//   上的底栏占比普遍 20-28% 短边 · 给主字号 + 参数二层堆叠足够呼吸空间。
+//   本项目原先竖图底栏 10-16% 过浅,导致竖图底部像"一条压条",丧失专业感。
+//
+// 数值来源:
+//   - Polaroid:真实 Polaroid 600 卡片底边 22mm ≈ 22% 短边(横竖都套用)
+//   - Gallery:画册惯例 · 横图 14% 竖图加到 24% 才够三行堆叠
+//   - Minimal Bar:底栏文字风格 · 横 8% 竖 20% 给"标题 + 参数"两行
+//   - Editorial / Contax:杂志版式 · 竖图 22% 给两行分明 + 留气口
 export const BORDER = {
   polaroid: {
     side: 0.04,
     top: 0.04,
     bottomLandscape: 0.22,
-    bottomPortrait: 0.18,
+    bottomPortrait: 0.22, // 竖图修订:与横图一致 22% · 保持宝丽来 600 真实比例(2026-05-01)
   },
   filmFullBorder: {
     perforationLandscape: 0.08,
@@ -65,11 +79,11 @@ export const BORDER = {
     side: 0.06,
     top: 0.06,
     bottomLandscape: 0.14,
-    bottomPortrait: 0.16, // 竖图 ↑ 从 0.12 → 0.16 · 三行堆叠需要足够高度避免挤压
+    bottomPortrait: 0.24, // 竖图修订:0.16 → 0.24 · 三行堆叠需要充分呼吸
   },
   minimalBar: {
     bottomLandscape: 0.08,
-    bottomPortrait: 0.12, // 竖图 ↑ 让 params + date 左右分置不再挤
+    bottomPortrait: 0.2, // 竖图修订:0.12 → 0.20 · 由"压条"变"专业底栏"
   },
   hairline: {
     insetLandscape: 0.015,
@@ -77,11 +91,11 @@ export const BORDER = {
   },
   editorialCaption: {
     bottomLandscape: 0.12,
-    bottomPortrait: 0.14, // 竖图 ↑ 从 0.10 → 0.14 · 配合两行堆叠的垂直空间
+    bottomPortrait: 0.22, // 竖图修订:0.14 → 0.22 · 两行堆叠 + 日期底角
   },
   spineEdition: {
     bandLandscape: 0.1, // 横图:底部带
-    bandPortrait: 0.08, // 竖图:右侧带
+    bandPortrait: 0.08, // 竖图:右侧带(侧带不变,已是专业值)
   },
   sx70: {
     side: 0.08,
@@ -95,7 +109,7 @@ export const BORDER = {
   pointAndShoot: { none: 0 },
   contaxLabel: {
     bottomLandscape: 0.1,
-    bottomPortrait: 0.14, // 竖图 ↑ 从 0.10 → 0.14 · 两行堆叠需要更多高度
+    bottomPortrait: 0.22, // 竖图修订:0.14 → 0.22 · 两行堆叠需充分空间
   },
 } as const
 
@@ -103,17 +117,32 @@ export const BORDER = {
 // 字号比例 Token(单位:相对于 minEdge 的百分比)
 // ============================================================================
 //
+// 2026-05-01 · 专业竖图修订:
+//   竖图画幅窄 · 但屏幕/打印高度长 · 底栏文字应当**放大而非缩小**
+//   才能与横图相同"视觉分量"(对照 ShotOn / Mark Foto / Fujifilm Ink Studio
+//   等专业 EXIF 边框 APP,竖图主字号通常 3-4.5% minEdge,显著大于横图)
+//
 // 在 4000px 短边的常见图上:
-//   - mainTitle 0.028 = 112px  —— 100% 查看时肉眼清晰
-//   - params    0.022 = 88px   —— 参数行,稍小
-//   - caption   0.018 = 72px   —— 副标题 / 日期
-//   - dateStamp 0.03  = 120px  —— 橙红日期戳(需要显眼)
+//   - mainTitle          0.028 = 112px  —— 横图 100% 查看肉眼清晰
+//   - mainTitlePortrait  0.034 = 136px  —— 竖图主标题 · 独占一行需要更强视觉分量
+//   - params             0.022 = 88px   —— 横图参数行,稍小
+//   - paramsPortrait     0.024 = 96px   —— 竖图参数 · 也适当放大保持层级
+//   - caption            0.018 = 72px   —— 横图副标题 / 日期
+//   - captionPortrait    0.020 = 80px   —— 竖图副标题 · 小幅放大
+//   - dateStamp          0.03  = 120px  —— 橙红日期戳(需要显眼)
+//   - smallLabel         0.014 = 56px   —— 角标
+//   - smallLabelPortrait 0.016 = 64px   —— 竖图角标
+//   - spine              0.024 = 96px   —— 书脊字
 export const FONT_SIZE = {
   mainTitle: 0.028,
+  mainTitlePortrait: 0.034,
   params: 0.022,
+  paramsPortrait: 0.024,
   caption: 0.018,
+  captionPortrait: 0.02,
   dateStamp: 0.03,
   smallLabel: 0.014,
+  smallLabelPortrait: 0.016,
   spine: 0.024,
 } as const
 

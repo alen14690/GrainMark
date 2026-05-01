@@ -46,13 +46,13 @@ function renderSvg(imgW: number, imgH: number): string {
 }
 
 describe('Contax Label · 几何契约', () => {
-  it('横图底边 10% · 竖图底边 14%(2026-05-01 竖图加厚以容纳两行堆叠)', () => {
+  it('横图底边 10% · 竖图底边 22%(2026-05-01 专业重设计 · 给二层堆叠充分空间)', () => {
     const style = getStyle()
     const gL = computeFrameGeometry(4000, 3000, style)
     const gP = computeFrameGeometry(3000, 4000, style)
     // minEdge=3000
     expect(gL.borderBottomPx).toBe(300) // 0.10 × 3000
-    expect(gP.borderBottomPx).toBe(420) // 0.14 × 3000
+    expect(gP.borderBottomPx).toBe(660) // 0.22 × 3000
     expect(gL.borderTopPx).toBe(0)
     expect(gL.borderLeftPx).toBe(0)
     expect(gL.borderRightPx).toBe(0)
@@ -97,18 +97,18 @@ describe('Contax Label · 橙红分隔线', () => {
     }
   })
 
-  it('竖图:橙红水平短线 y1==y2,x1!=x2 · 位置在底条左侧(2026-05-01 竖图优化)', () => {
+  it('竖图:橙红粗竖线 x1==x2,y1!=y2 · 位置在底条左侧 5%(2026-05-01 专业重设计 · 左侧视觉轴)', () => {
     const svgP = renderSvg(3000, 4000)
     const match = svgP.match(/<line x1="(\d+)" y1="(\d+)" x2="(\d+)" y2="(\d+)"/)
     expect(match).toBeTruthy()
     if (match) {
       const [, x1, y1, x2, y2] = match
-      // 水平线:y 相同
-      expect(y1).toBe(y2)
-      // x1 ≠ x2 · x1 应 ≈ canvasW × 0.06 = 3000 × 0.06 = 180
-      expect(Number(x1)).toBeLessThan(Number(x2))
+      // 竖直线:x 相同
+      expect(x1).toBe(x2)
+      // y1 ≠ y2 · 线贯穿两行 · canvasW=3000 × 0.05=150
+      expect(Number(y1)).not.toBe(Number(y2))
       expect(Number(x1)).toBeGreaterThan(100)
-      expect(Number(x1)).toBeLessThan(300)
+      expect(Number(x1)).toBeLessThan(200)
     }
   })
 })

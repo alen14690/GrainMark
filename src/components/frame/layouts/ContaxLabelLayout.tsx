@@ -74,31 +74,34 @@ function LandscapeAccentLine({
   )
 }
 
-/** 竖图:短水平橙红线 · 底条垂直中线 · x 起点 6%(与 model/params 对齐) · 宽 18% */
+/** 竖图:左侧粗橙红竖线 · 贯穿 model + params 两行作为视觉轴(2026-05-01 专业重设计) */
 function PortraitAccentLine({
   containerWidth,
   containerHeight,
   borderBottom,
-  lineStroke,
+  lineStroke: _lineStroke,
 }: {
   containerWidth: number
   containerHeight: number
   borderBottom: number
   lineStroke: number
 }) {
-  const lineY = containerHeight - borderBottom + borderBottom * 0.5
-  const lineX0 = containerWidth * 0.06
-  const lineW = containerWidth * 0.18
+  // 竖图装饰粗度 0.005 vs 横图 0.003 · 作为视觉主角更显眼
+  const strokePortrait = Math.max((containerWidth * 0.005) / 1, 3)
+  const lineX = containerWidth * 0.05
+  const barTop = containerHeight - borderBottom
+  const lineY0 = barTop + borderBottom * 0.22
+  const lineY1 = barTop + borderBottom * 0.8
   return (
     <div
       style={{
         position: 'absolute',
-        top: `${lineY - lineStroke / 2}px`,
-        left: `${lineX0}px`,
-        width: `${lineW}px`,
-        height: `${lineStroke}px`,
+        top: `${lineY0}px`,
+        left: `${lineX - strokePortrait / 2}px`,
+        width: `${strokePortrait}px`,
+        height: `${lineY1 - lineY0}px`,
         backgroundColor: COLOR.dateStampOrange,
-        borderRadius: `${lineStroke}px`,
+        borderRadius: `${strokePortrait}px`,
         pointerEvents: 'none',
       }}
     />

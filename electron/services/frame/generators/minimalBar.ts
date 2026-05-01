@@ -3,64 +3,87 @@
  *
  * 设计语言(artifact/design/frame-system-2026-05-01.md · 组 A1):
  *   - 纸白底栏 `#F8F5EE`,深灰等宽字 `#2A2A2A`
- *   - 底栏高 8%(横)/ 10%(竖)· 不加四周边框
- *   - 左:参数一行;右:日期(次要色 softGray)
- *
- * 与旧 `watermark/renderer.ts` 的差异:
- *   - 老版黑底白字(style.bgColor='#000000', style.color='#ffffff')→ 粗糙
- *   - 新版按 frame-tokens 走 paperWhite / inkGray · 纸质感更强
- *   - 新版字号按 `scaleByMinEdge(FONT_SIZE.params, w, h)` 线性缩放 · 24MP 图不糊
+ *   - 横图:底栏 8% · 左参数 + 右日期(一行二元素)
+ *   - 竖图(2026-05-01 专业重设计):底栏 20% · 三行堆叠(model + params + date)
  *
  * 纯函数契约:
  *   - 只接收 FrameGeneratorContext(无 Sharp / fs / ipc 依赖)
  *   - 输出完整 SVG 字符串,宽高 = geometry.canvasW × geometry.canvasH
- *   - 可单测:给定输入,验证 SVG 含预期 `<text>` / `<rect>` 元素和颜色
+ *   - 通用 slot 遍历:本 generator 不硬编 "params + date",完全由 layout.slots 驱动
+ *     → 横竖差异由 registry 的 portrait 数据表达,不在 generator 写 if(imgW > imgH)
+ *
+ * 架构升级原因(2026-05-01):
+ *   原 generator 硬编 `paramsSlot + dateSlot` 两个 slot 的排版方式,竖图新增 model
+ *   slot 后无法展示。改为通用 slot 遍历(与 filmFullBorder/spineEdition 共享逻辑),
+ *   让数据驱动所有横竖差异。
  */
 import { scaleByMinEdge } from '../../../../shared/frame-tokens.js'
+import type { FrameContentSlot } from '../../../../shared/types.js'
 import type { FrameSvgGenerator } from '../composite.js'
 import { alignToSvgAnchor, escSvgText, resolveSvgFontStack } from '../typography.js'
 
-export const generateMinimalBar: FrameSvgGenerator = ({ geometry, paramLine, dateLine, style }) => {
+export const generateMinimalBar: FrameSvgGenerator = ({
+  geometry,
+  paramLine,
+  modelLine,
+  dateLine,
+  style,
+}) => {
   const { canvasW, canvasH, imgOffsetY, imgH, borderBottomPx, layout, imgW } = geometry
 
-  // 底栏区域(y 从 imgOffsetY+imgH 到 canvasH)
   const barTop = imgOffsetY + imgH
   const barH = borderBottomPx
 
-  // 字号:FrameLayout.slots 里每个 slot 定义了自己的 fontSize 比例,
-  // 这里按 scaleByMinEdge(fontSize, imgW, imgH) 换算为像素。
-  // 不把 FONT_SIZE.params 直接写死 —— 让 slots 数据做单源(AGENTS.md 第 8 条)。
+  // 兼容性护栏:必须有 params slot(Minimal Bar 核心)
   const paramsSlot = layout.slots.find((s) => s.id === 'params')
-  const dateSlot = layout.slots.find((s) => s.id === 'date')
-
   if (!paramsSlot) {
     throw new Error('[minimalBar] layout 缺少 params slot —— registry 数据定义有误')
   }
 
-  const paramsFontPx = scaleByMinEdge(paramsSlot.fontSize, imgW, imgH)
-  const dateFontPx = dateSlot ? scaleByMinEdge(dateSlot.fontSize, imgW, imgH) : paramsFontPx
-
-  // 竖向中线(SVG text 的 y 是字体基线位置,要加字号的 0.35 倍做视觉居中)
-  const textBaselineY = barTop + Math.round(barH / 2 + paramsFontPx * 0.35)
-
-  // 水平位置:anchor.x × canvasW
-  const paramsX = Math.round(paramsSlot.anchor.x * canvasW)
-  const dateX = dateSlot ? Math.round(dateSlot.anchor.x * canvasW) : canvasW - paramsX
-
-  const paramsFontStack = escSvgText(resolveSvgFontStack(paramsSlot.fontFamily))
-  const dateFontStack = dateSlot ? escSvgText(resolveSvgFontStack(dateSlot.fontFamily)) : paramsFontStack
-
-  const textColor = escSvgText(layout.textColor)
-  const dateColor = dateSlot?.colorOverride ? escSvgText(dateSlot.colorOverride) : textColor
+  const textParts: string[] = []
+  for (const slot of layout.slots) {
+    const text = pickSlotText(slot, { modelLine, paramLine, dateLine })
+    if (!text) continue
+    textParts.push(renderSlotInBar(slot, text, barTop, barH, canvasW, imgW, imgH, layout.textColor))
+  }
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}" height="${canvasH}" viewBox="0 0 ${canvasW} ${canvasH}">
   <!-- style=${escSvgText(style.id)} -->
   <rect x="0" y="${barTop}" width="${canvasW}" height="${barH}" fill="${escSvgText(layout.backgroundColor)}"/>
-  <text x="${paramsX}" y="${textBaselineY}" font-family="${paramsFontStack}" font-size="${paramsFontPx}" fill="${textColor}" text-anchor="${alignToSvgAnchor(paramsSlot.align)}">${escSvgText(paramLine)}</text>
-  ${
-    dateLine && dateSlot
-      ? `<text x="${dateX}" y="${textBaselineY}" font-family="${dateFontStack}" font-size="${dateFontPx}" fill="${dateColor}" text-anchor="${alignToSvgAnchor(dateSlot.align)}">${escSvgText(dateLine)}</text>`
-      : ''
-  }
+  ${textParts.join('\n  ')}
 </svg>`
+}
+
+function pickSlotText(
+  slot: FrameContentSlot,
+  texts: { modelLine: string; paramLine: string; dateLine: string },
+): string {
+  if (slot.id === 'model') return texts.modelLine
+  if (slot.id === 'params') return texts.paramLine
+  if (slot.id === 'date') return texts.dateLine
+  return ''
+}
+
+/**
+ * 在底栏 bar 区内按 slot.anchor 渲染单个 <text>。
+ *
+ * anchor.y 归一化到 bar 高(0=上沿 / 1=下沿) · 视觉居中加字号 0.35 补偿
+ * anchor.x 归一化到 canvas 宽
+ */
+function renderSlotInBar(
+  slot: FrameContentSlot,
+  text: string,
+  barTop: number,
+  barH: number,
+  canvasW: number,
+  imgW: number,
+  imgH: number,
+  defaultColor: string,
+): string {
+  const fontPx = scaleByMinEdge(slot.fontSize, imgW, imgH)
+  const baselineY = barTop + Math.round(slot.anchor.y * barH + fontPx * 0.35)
+  const x = Math.round(slot.anchor.x * canvasW)
+  const color = escSvgText(slot.colorOverride ?? defaultColor)
+  const fontStack = escSvgText(resolveSvgFontStack(slot.fontFamily))
+  return `<text x="${x}" y="${baselineY}" font-family="${fontStack}" font-size="${fontPx}" fill="${color}" text-anchor="${alignToSvgAnchor(slot.align)}">${escSvgText(text)}</text>`
 }

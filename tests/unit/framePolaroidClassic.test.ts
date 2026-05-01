@@ -57,14 +57,14 @@ describe('generatePolaroidClassic · 语义契约', () => {
     expect(svg.toLowerCase()).toMatch(/<rect[^>]+fill="#f8f5ee"/)
   })
 
-  it('横图用 22% 底边,竖图用 18%(BORDER.polaroid 分支真生效)', () => {
+  it('横竖图都用 22% 底边(2026-05-01 专业重设计 · 统一 Polaroid 600 真实比例)', () => {
     const style = getStyle()
     const gL = computeFrameGeometry(4000, 3000, style)
     const gP = computeFrameGeometry(3000, 4000, style)
     // 横图:minEdge=3000,底边 0.22×3000=660
-    // 竖图:minEdge=3000,底边 0.18×3000=540
+    // 竖图:minEdge=3000,底边 0.22×3000=660(2026-05-01 从 0.18 统一到 0.22)
     expect(gL.borderBottomPx).toBe(660)
-    expect(gP.borderBottomPx).toBe(540)
+    expect(gP.borderBottomPx).toBe(660)
     // 左右上都是 4% = 120
     expect(gL.borderLeftPx).toBe(120)
     expect(gL.borderRightPx).toBe(120)

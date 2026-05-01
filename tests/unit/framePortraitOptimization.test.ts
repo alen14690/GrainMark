@@ -102,7 +102,7 @@ describe('竖图布局优化 · 契约护栏', () => {
     expect(landscapeParams?.anchor.x, '横图 params 应右端(对照组)').toBeGreaterThan(0.5)
   })
 
-  it('所有风格 portrait 底栏比例在合理范围(0 ~ 0.25)', () => {
+  it('所有风格 portrait 底栏比例在合理范围(0 ~ 0.28)', () => {
     // 防御:有人把 bottomPortrait 改成 1.5 或负值等异常值
     const style = getFrameStyle
     const ids: FrameStyleId[] = [
@@ -118,7 +118,59 @@ describe('竖图布局优化 · 契约护栏', () => {
       expect(s, id).toBeTruthy()
       if (!s) continue
       expect(s.portrait.borderBottom).toBeGreaterThanOrEqual(0)
-      expect(s.portrait.borderBottom).toBeLessThanOrEqual(0.25)
+      expect(s.portrait.borderBottom).toBeLessThanOrEqual(0.28)
+    }
+  })
+
+  // ============================================================================
+  // 2026-05-01 专业比例契约(对标 ShotOn / Mark Foto / Fujifilm Ink Studio)
+  // ============================================================================
+  // 竖图底栏必须 >= 0.18 · 主字号必须 >= 0.03 · 专业 EXIF 边框的工程标准
+  // 蓝军:防止有人再把 bottomPortrait 改回 0.12 / 主字号改回 0.024 这种"压条 + 小字"反模式
+
+  it('专业竖图:底栏式 5 风格(minimal/gallery/editorial/contax + polaroid)竖图底栏 >= 18%', () => {
+    const ids: FrameStyleId[] = [
+      'minimal-bar',
+      'polaroid-classic',
+      'gallery-black',
+      'gallery-white',
+      'editorial-caption',
+      'contax-label',
+    ]
+    for (const id of ids) {
+      const s = getFrameStyle(id)
+      expect(s, id).toBeTruthy()
+      if (!s) continue
+      expect(
+        s.portrait.borderBottom,
+        `${id} 竖图底栏 ${s.portrait.borderBottom} 小于专业下限 0.18 —— 会观感像"压条"`,
+      ).toBeGreaterThanOrEqual(0.18)
+    }
+  })
+
+  it('专业竖图:含主标题 slot 的风格(model/artist)竖图主字号 >= 0.028(放大而非缩小)', () => {
+    // 底栏式 4 风格的主标题都应满足:字号 >= mainTitlePortrait(0.034) 附近
+    // 最低接受 0.028(mainTitle 原始值),不允许退回到 < 0.028
+    const ids: FrameStyleId[] = [
+      'minimal-bar',
+      'polaroid-classic',
+      'gallery-black',
+      'gallery-white',
+      'editorial-caption',
+      'contax-label',
+    ]
+    for (const id of ids) {
+      const s = getFrameStyle(id)
+      expect(s, id).toBeTruthy()
+      if (!s) continue
+      const titleSlot = s.portrait.slots.find((slot) => slot.id === 'model')
+      // minimal-bar 横图无 model slot,但竖图专业重设计后加了(验证存在性)
+      expect(titleSlot, `${id} 竖图缺 model slot —— 专业重设计要求竖图必有主标题`).toBeTruthy()
+      if (!titleSlot) continue
+      expect(
+        titleSlot.fontSize,
+        `${id} 竖图主标题字号 ${titleSlot.fontSize} 小于专业下限 0.028 —— 放大而非缩小才专业`,
+      ).toBeGreaterThanOrEqual(0.028)
     }
   })
 })
