@@ -198,12 +198,114 @@ const POLAROID_CLASSIC: FrameStyle = {
 }
 
 // ============================================================================
+// Film Full Border · 135 全齿孔(阶段 2 · 2026-05-01)
+// ============================================================================
+//
+// 设计语言(artifact/design/frame-system-2026-05-01.md · 组 B1):
+//   - 胶片黑 #0A0A0A 背景 · 上下两排齿孔
+//   - 横图:齿孔在上下(对应真实 135 胶卷齿孔在胶片长边)
+//   - 竖图:齿孔切到左右(真实 135 胶卷竖拍时齿孔本身就在两侧长边)
+//     · 这是本风格最关键的横竖自适应契约:slot area 从 top/bottom 切到 left/right
+//   - 上边:相机型号 + 日期(白字)
+//   - 下边:焦距 · 光圈 · 快门 · ISO(等宽小字 · 白字)
+//   - 橙红帧号 "36 →"(胶片帧计数致敬,固定字符)
+//
+// 齿孔图案由 SVG `<pattern>` 定义 · generator 内渲染
+
+const FILM_FULL_BORDER: FrameStyle = {
+  id: 'film-full-border',
+  name: '135 全齿孔',
+  description: '胶片黑边 + 真实 135 齿孔图案,横竖自动切换齿孔方向',
+  landscape: {
+    borderTop: BORDER.filmFullBorder.perforationLandscape,
+    borderBottom: BORDER.filmFullBorder.perforationLandscape,
+    borderLeft: 0,
+    borderRight: 0,
+    backgroundColor: COLOR.filmBlack,
+    textColor: COLOR.paperWhite,
+    accentColor: COLOR.dateStampOrange,
+    slots: [
+      {
+        // 机型放上边中线偏左
+        id: 'model',
+        area: 'top',
+        anchor: { x: 0.08, y: 0.55 },
+        fontSize: FONT_SIZE.caption,
+        align: 'left',
+        fontFamily: 'mono',
+      },
+      {
+        // 日期放上边右侧,橙红
+        id: 'date',
+        area: 'top',
+        anchor: { x: 0.92, y: 0.55 },
+        fontSize: FONT_SIZE.caption,
+        align: 'right',
+        fontFamily: 'courier',
+        colorOverride: COLOR.dateStampOrange,
+      },
+      {
+        // 参数放下边
+        id: 'params',
+        area: 'bottom',
+        anchor: { x: 0.08, y: 0.55 },
+        fontSize: FONT_SIZE.caption,
+        align: 'left',
+        fontFamily: 'mono',
+      },
+    ],
+  },
+  portrait: {
+    // 竖图关键:齿孔切到左右,文字也跟着到左右
+    borderTop: 0,
+    borderBottom: 0,
+    borderLeft: BORDER.filmFullBorder.perforationPortrait,
+    borderRight: BORDER.filmFullBorder.perforationPortrait,
+    backgroundColor: COLOR.filmBlack,
+    textColor: COLOR.paperWhite,
+    accentColor: COLOR.dateStampOrange,
+    slots: [
+      {
+        // 机型竖排在左边(从下向上读)
+        id: 'model',
+        area: 'left',
+        anchor: { x: 0.55, y: 0.08 },
+        fontSize: FONT_SIZE.caption,
+        align: 'left',
+        fontFamily: 'mono',
+      },
+      {
+        // 日期竖排在左边靠下
+        id: 'date',
+        area: 'left',
+        anchor: { x: 0.55, y: 0.92 },
+        fontSize: FONT_SIZE.caption,
+        align: 'right',
+        fontFamily: 'courier',
+        colorOverride: COLOR.dateStampOrange,
+      },
+      {
+        // 参数竖排在右边
+        id: 'params',
+        area: 'right',
+        anchor: { x: 0.45, y: 0.08 },
+        fontSize: FONT_SIZE.caption,
+        align: 'left',
+        fontFamily: 'mono',
+      },
+    ],
+  },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+// ============================================================================
 // 注册表
 // ============================================================================
 
 const REGISTRY = new Map<FrameStyleId, FrameStyle>()
 REGISTRY.set(MINIMAL_BAR.id, MINIMAL_BAR)
 REGISTRY.set(POLAROID_CLASSIC.id, POLAROID_CLASSIC)
+REGISTRY.set(FILM_FULL_BORDER.id, FILM_FULL_BORDER)
 
 /** 列出已注册的全部 FrameStyle */
 export function listFrameStyles(): FrameStyle[] {

@@ -11,6 +11,7 @@
  */
 import type { FrameStyleId, FrameStyleOverrides } from '../../../shared/types.js'
 import { type FrameSvgGenerator, renderWithGenerator } from './composite.js'
+import { generateFilmFullBorder } from './generators/filmFullBorder.js'
 import { generateMinimalBar } from './generators/minimalBar.js'
 import { generatePolaroidClassic } from './generators/polaroidClassic.js'
 import { getFrameStyle } from './registry.js'
@@ -19,6 +20,7 @@ import { getFrameStyle } from './registry.js'
 const GENERATORS: Partial<Record<FrameStyleId, FrameSvgGenerator>> = {
   'minimal-bar': generateMinimalBar,
   'polaroid-classic': generatePolaroidClassic,
+  'film-full-border': generateFilmFullBorder,
 }
 
 /**

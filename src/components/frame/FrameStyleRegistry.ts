@@ -13,6 +13,7 @@ import type { ComponentType } from 'react'
  */
 import type { FrameStyle, FrameStyleId, FrameStyleOverrides } from '../../../shared/types'
 import type { Photo } from '../../../shared/types'
+import { FilmFullBorderLayout } from './layouts/FilmFullBorderLayout'
 import { MinimalBarLayout } from './layouts/MinimalBarLayout'
 import { PlaceholderFrameLayout } from './layouts/PlaceholderFrameLayout'
 import { PolaroidClassicLayout } from './layouts/PolaroidClassicLayout'
@@ -38,8 +39,9 @@ const LAYOUT_REGISTRY: Partial<Record<FrameStyleId, ComponentType<FrameLayoutPro
   // 阶段 2:实装风格
   'minimal-bar': MinimalBarLayout,
   'polaroid-classic': PolaroidClassicLayout,
-  // 阶段 2 后续会替换:film-full-border / gallery-black / gallery-white /
-  // editorial-caption / spine-edition / hairline
+  'film-full-border': FilmFullBorderLayout,
+  // 阶段 2 后续:gallery-black / gallery-white / editorial-caption /
+  // spine-edition / hairline(各自 commit)
   // 未实装时 FramePreviewHost 会走"尚未实装"友好 fallback
 }
 
