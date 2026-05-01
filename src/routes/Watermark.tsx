@@ -48,14 +48,19 @@ function FrameTabBody({
   refPhoto,
 }: { refPhoto: ReturnType<typeof useAppStore.getState>['photos'][number] | null }) {
   const [styles, setStyles] = useState<FrameStyle[]>([])
-  const [activeId, setActiveId] = useState<FrameStyleId>('minimal-bar')
+  // 2026-05-01 默认选中第一个阶段 5 风格(玻璃拟态) · 老 'minimal-bar' 属于 classic 已不在公共列表
+  const [activeId, setActiveId] = useState<FrameStyleId>('frosted-glass')
   const [overrides, setOverrides] = useState<FrameStyleOverrides>({ showFields: DEFAULT_FRAME_SHOW_FIELDS })
   const [rendering, setRendering] = useState(false)
 
   useEffect(() => {
     ipc('frame:templates').then((list) => {
       setStyles(list)
-      if (list[0]) setOverrides(list[0].defaultOverrides)
+      if (list[0]) {
+        // 如果 activeId 不在公共列表里(例如老 localStorage 残留) · 自动切到第一个
+        setActiveId((cur) => (list.some((x) => x.id === cur) ? cur : list[0].id))
+        setOverrides(list[0].defaultOverrides)
+      }
     })
   }, [])
 
@@ -220,10 +225,11 @@ function fieldLabel(k: string): string {
 // 质感分组 · 与 electron/services/frame/registry.ts 的 GROUPS_ORDERED/LABELS/SUBTITLES 保持一致
 // 前端不能 import electron/ 代码(AGENTS.md 目录约定),只能复制常量
 // 如何防漂移:tests/unit/frameGroupRegistry.test.ts 会校验两端一致
+//
+// 2026-05-01 变更:去掉 'classic'(用户反馈"经典那部分不要了")
 // ============================================================================
 
-const GROUP_ORDER: readonly FrameStyle['group'][] = [
-  'classic',
+const GROUP_ORDER: readonly Exclude<FrameStyle['group'], 'classic'>[] = [
   'editorial',
   'oil',
   'floating',
@@ -233,8 +239,7 @@ const GROUP_ORDER: readonly FrameStyle['group'][] = [
   'cinema',
 ] as const
 
-const GROUP_LABELS: Record<FrameStyle['group'], string> = {
-  classic: '经典必保',
+const GROUP_LABELS: Record<Exclude<FrameStyle['group'], 'classic'>, string> = {
   glass: '玻璃拟态',
   oil: '油画 · 水彩',
   ambient: '氛围模糊',
@@ -244,8 +249,7 @@ const GROUP_LABELS: Record<FrameStyle['group'], string> = {
   floating: '浮动徽章',
 }
 
-const GROUP_SUBTITLES: Record<FrameStyle['group'], string> = {
-  classic: 'CLASSIC',
+const GROUP_SUBTITLES: Record<Exclude<FrameStyle['group'], 'classic'>, string> = {
   glass: 'FROSTED GLASS',
   oil: 'OIL · WATERCOLOR',
   ambient: 'AMBIENT BLUR',

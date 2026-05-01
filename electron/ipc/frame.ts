@@ -13,12 +13,14 @@
  *   - overrides.logoPath 也要过(args.2.logoPath),阶段 2 起真用到时依赖这一守卫
  */
 import type { FrameStyleId, FrameStyleOverrides } from '../../shared/types.js'
-import { listFrameStyles } from '../services/frame/registry.js'
+import { listPublicFrameStyles } from '../services/frame/registry.js'
 import { renderFrame } from '../services/frame/renderer.js'
 import { registerIpc } from './safeRegister.js'
 
 export function registerFrameIpc() {
-  registerIpc('frame:templates', async () => listFrameStyles())
+  // 2026-05-01 用户反馈"经典组不要了" · UI 拉取列表只给 14 个阶段 5 风格
+  // 老 classic 风格仍在 registry 内 · 兼容 getFrameStyle / 老测试
+  registerIpc('frame:templates', async () => listPublicFrameStyles())
   registerIpc(
     'frame:render',
     async (photoPath: unknown, styleId: unknown, overrides: unknown) =>

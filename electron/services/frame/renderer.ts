@@ -14,24 +14,24 @@ import { type FrameSvgGenerator, renderWithGenerator } from './composite.js'
 import { generateEditorialCaption, generateGallery } from './generators/bottomTextGenerator.js'
 import { generateContaxLabel } from './generators/contaxLabel.js'
 import { generateFilmFullBorder } from './generators/filmFullBorder.js'
-import { generateGenericFallback } from './generators/genericFallback.js'
 import { generateHairline } from './generators/hairline.js'
 import { generateMinimalBar } from './generators/minimalBar.js'
 import { generateNegativeStrip } from './generators/negativeStrip.js'
 import { generatePointAndShootStamp } from './generators/pointAndShootStamp.js'
 import { generatePolaroidClassic } from './generators/polaroidClassic.js'
 import { generateSpineEdition } from './generators/spineEdition.js'
+import { STAGE5_GENERATORS } from './generators/stage5Generators.js'
 import { generateSx70Square } from './generators/sx70Square.js'
 import { getFrameStyle } from './registry.js'
 
 /**
  * 风格 id → SVG generator 映射
  *
- *   - 阶段 2(必保 8) + 阶段 3(可选 4) · 各自独立 generator
- *   - 阶段 5(14 个) · 暂用 genericFallback 跑通数据层契约 · 装饰层由阶段 5b 单独补
+ *   - 阶段 2(必保 8) + 阶段 3(可选 4) · 各自独立 generator · 保留兼容
+ *   - 阶段 5(14 个) · 每个风格独立装饰几何 · 走 stage5Generators
  */
 const GENERATORS: Partial<Record<FrameStyleId, FrameSvgGenerator>> = {
-  // 阶段 2 · 必保 8
+  // 阶段 2 · 必保 8(classic 组 · UI 不展示 · 保留供老测试与兼容)
   'minimal-bar': generateMinimalBar,
   'polaroid-classic': generatePolaroidClassic,
   'film-full-border': generateFilmFullBorder,
@@ -40,26 +40,13 @@ const GENERATORS: Partial<Record<FrameStyleId, FrameSvgGenerator>> = {
   'editorial-caption': generateEditorialCaption,
   'spine-edition': generateSpineEdition,
   hairline: generateHairline,
-  // 阶段 3 · 可选 4
+  // 阶段 3 · 可选 4(classic 组 · 同上)
   'sx70-square': generateSx70Square,
   'negative-strip': generateNegativeStrip,
   'point-and-shoot-stamp': generatePointAndShootStamp,
   'contax-label': generateContaxLabel,
-  // 阶段 5 · 14 个高级质感(generator 暂用 genericFallback · 装饰阶段 5b 补)
-  'frosted-glass': generateGenericFallback,
-  'glass-chip': generateGenericFallback,
-  'oil-texture': generateGenericFallback,
-  'watercolor-caption': generateGenericFallback,
-  'ambient-glow': generateGenericFallback,
-  'bokeh-pillar': generateGenericFallback,
-  'cinema-scope': generateGenericFallback,
-  'neon-edge': generateGenericFallback,
-  'swiss-grid': generateGenericFallback,
-  'contact-sheet': generateGenericFallback,
-  'brushed-metal': generateGenericFallback,
-  'medal-plate': generateGenericFallback,
-  'floating-caption': generateGenericFallback,
-  'stamp-corner': generateGenericFallback,
+  // 阶段 5 · 14 个高级质感 · 每个风格独立装饰几何
+  ...STAGE5_GENERATORS,
 }
 
 /**

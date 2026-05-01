@@ -1001,9 +1001,14 @@ const CONTAX_LABEL: FrameStyle = {
 // ============================================================================
 // 注册表
 // ============================================================================
+//
+// 注册策略(2026-05-01 用户反馈\"经典组不要了\"):
+//   - Classic 12 风格仍注册入 REGISTRY(供老测试 + 未来潜在调用方)
+//   - 但通过 listPublicFrameStyles() 过滤 · UI 只展示阶段 5 的 14 个
+//   - IPC 'frame:templates' 的公共列表也只返回 14 个(见 electron/ipc/frame.ts)
 
 const REGISTRY = new Map<FrameStyleId, FrameStyle>()
-// classic · 阶段 2 必保 8 + 阶段 3 可选 4
+// classic · 阶段 2 必保 8 + 阶段 3 可选 4(保留注册 · UI 不展示)
 REGISTRY.set(MINIMAL_BAR.id, MINIMAL_BAR)
 REGISTRY.set(POLAROID_CLASSIC.id, POLAROID_CLASSIC)
 REGISTRY.set(FILM_FULL_BORDER.id, FILM_FULL_BORDER)
@@ -1016,15 +1021,27 @@ REGISTRY.set(SX70_SQUARE.id, SX70_SQUARE)
 REGISTRY.set(NEGATIVE_STRIP.id, NEGATIVE_STRIP)
 REGISTRY.set(POINT_AND_SHOOT_STAMP.id, POINT_AND_SHOOT_STAMP)
 REGISTRY.set(CONTAX_LABEL.id, CONTAX_LABEL)
-// 阶段 5 · 14 个高级质感(glass/oil/ambient/cinema/editorial/metal/floating 8 簇)
-// 数据定义在 registry-stage5.ts · 此处集中注册
+// 阶段 5 · 14 个高级质感(glass/oil/ambient/cinema/editorial/metal/floating 7 簇)
+// 数据定义在 registry-stage5.ts · 此处集中注册 · 对外公开展示
 for (const style of STAGE5_STYLES) {
   REGISTRY.set(style.id, style)
 }
 
-/** 列出已注册的全部 FrameStyle */
+/** 列出已注册的全部 FrameStyle(包含老 classic · 用于测试 / 动态注册场景) */
 export function listFrameStyles(): FrameStyle[] {
   return Array.from(REGISTRY.values())
+}
+
+/**
+ * 列出对外公开展示的 FrameStyle(UI + IPC `frame:templates` 用)
+ *
+ * 2026-05-01 用户反馈\"经典那部分不要了,新增的部分已经包含这些效果了\"
+ * 策略:过滤掉 group='classic' 的 12 个老风格 · 只返回阶段 5 的 14 个
+ *
+ * 老风格仍在 REGISTRY 供 getFrameStyle / 内部测试使用 · UI 层不可见
+ */
+export function listPublicFrameStyles(): FrameStyle[] {
+  return listFrameStyles().filter((s) => s.group !== 'classic')
 }
 
 /** 按 id 取 FrameStyle;未注册的返回 null(调用方必须容错) */
@@ -1049,15 +1066,19 @@ export function registerFrameStyle(style: FrameStyle): FrameStyle | null {
 /**
  * 质感分组展示顺序(UI 按此顺序 section 化)
  *
- * classic 放首位(经典默认组,入门友好),余下按"靠近经典 → 远离经典"排序:
+ * 2026-05-01 用户反馈"经典组不要了" · 只保留阶段 5 的 7 个新簇
+ *
+ * 顺序按"纸面感 → 数字质感 → 个性强"排列:
  *   editorial(印刷排版) → oil(油画) → floating(浮动) · 都是纸面语义
- *   glass / ambient(数字质感 · iOS 风) → metal(金属 · 硬物理)
+ *   glass / ambient(数字质感 · iOS 风)
+ *   metal(金属 · 硬物理)
  *   cinema(电影霓虹 · 个性最强)
  *
  * 类型安全:若将来新增 FrameStyleGroup 成员,此数组漏掉会被 TS never 断言捕获。
+ *
+ * 注:'classic' 仍在 FrameStyleGroup 类型里(老 style 兼容),但不在公共展示顺序里。
  */
 export const FRAME_STYLE_GROUPS_ORDERED = [
-  'classic',
   'editorial',
   'oil',
   'floating',
@@ -1065,15 +1086,16 @@ export const FRAME_STYLE_GROUPS_ORDERED = [
   'ambient',
   'metal',
   'cinema',
-] as const satisfies readonly FrameStyle['group'][]
+] as const satisfies readonly Exclude<FrameStyle['group'], 'classic'>[]
 
 /**
  * 分组中文名(UI 展示用)
  *
  * 类型安全:Record 字段必须覆盖所有 FrameStyleGroup 成员,漏一个就 TS 报错。
+ * classic 保留映射但 UI 的 GROUPS_ORDERED 已不含它 · 不会出现在界面上。
  */
 export const FRAME_STYLE_GROUP_LABELS: Record<FrameStyle['group'], string> = {
-  classic: '经典必保',
+  classic: '经典', // 保留类型完整性 · UI 不展示
   glass: '玻璃拟态',
   oil: '油画 · 水彩',
   ambient: '氛围模糊',
@@ -1095,8 +1117,16 @@ export const FRAME_STYLE_GROUP_SUBTITLES: Record<FrameStyle['group'], string> = 
   floating: 'FLOATING',
 }
 
-/** 按分组归类 · 返回 { group → style[] } · 内部按注册顺序保持稳定 */
-export function getFrameStylesByGroup(): Record<FrameStyle['group'], FrameStyle[]> {
+/**
+ * 按分组归类 · 返回 { group → style[] } · 内部按注册顺序保持稳定
+ *
+ * 2026-05-01 变更:
+ *   - 默认过滤 classic(用户反馈"经典组不要了")
+ *   - 需要全量(含 classic)可传 `{ includeClassic: true }`
+ */
+export function getFrameStylesByGroup(
+  opts: { includeClassic?: boolean } = {},
+): Record<FrameStyle['group'], FrameStyle[]> {
   const result = {
     classic: [] as FrameStyle[],
     glass: [] as FrameStyle[],
@@ -1107,7 +1137,8 @@ export function getFrameStylesByGroup(): Record<FrameStyle['group'], FrameStyle[
     metal: [] as FrameStyle[],
     floating: [] as FrameStyle[],
   }
-  for (const style of REGISTRY.values()) {
+  const source = opts.includeClassic ? listFrameStyles() : listPublicFrameStyles()
+  for (const style of source) {
     result[style.group].push(style)
   }
   return result
