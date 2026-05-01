@@ -143,7 +143,7 @@
 
 ---
 
-## 🚀 E2E 基础设施（Pass T1-T3 · 2026-05-01）
+## 🚀 E2E 基础设施（Pass T1-T4 · 2026-05-01）
 
 ### 目录结构
 
@@ -157,6 +157,9 @@ tests/e2e/
 ├── smoke.spec.ts                 # T1 冒烟：启动 + Sidebar + 路由切换（5 例）
 ├── editorJourney.spec.ts         # T2 用户旅程：导入→Editor→滤镜→滑块→Undo→切回原图（6 例）
 └── visualRegression.spec.ts      # T3 视觉回归：Sidebar + Library 网格像素基线（2 例，macOS only）
+
+tests/packaged/
+└── smoke.spec.ts                 # T4 打包冒烟：.app/Contents/MacOS 启动 + preload + asar 内资源 + native binding（3 例，release only）
 ```
 
 ### 运行
@@ -164,6 +167,7 @@ tests/e2e/
 ```bash
 npm run build                     # 必须先构建 dist-electron/main.js
 npm run test:e2e                  # 运行全部 E2E（13 例，~9s）
+npm run test:packaged             # 运行 packaged smoke（内含 pack:dir，首次 ~5 min；复用 ~25s）
 npx playwright test --project=e2e --update-snapshots visualRegression.spec.ts   # 更新视觉基线
 ```
 
@@ -185,13 +189,25 @@ npx playwright test --project=e2e --update-snapshots visualRegression.spec.ts   
 
 6. **不对 WebGL canvas 做视觉回归**（Pass T3 复盘决策 · **重要**）：
    - Editor 的 `useWebGLPreview` 使用 `preserveDrawingBuffer: false`（性能决策，见 `src/lib/useWebGLPreview.ts:362`）
-   - Playwright 的 `locator.screenshot()` / `toHaveScreenshot()` 抓 canvas 的时机不可控：可能抓到 WebGL 画面，也可能抓到透明背景（取决于浏览器 composite 调度）
-   - 因此 E2E 层放弃对 preview-canvas 本身的像素断言
-   - 像素级滤镜/滑块正确性由**单测层的 CPU 镜像**覆盖：
-     * `tests/unit/shaderSnapshots.test.ts`（10 shader × 100×100 baseline）
-     * `tests/unit/perceptibility.test.ts`（滑块 → 像素 Δ 可感知性）
-   - Pass T2 的 DOM 状态契约（aria-valuenow、EDITED badge、filter 高亮 class）补齐了"滤镜/滑块链路是否真触发"的 E2E 防线
-   - Pass T3 的视觉回归仅覆盖 **非 WebGL 稳定区域**（Sidebar / Library 网格 / 缩略图）
+   - Playwright 的 `locator.screenshot()` / `toHaveScreenshot()` 抓 canvas 的时机不可控
+   - 像素级滤镜/滑块正确性由**单测层的 CPU 镜像**覆盖（shaderSnapshots.test.ts / perceptibility.test.ts）
+   - Pass T2 的 DOM 状态契约补齐 E2E 链路防线
+   - Pass T3 的视觉回归仅覆盖**非 WebGL 稳定区域**
+
+7. **Packaged spec 不复用 launchApp**（Pass T4 决策）：
+   - `launchApp` 启动 `dist-electron/main.js`（开发产物）
+   - `packaged/smoke.spec.ts` 必须启动 `.app/Contents/MacOS/GrainMark`（实际发布物）
+   - 两者入口本质不同，按 AGENTS.md 第 8 条不强行抽象（散布阈值只对"相同语义"适用）
+
+### CI 分层（.github/workflows/ci.yml）
+
+| Job | 触发 | 耗时预算 | 内容 |
+|---|---|---|---|
+| `gate` | 每次 push/PR | 10 min | typecheck + lint + vitest（640 例）+ coverage |
+| `visual-e2e` | push/PR → gate 后 | 25 min | build + integration-e2e + visual + e2e（13 例）· macOS only · artifact 保留失败截图 |
+| `packaged-smoke` | release/* 分支 + tag 推送 | 30 min | pack:dir + packaged spec（3 例） |
+
+无 `continue-on-error` —— 任何 E2E/visual 红都会 block CI（AGENTS.md 第 4 条零回归）。
 
 ### 新增 E2E 用例前自查
 
