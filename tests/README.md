@@ -143,28 +143,28 @@
 
 ---
 
-## 🚀 E2E 基础设施（Pass T1-T2 · 2026-05-01）
+## 🚀 E2E 基础设施（Pass T1-T3 · 2026-05-01）
 
 ### 目录结构
 
 ```
 tests/e2e/
 ├── _support/                     # 共享 fixture（非 spec，playwright 不拾取）
-│   ├── launchApp.ts              # 启动真 Electron + 隔离 userData + 等 preload 就绪
+│   ├── launchApp.ts              # 启动真 Electron + 隔离 userData + 锁定 DPR=1 + 等 preload 就绪
 │   ├── grainInvoke.ts            # page 内类型化 IPC 调用 helper
 │   ├── seedFixtures.ts           # 把 tests/fixtures/images 注入到 photoStore（默认 reload 让 zustand 看到）
 │   └── selectors.ts              # 选择器集中表（Single Source of Truth · 第 8 条）
 ├── smoke.spec.ts                 # T1 冒烟：启动 + Sidebar + 路由切换（5 例）
-└── editorJourney.spec.ts         # T2 用户旅程：导入→Editor→滤镜→滑块→Undo→切回原图（6 例）
+├── editorJourney.spec.ts         # T2 用户旅程：导入→Editor→滤镜→滑块→Undo→切回原图（6 例）
+└── visualRegression.spec.ts      # T3 视觉回归：Sidebar + Library 网格像素基线（2 例，macOS only）
 ```
 
 ### 运行
 
 ```bash
 npm run build                     # 必须先构建 dist-electron/main.js
-npm run test:e2e                  # 运行全部 E2E（11 例，~6s）
-npx playwright test --project=e2e smoke.spec.ts           # 只跑冒烟
-npx playwright test --project=e2e editorJourney.spec.ts   # 只跑用户旅程
+npm run test:e2e                  # 运行全部 E2E（13 例，~9s）
+npx playwright test --project=e2e --update-snapshots visualRegression.spec.ts   # 更新视觉基线
 ```
 
 ### 核心设计决策
@@ -181,7 +181,21 @@ npx playwright test --project=e2e editorJourney.spec.ts   # 只跑用户旅程
 
 4. **PathGuard 配合**：fixtures 拷到 `os.tmpdir()` 下（命中 main.ts 默认白名单 `app.getPath('temp')`），不需要给 guard 开测试后门
 
-5. **不从 WebGL canvas 取像素** ⚠：Editor 的 `useWebGLPreview` 使用 `preserveDrawingBuffer: false`（性能决策，见 `src/lib/useWebGLPreview.ts:362`），任何 `canvas.toDataURL/getImageData/drawImage` 都不稳定。Pass T2 用**可观测 DOM 状态**断言（aria-valuenow、EDITED badge、filter 高亮态、按钮 enabled）；像素级验证交给 **Pass T3 visual regression**（Playwright `toHaveScreenshot` 走合成层抓图，不受 preserveDrawingBuffer 影响）
+5. **锁定 device scale factor = 1**（Pass T3 发现的踩坑）：launchApp 传 `--force-device-scale-factor=1` 给 Electron，避免不同开发机 retina / 外接显示器带来的截图尺寸抖动；让 visual baselines 在任意 macOS 机器上稳定
+
+6. **不对 WebGL canvas 做视觉回归**（Pass T3 复盘决策 · **重要**）：
+   - Editor 的 `useWebGLPreview` 使用 `preserveDrawingBuffer: false`（性能决策，见 `src/lib/useWebGLPreview.ts:362`）
+   - Playwright 的 `locator.screenshot()` / `toHaveScreenshot()` 抓 canvas 的时机不可控：可能抓到 WebGL 画面，也可能抓到透明背景（取决于浏览器 composite 调度）
+   - 因此 E2E 层放弃对 preview-canvas 本身的像素断言
+   - 像素级滤镜/滑块正确性由**单测层的 CPU 镜像**覆盖：
+     * `tests/unit/shaderSnapshots.test.ts`（10 shader × 100×100 baseline）
+     * `tests/unit/perceptibility.test.ts`（滑块 → 像素 Δ 可感知性）
+   - Pass T2 的 DOM 状态契约（aria-valuenow、EDITED badge、filter 高亮 class）补齐了"滤镜/滑块链路是否真触发"的 E2E 防线
+   - Pass T3 的视觉回归仅覆盖 **非 WebGL 稳定区域**（Sidebar / Library 网格 / 缩略图）
+
+### 新增 E2E 用例前自查
+
+除通用 5 条外，还需：
 
 ### 新增 E2E 用例前自查
 

@@ -73,8 +73,15 @@ export async function launchApp(options: LaunchAppOptions = {}): Promise<Launche
     throw new Error(`[launchApp] dist-electron/main.js 不存在。请先运行 \`npm run build\`。path=${mainPath}`)
   }
 
+  // 锁定 device scale factor 到 1：
+  //   - 避免 retina / 外接显示器 / 系统缩放导致的截图尺寸抖动
+  //   - 让 Pass T3 visual regression 的基线在任意开发机上稳定
+  //   - 不影响 Pass T1-T2（那些只看 DOM 状态，不关心像素密度）
+  //   - 生产环境用户真实 DPR 不受此影响（仅本 fixture 覆盖的 Electron 实例）
+  const defaultArgs = ['--force-device-scale-factor=1', '--high-dpi-support=1']
+
   const app = await electron.launch({
-    args: [mainPath, ...(options.extraArgs ?? [])],
+    args: [mainPath, ...defaultArgs, ...(options.extraArgs ?? [])],
     env: {
       ...process.env,
       GRAINMARK_TEST: '1',
