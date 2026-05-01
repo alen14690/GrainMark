@@ -72,8 +72,10 @@ export async function renderWithGenerator(
   // 构建文本行(调用方的 generator 不直接读 EXIF,避免散布)
   const paramLine = buildFrameParamLine(exif, overrides.showFields)
   const modelLine = [exif.make, exif.model].filter(Boolean).join(' ')
-  const dateLine = exif.dateTimeOriginal ?? ''
-  const artistLine = overrides.artistName ?? exif.artist ?? ''
+  const dateLine = overrides.showFields.dateTime ? (exif.dateTimeOriginal ?? '') : ''
+  // artist 字段:overrides.artistName 优先(用户显式传入),兜底 exif.artist
+  // 只在 showFields.artist=true 时真正返回值(否则空串,generator 自动跳过)
+  const artistLine = overrides.showFields.artist ? (overrides.artistName ?? exif.artist ?? '') : ''
 
   const svg = generateSvg({
     geometry,

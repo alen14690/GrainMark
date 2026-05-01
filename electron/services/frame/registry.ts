@@ -299,6 +299,133 @@ const FILM_FULL_BORDER: FrameStyle = {
 }
 
 // ============================================================================
+// Gallery Black · 画册黑(阶段 2 · 2026-05-01)
+// ============================================================================
+//
+// 设计(artifact/design/frame-system-2026-05-01.md · 组 D1):
+//   - 四周胶片黑 #0A0A0A,底部延至 14%(横)/ 12%(竖)
+//   - 底部居中三行堆叠:
+//     · model 大字 Georgia serif(画册文字多用衬线)
+//     · artist 斜体小字(艺术家署名位,Ins 摄影师偏好)
+//     · date 等宽小字(创作日期,次级信息)
+//   - 所有文字走 paperWhite,与黑底形成画册/画廊标签的端庄气质
+//
+// Gallery White 是本风格的 light 镜像 —— 用 generator 的 colorScheme 分支
+// (colorScheme=light 时 bg/fg 互换),但本实现采用独立 FrameStyle 避免
+// UI 分支复杂化(用户切 Gallery White 就是另一个风格,不是改 Black 的参数)
+
+const GALLERY_BLACK: FrameStyle = {
+  id: 'gallery-black',
+  name: '画册黑',
+  description: '胶片黑画册边 + 衬线字白,端庄沉稳,适合展览/奖赛',
+  landscape: {
+    borderTop: BORDER.gallery.top,
+    borderBottom: BORDER.gallery.bottomLandscape,
+    borderLeft: BORDER.gallery.side,
+    borderRight: BORDER.gallery.side,
+    backgroundColor: COLOR.filmBlack,
+    textColor: COLOR.paperWhite,
+    slots: [
+      {
+        id: 'model',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.35 },
+        fontSize: FONT_SIZE.mainTitle,
+        align: 'center',
+        fontFamily: 'georgia',
+      },
+      {
+        id: 'artist',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.62 },
+        fontSize: FONT_SIZE.caption,
+        align: 'center',
+        fontFamily: 'georgia',
+      },
+      {
+        id: 'date',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.82 },
+        fontSize: FONT_SIZE.smallLabel,
+        align: 'center',
+        fontFamily: 'mono',
+        colorOverride: COLOR.softGray,
+      },
+    ],
+  },
+  portrait: {
+    borderTop: BORDER.gallery.top,
+    borderBottom: BORDER.gallery.bottomPortrait,
+    borderLeft: BORDER.gallery.side,
+    borderRight: BORDER.gallery.side,
+    backgroundColor: COLOR.filmBlack,
+    textColor: COLOR.paperWhite,
+    slots: [
+      {
+        id: 'model',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.35 },
+        fontSize: FONT_SIZE.mainTitle,
+        align: 'center',
+        fontFamily: 'georgia',
+      },
+      {
+        id: 'artist',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.62 },
+        fontSize: FONT_SIZE.caption,
+        align: 'center',
+        fontFamily: 'georgia',
+      },
+      {
+        id: 'date',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.82 },
+        fontSize: FONT_SIZE.smallLabel,
+        align: 'center',
+        fontFamily: 'mono',
+        colorOverride: COLOR.softGray,
+      },
+    ],
+  },
+  defaultOverrides: {
+    ...DEFAULT_OVERRIDES,
+    showFields: { ...DEFAULT_OVERRIDES.showFields, artist: true }, // 画册风格默认显示作者
+  },
+}
+
+// ============================================================================
+// Gallery White · 美术馆白(阶段 2 · 2026-05-01)
+// ============================================================================
+//
+// Gallery Black 的 light 反色版:纸白边 + 深灰字,更 Ins 风、更现代。
+// 结构完全一致,只交换 backgroundColor / textColor。
+// 用独立 FrameStyle(不是 colorScheme 分支)保证 UI 里可独立选择,语义更清晰。
+
+const GALLERY_WHITE: FrameStyle = {
+  id: 'gallery-white',
+  name: '美术馆白',
+  description: '纸白画册边 + 深灰衬线字,现代 Ins 风,画廊感',
+  landscape: {
+    ...GALLERY_BLACK.landscape,
+    backgroundColor: COLOR.paperWhite,
+    textColor: COLOR.inkGray,
+    slots: GALLERY_BLACK.landscape.slots.map((s) =>
+      s.id === 'date' ? { ...s, colorOverride: COLOR.softGray } : s,
+    ),
+  },
+  portrait: {
+    ...GALLERY_BLACK.portrait,
+    backgroundColor: COLOR.paperWhite,
+    textColor: COLOR.inkGray,
+    slots: GALLERY_BLACK.portrait.slots.map((s) =>
+      s.id === 'date' ? { ...s, colorOverride: COLOR.softGray } : s,
+    ),
+  },
+  defaultOverrides: GALLERY_BLACK.defaultOverrides,
+}
+
+// ============================================================================
 // 注册表
 // ============================================================================
 
@@ -306,6 +433,8 @@ const REGISTRY = new Map<FrameStyleId, FrameStyle>()
 REGISTRY.set(MINIMAL_BAR.id, MINIMAL_BAR)
 REGISTRY.set(POLAROID_CLASSIC.id, POLAROID_CLASSIC)
 REGISTRY.set(FILM_FULL_BORDER.id, FILM_FULL_BORDER)
+REGISTRY.set(GALLERY_BLACK.id, GALLERY_BLACK)
+REGISTRY.set(GALLERY_WHITE.id, GALLERY_WHITE)
 
 /** 列出已注册的全部 FrameStyle */
 export function listFrameStyles(): FrameStyle[] {
