@@ -14,13 +14,17 @@ import type { ComponentType } from 'react'
 import type { FrameStyle, FrameStyleId, FrameStyleOverrides } from '../../../shared/types'
 import type { Photo } from '../../../shared/types'
 import { BottomTextLayout } from './layouts/BottomTextLayout'
+import { ContaxLabelLayout } from './layouts/ContaxLabelLayout'
 import { EditorialCaptionLayout } from './layouts/EditorialCaptionLayout'
 import { FilmFullBorderLayout } from './layouts/FilmFullBorderLayout'
 import { HairlineLayout } from './layouts/HairlineLayout'
 import { MinimalBarLayout } from './layouts/MinimalBarLayout'
+import { NegativeStripLayout } from './layouts/NegativeStripLayout'
 import { PlaceholderFrameLayout } from './layouts/PlaceholderFrameLayout'
+import { PointAndShootStampLayout } from './layouts/PointAndShootStampLayout'
 import { PolaroidClassicLayout } from './layouts/PolaroidClassicLayout'
 import { SpineEditionLayout } from './layouts/SpineEditionLayout'
+import { Sx70SquareLayout } from './layouts/Sx70SquareLayout'
 
 /** 每个 layout 组件接收的标准 props */
 export interface FrameLayoutProps {
@@ -49,7 +53,11 @@ const LAYOUT_REGISTRY: Partial<Record<FrameStyleId, ComponentType<FrameLayoutPro
   'editorial-caption': EditorialCaptionLayout,
   'spine-edition': SpineEditionLayout,
   hairline: HairlineLayout,
-  // 阶段 3 再补:sx70-square / negative-strip / point-and-shoot-stamp / contax-label
+  // 阶段 3:可选 4 风格全部实装
+  'sx70-square': Sx70SquareLayout,
+  'negative-strip': NegativeStripLayout,
+  'point-and-shoot-stamp': PointAndShootStampLayout,
+  'contax-label': ContaxLabelLayout,
 }
 
 /** 占位布局导出:给未注册的风格调用方手动 fallback 用(可选) */
