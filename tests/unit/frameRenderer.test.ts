@@ -33,18 +33,16 @@ const EMPTY_OVERRIDES: FrameStyleOverrides = {
 
 describe('renderFrame · 错误边界契约', () => {
   it('未注册的 FrameStyleId 抛"未注册"错误', async () => {
-    // sx70-square 阶段 2 尚未注册到 registry
-    await expect(renderFrame('/tmp/fake.jpg', 'sx70-square', EMPTY_OVERRIDES)).rejects.toThrow(
-      /sx70-square.*未注册/,
+    // 阶段 3 后 sx70-square 已注册 —— 用一个永远不会注册的伪 id 验证错误路径
+    // 通过 as 强转穿透类型,本测专门覆盖 registry "未注册"分支
+    const fakeId = '__never-registered-frame-id__' as unknown as Parameters<typeof renderFrame>[1]
+    await expect(renderFrame('/tmp/fake.jpg', fakeId, EMPTY_OVERRIDES)).rejects.toThrow(
+      /__never-registered.*未注册/,
     )
   })
 
   it('注册了但无 generator 的风格抛"尚未实装"错误(阶段 2 逐步消除)', async () => {
-    // 阶段 2 的某个时刻:registry 里有 style 但 renderer 的 GENERATORS map 里还没挂。
-    // 当前:minimal-bar 已实装;阶段 2 后续会注册更多风格后再挂 generator。
-    //
-    // 这里不硬编码"哪个 id 未实装",避免每实装一个就得改测试;
-    // 改为验证"实装之后不能回归成尚未实装":
+    // 阶段 3 后必保 8 + 可选 4 全部挂齐 generator,本测验证"实装回归"的防线:
     // minimal-bar 调用会在 Sharp 层因文件不存在失败,但错误消息不得含"尚未实装"。
     let caught: Error | null = null
     try {

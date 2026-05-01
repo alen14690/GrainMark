@@ -12,15 +12,20 @@
 import type { FrameStyleId, FrameStyleOverrides } from '../../../shared/types.js'
 import { type FrameSvgGenerator, renderWithGenerator } from './composite.js'
 import { generateEditorialCaption, generateGallery } from './generators/bottomTextGenerator.js'
+import { generateContaxLabel } from './generators/contaxLabel.js'
 import { generateFilmFullBorder } from './generators/filmFullBorder.js'
 import { generateHairline } from './generators/hairline.js'
 import { generateMinimalBar } from './generators/minimalBar.js'
+import { generateNegativeStrip } from './generators/negativeStrip.js'
+import { generatePointAndShootStamp } from './generators/pointAndShootStamp.js'
 import { generatePolaroidClassic } from './generators/polaroidClassic.js'
 import { generateSpineEdition } from './generators/spineEdition.js'
+import { generateSx70Square } from './generators/sx70Square.js'
 import { getFrameStyle } from './registry.js'
 
-/** 风格 id → SVG generator 映射(阶段 2 逐个补) */
+/** 风格 id → SVG generator 映射(阶段 2 必保 8 + 阶段 3 可选 4 全部挂齐) */
 const GENERATORS: Partial<Record<FrameStyleId, FrameSvgGenerator>> = {
+  // 阶段 2 · 必保 8
   'minimal-bar': generateMinimalBar,
   'polaroid-classic': generatePolaroidClassic,
   'film-full-border': generateFilmFullBorder,
@@ -29,6 +34,11 @@ const GENERATORS: Partial<Record<FrameStyleId, FrameSvgGenerator>> = {
   'editorial-caption': generateEditorialCaption,
   'spine-edition': generateSpineEdition,
   hairline: generateHairline,
+  // 阶段 3 · 可选 4
+  'sx70-square': generateSx70Square,
+  'negative-strip': generateNegativeStrip,
+  'point-and-shoot-stamp': generatePointAndShootStamp,
+  'contax-label': generateContaxLabel,
 }
 
 /**

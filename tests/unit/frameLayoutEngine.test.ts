@@ -172,7 +172,9 @@ describe('frame registry', () => {
   })
 
   it('getFrameStyle 对未注册 id 返回 null', () => {
-    expect(getFrameStyle('sx70-square')).toBeNull() // 阶段 1 尚未注册
+    // 阶段 3 后 sx70-square 已注册 —— 用一个永远不会注册的伪 id 验证 null 契约
+    // 类型断言:该 id 不在 FrameStyleId union 内,本测专门用于验证 null 返回
+    expect(getFrameStyle('__never-registered__' as unknown as Parameters<typeof getFrameStyle>[0])).toBeNull()
   })
 
   it('registerFrameStyle 覆盖相同 id 返回旧值', () => {

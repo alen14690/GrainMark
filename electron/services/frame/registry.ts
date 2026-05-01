@@ -661,6 +661,313 @@ const HAIRLINE: FrameStyle = {
 }
 
 // ============================================================================
+// SX-70 Square · 方形宝丽来(阶段 3 · 2026-05-01)
+// ============================================================================
+//
+// 设计(artifact/design/frame-system-2026-05-01.md · 组 C2):
+//   - 四边等白 8% + 底部 20% · 横竖数据一致(本风格本质是方形,横竖区别弱)
+//   - 底部三行文字(model/params/date),Courier Prime 老打字机字
+//   - 与 Polaroid Classic 对照:Polaroid 偏长方形 + Georgia 手写感;
+//     SX-70 偏方形 + Courier 老打字机
+//   - 非方形图由 generator 内部画 filmBlack 填充带,layout 只负责边框几何
+
+const SX70_SQUARE: FrameStyle = {
+  id: 'sx70-square',
+  name: 'SX-70 方宝丽来',
+  description: '四边等白 + 老打字机字,真实 SX-70 相纸方形比例',
+  landscape: {
+    borderTop: BORDER.sx70.top,
+    borderBottom: BORDER.sx70.bottom,
+    borderLeft: BORDER.sx70.side,
+    borderRight: BORDER.sx70.side,
+    backgroundColor: COLOR.paperWhite,
+    textColor: COLOR.inkGray,
+    slots: [
+      {
+        id: 'model',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.4 },
+        fontSize: FONT_SIZE.mainTitle,
+        align: 'center',
+        fontFamily: 'courier',
+      },
+      {
+        id: 'params',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.68 },
+        fontSize: FONT_SIZE.caption,
+        align: 'center',
+        fontFamily: 'mono',
+        colorOverride: COLOR.softGray,
+      },
+      {
+        id: 'date',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.9 },
+        fontSize: FONT_SIZE.smallLabel,
+        align: 'center',
+        fontFamily: 'courier',
+        colorOverride: COLOR.softGray,
+      },
+    ],
+  },
+  portrait: {
+    // 竖图 = 横图(方形风格横竖无差异)
+    borderTop: BORDER.sx70.top,
+    borderBottom: BORDER.sx70.bottom,
+    borderLeft: BORDER.sx70.side,
+    borderRight: BORDER.sx70.side,
+    backgroundColor: COLOR.paperWhite,
+    textColor: COLOR.inkGray,
+    slots: [
+      {
+        id: 'model',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.4 },
+        fontSize: FONT_SIZE.mainTitle,
+        align: 'center',
+        fontFamily: 'courier',
+      },
+      {
+        id: 'params',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.68 },
+        fontSize: FONT_SIZE.caption,
+        align: 'center',
+        fontFamily: 'mono',
+        colorOverride: COLOR.softGray,
+      },
+      {
+        id: 'date',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.9 },
+        fontSize: FONT_SIZE.smallLabel,
+        align: 'center',
+        fontFamily: 'courier',
+        colorOverride: COLOR.softGray,
+      },
+    ],
+  },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+// ============================================================================
+// Negative Strip · 胶片负片条(阶段 3 · 2026-05-01)
+// ============================================================================
+//
+// 设计(artifact/design/frame-system-2026-05-01.md · 组 B3):
+//   - 横图:上下胶片黑 ledger 8%,白字机型/参数 + 橙红 "24 →" 帧号戳(在画面左上)
+//   - 竖图:左右胶片黑 ledger 8%,参数切到 area='right'(垂直排)
+//   - 与 Film Full Border 的关系:都是"双边黑带 + 横竖切换",但 Negative Strip
+//     无齿孔 + 固定帧号戳(两个风格在 generators 里相互独立,共享 slotPlacement)
+
+const NEGATIVE_STRIP: FrameStyle = {
+  id: 'negative-strip',
+  name: '负片黑边条',
+  description: '上下(横)/ 左右(竖)黑 ledger + 白字参数 + 橙红帧号戳 "24 →"',
+  landscape: {
+    borderTop: BORDER.negativeStrip.stripLandscape,
+    borderBottom: BORDER.negativeStrip.stripLandscape,
+    borderLeft: 0,
+    borderRight: 0,
+    backgroundColor: COLOR.filmBlack,
+    textColor: COLOR.paperWhite,
+    slots: [
+      {
+        // 机型在上 ledger 左侧
+        id: 'model',
+        area: 'top',
+        anchor: { x: 0.06, y: 0.55 },
+        fontSize: FONT_SIZE.caption,
+        align: 'left',
+        fontFamily: 'mono',
+      },
+      {
+        // 日期在上 ledger 右侧
+        id: 'date',
+        area: 'top',
+        anchor: { x: 0.94, y: 0.55 },
+        fontSize: FONT_SIZE.caption,
+        align: 'right',
+        fontFamily: 'mono',
+      },
+      {
+        // 参数在下 ledger 左侧
+        id: 'params',
+        area: 'bottom',
+        anchor: { x: 0.06, y: 0.55 },
+        fontSize: FONT_SIZE.caption,
+        align: 'left',
+        fontFamily: 'mono',
+      },
+    ],
+  },
+  portrait: {
+    // 竖图:黑带切到左右,参数 area='right' 竖排
+    borderTop: 0,
+    borderBottom: 0,
+    borderLeft: BORDER.negativeStrip.stripPortrait,
+    borderRight: BORDER.negativeStrip.stripPortrait,
+    backgroundColor: COLOR.filmBlack,
+    textColor: COLOR.paperWhite,
+    slots: [
+      {
+        // 机型竖排在左带
+        id: 'model',
+        area: 'left',
+        anchor: { x: 0.55, y: 0.06 },
+        fontSize: FONT_SIZE.caption,
+        align: 'left',
+        fontFamily: 'mono',
+      },
+      {
+        // 日期竖排在左带靠底
+        id: 'date',
+        area: 'left',
+        anchor: { x: 0.55, y: 0.94 },
+        fontSize: FONT_SIZE.caption,
+        align: 'right',
+        fontFamily: 'mono',
+      },
+      {
+        // 参数竖排在右带
+        id: 'params',
+        area: 'right',
+        anchor: { x: 0.45, y: 0.06 },
+        fontSize: FONT_SIZE.caption,
+        align: 'left',
+        fontFamily: 'mono',
+      },
+    ],
+  },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+// ============================================================================
+// Point-and-Shoot Stamp · 傻瓜相机日期戳(阶段 3 · 2026-05-01)
+// ============================================================================
+//
+// 设计(artifact/design/frame-system-2026-05-01.md · 组 B4):
+//   - 零边框 · 图像不扩展;只在画面右下角叠一枚 overlay 橙红日期戳
+//   - 与 Hairline 相似(都用 overlay),但本风格完全不画线框,日期字号更大
+//   - 用户 showFields.dateTime=false 时会退化成"空 overlay",即跟无边框原图一致
+
+const POINT_AND_SHOOT_STAMP: FrameStyle = {
+  id: 'point-and-shoot-stamp',
+  name: '傻瓜机日期戳',
+  description: '零边框 + 右下角橙红 LCD 日期戳,致敬 90 年代傻瓜相机',
+  landscape: {
+    borderTop: BORDER.pointAndShoot.none,
+    borderBottom: BORDER.pointAndShoot.none,
+    borderLeft: BORDER.pointAndShoot.none,
+    borderRight: BORDER.pointAndShoot.none,
+    backgroundColor: COLOR.filmBlack, // 零边框时不会看到背景,但保底给个颜色
+    textColor: COLOR.dateStampOrange,
+    slots: [
+      {
+        // 只用 date slot(overlay 在图右下角) · 字号 3% · Courier 粗体
+        id: 'date',
+        area: 'overlay',
+        anchor: { x: 0.96, y: 0.94 },
+        fontSize: 0.03,
+        align: 'right',
+        fontFamily: 'courier',
+        colorOverride: COLOR.dateStampOrange,
+      },
+    ],
+  },
+  portrait: {
+    borderTop: BORDER.pointAndShoot.none,
+    borderBottom: BORDER.pointAndShoot.none,
+    borderLeft: BORDER.pointAndShoot.none,
+    borderRight: BORDER.pointAndShoot.none,
+    backgroundColor: COLOR.filmBlack,
+    textColor: COLOR.dateStampOrange,
+    slots: [
+      {
+        id: 'date',
+        area: 'overlay',
+        anchor: { x: 0.96, y: 0.96 },
+        fontSize: 0.03,
+        align: 'right',
+        fontFamily: 'courier',
+        colorOverride: COLOR.dateStampOrange,
+      },
+    ],
+  },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+// ============================================================================
+// Contax Label · 相机铭牌致敬条(阶段 3 · 2026-05-01)
+// ============================================================================
+//
+// 设计(artifact/design/frame-system-2026-05-01.md · 组 E2):
+//   - 底部 10% 胶片黑条,横竖一致(不切侧)
+//   - 左:大字 Inter 粗体机型(白字) · 右:mono 小字参数(白字)
+//   - 中间一根橙红竖线分隔(致敬 Leica 红标 / Contax 红 T*)
+//   - Logo 留给用户上传(overrides.logoPath;安全红线:不内置任何受商标保护的 Logo)
+
+const CONTAX_LABEL: FrameStyle = {
+  id: 'contax-label',
+  name: '铭牌致敬条',
+  description: '底部黑条 + 左粗体机型 · 右小字参数 · 橙红竖线分隔',
+  landscape: {
+    borderTop: 0,
+    borderBottom: BORDER.contaxLabel.bottomLandscape,
+    borderLeft: 0,
+    borderRight: 0,
+    backgroundColor: COLOR.filmBlack,
+    textColor: COLOR.paperWhite,
+    slots: [
+      {
+        id: 'model',
+        area: 'bottom',
+        anchor: { x: 0.06, y: 0.55 },
+        fontSize: FONT_SIZE.mainTitle,
+        align: 'left',
+        fontFamily: 'inter',
+      },
+      {
+        id: 'params',
+        area: 'bottom',
+        anchor: { x: 0.94, y: 0.55 },
+        fontSize: FONT_SIZE.caption,
+        align: 'right',
+        fontFamily: 'mono',
+      },
+    ],
+  },
+  portrait: {
+    borderTop: 0,
+    borderBottom: BORDER.contaxLabel.bottomPortrait,
+    borderLeft: 0,
+    borderRight: 0,
+    backgroundColor: COLOR.filmBlack,
+    textColor: COLOR.paperWhite,
+    slots: [
+      {
+        id: 'model',
+        area: 'bottom',
+        anchor: { x: 0.06, y: 0.55 },
+        fontSize: FONT_SIZE.mainTitle,
+        align: 'left',
+        fontFamily: 'inter',
+      },
+      {
+        id: 'params',
+        area: 'bottom',
+        anchor: { x: 0.94, y: 0.55 },
+        fontSize: FONT_SIZE.caption,
+        align: 'right',
+        fontFamily: 'mono',
+      },
+    ],
+  },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+// ============================================================================
 // 注册表
 // ============================================================================
 
@@ -673,6 +980,11 @@ REGISTRY.set(GALLERY_WHITE.id, GALLERY_WHITE)
 REGISTRY.set(EDITORIAL_CAPTION.id, EDITORIAL_CAPTION)
 REGISTRY.set(SPINE_EDITION.id, SPINE_EDITION)
 REGISTRY.set(HAIRLINE.id, HAIRLINE)
+// 阶段 3 可选 4
+REGISTRY.set(SX70_SQUARE.id, SX70_SQUARE)
+REGISTRY.set(NEGATIVE_STRIP.id, NEGATIVE_STRIP)
+REGISTRY.set(POINT_AND_SHOOT_STAMP.id, POINT_AND_SHOOT_STAMP)
+REGISTRY.set(CONTAX_LABEL.id, CONTAX_LABEL)
 
 /** 列出已注册的全部 FrameStyle */
 export function listFrameStyles(): FrameStyle[] {
