@@ -15,28 +15,18 @@
  *   6. 在 tests/unit/frame<Name>.test.ts 加语义契约测试
  */
 import { BORDER, COLOR, FONT_SIZE } from '../../../shared/frame-tokens.js'
-import type { FrameStyle, FrameStyleId, FrameStyleOverrides } from '../../../shared/types.js'
+import type { FrameStyle, FrameStyleId } from '../../../shared/types.js'
+import { DEFAULT_OVERRIDES } from './registry-defaults.js'
 import { STAGE5_STYLES } from './registry-stage5.js'
 
-// ============================================================================
-// 默认 overrides(所有风格共用的初始字段可见性)
-// ============================================================================
+// 对外透出 DEFAULT_OVERRIDES(保持老调用方 `import { DEFAULT_OVERRIDES } from './registry'` 兼容)
+// 实际定义已迁到 registry-defaults.ts · 打破 ESM 循环依赖(2026-05-01)
+export { DEFAULT_OVERRIDES }
 
-export const DEFAULT_OVERRIDES: FrameStyleOverrides = {
-  showFields: {
-    make: true,
-    model: true,
-    lens: true,
-    aperture: true,
-    shutter: true,
-    iso: true,
-    focalLength: true,
-    dateTime: false, // 2026-05-01 用户反馈"拍摄时间不要了" · 默认关闭
-    artist: false,
-    location: false,
-  },
-  colorScheme: 'default',
-}
+// ============================================================================
+// 默认 overrides 定义已迁到 registry-defaults.ts(2026-05-01 打破 ESM 循环)
+// 本文件通过顶部 `import { DEFAULT_OVERRIDES } from './registry-defaults.js'` + re-export 保持兼容
+// ============================================================================
 
 // ============================================================================
 // Minimal Bar · 极简底栏(阶段 2 已实装)

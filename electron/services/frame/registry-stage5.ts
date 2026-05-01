@@ -25,8 +25,8 @@
  *   - 去重由 composite 按 hasModelSlot 自动决定(不在此处写 if)
  */
 import { COLOR, FONT_SIZE } from '../../../shared/frame-tokens.js'
-import type { FrameStyle, FrameStyleOverrides } from '../../../shared/types.js'
-import { DEFAULT_OVERRIDES } from './registry.js'
+import type { FrameStyle } from '../../../shared/types.js'
+import { DEFAULT_OVERRIDES } from './registry-defaults.js'
 
 // 阶段 5 · 玻璃拟态:比常规风格更高的字号权重,因为玻璃条本身只有 ~12% 高度
 const GLASS_MODEL_FONT = 0.022
@@ -1003,7 +1003,3 @@ export const STAGE5_STYLES: readonly FrameStyle[] = [
   FLOATING_CAPTION,
   STAMP_CORNER,
 ]
-
-// 类型守卫:防止漏掉任何 style 的 overrides
-const _DEFAULT_OVERRIDES_USED: FrameStyleOverrides = DEFAULT_OVERRIDES
-void _DEFAULT_OVERRIDES_USED

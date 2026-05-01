@@ -165,4 +165,28 @@ describe('FrameStyle 分组注册契约(阶段 5 · 2026-05-01)', () => {
     const secondIds = second.map((s) => s.id).join(',')
     expect(secondIds).toBe(firstIds)
   })
+
+  it('G11 · 蓝军:registry 模块加载无 ESM 循环依赖(stage5 的 defaultOverrides 可读)', async () => {
+    // 2026-05-01 复盘:老版 registry-stage5 `import DEFAULT_OVERRIDES from registry`
+    //   registry `import STAGE5_STYLES from registry-stage5` → 循环 → TDZ
+    //   报错:"Cannot access 'H' before initialization"(H = 压缩后的 DEFAULT_OVERRIDES)
+    //
+    // 新版:DEFAULT_OVERRIDES 迁到独立 registry-defaults.ts · 两边 import 都走它
+    //
+    // 本契约:如果哪天有人把 DEFAULT_OVERRIDES 挪回 registry.ts · stage5 的每个 style 的
+    //   defaultOverrides 会变成 undefined(顶层 TDZ 读取) · 本断言会捕获
+    const { STAGE5_STYLES } = await import('../../electron/services/frame/registry-stage5')
+    expect(STAGE5_STYLES.length).toBe(14)
+    for (const s of STAGE5_STYLES) {
+      expect(
+        s.defaultOverrides,
+        `stage5 style "${s.id}" defaultOverrides 未初始化(ESM 循环 TDZ?)`,
+      ).toBeTruthy()
+      expect(s.defaultOverrides.showFields, `stage5 style "${s.id}" showFields 丢失`).toBeTruthy()
+    }
+    // 同时验证:registry 对外 re-export 的 DEFAULT_OVERRIDES 与 defaults 模块一致
+    const { DEFAULT_OVERRIDES: viaRegistry } = await import('../../electron/services/frame/registry')
+    const { DEFAULT_OVERRIDES: viaDefaults } = await import('../../electron/services/frame/registry-defaults')
+    expect(viaRegistry).toBe(viaDefaults) // 应是同一引用
+  })
 })
