@@ -19,6 +19,7 @@ import { FilmFullBorderLayout } from './layouts/FilmFullBorderLayout'
 import { MinimalBarLayout } from './layouts/MinimalBarLayout'
 import { PlaceholderFrameLayout } from './layouts/PlaceholderFrameLayout'
 import { PolaroidClassicLayout } from './layouts/PolaroidClassicLayout'
+import { SpineEditionLayout } from './layouts/SpineEditionLayout'
 
 /** 每个 layout 组件接收的标准 props */
 export interface FrameLayoutProps {
@@ -42,11 +43,11 @@ const LAYOUT_REGISTRY: Partial<Record<FrameStyleId, ComponentType<FrameLayoutPro
   'minimal-bar': MinimalBarLayout,
   'polaroid-classic': PolaroidClassicLayout,
   'film-full-border': FilmFullBorderLayout,
-  // Gallery 兄弟风格共用 BottomTextLayout(layout 数据分 black/white 两份)
   'gallery-black': BottomTextLayout,
   'gallery-white': BottomTextLayout,
   'editorial-caption': EditorialCaptionLayout,
-  // 阶段 2 后续:spine-edition / hairline
+  'spine-edition': SpineEditionLayout,
+  // 阶段 2 后续:hairline
   // 未实装时 FramePreviewHost 会走"尚未实装"友好 fallback
 }
 

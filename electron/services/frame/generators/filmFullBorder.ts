@@ -16,10 +16,10 @@
  * 不用手撸 for 循环画 100 个 `<rect>`(JSON 响应过大 + Sharp 解析慢)。
  */
 import { scaleByMinEdge } from '../../../../shared/frame-tokens.js'
-import type { FrameContentSlot, FrameLayout } from '../../../../shared/types.js'
+import type { FrameContentSlot } from '../../../../shared/types.js'
 import type { FrameSvgGenerator } from '../composite.js'
-import type { FrameGeometry } from '../layoutEngine.js'
-import { alignToSvgAnchor, escSvgText, resolveSvgFontStack } from '../typography.js'
+import { escSvgText } from '../typography.js'
+import { renderSlotTextGeneric } from './slotPlacement.js'
 
 export const generateFilmFullBorder: FrameSvgGenerator = ({
   geometry,
@@ -37,8 +37,6 @@ export const generateFilmFullBorder: FrameSvgGenerator = ({
   const perfH = Math.round(perfW * 0.5)
   const perfRadius = Math.round(perfH * 0.3)
 
-  // 齿孔 <pattern> —— 一个 perfW×perfW 的 tile,中央一个 perfW×perfH 圆角白块
-  //   - 水平密集排列靠 pattern 的 x 维;竖直居中靠 y=(perfW-perfH)/2
   const perfPatternId = 'film-perforation'
   const patternDef = `<defs>
     <pattern id="${perfPatternId}" patternUnits="userSpaceOnUse" width="${perfW}" height="${perfW}">
@@ -46,12 +44,10 @@ export const generateFilmFullBorder: FrameSvgGenerator = ({
     </pattern>
   </defs>`
 
-  // 黑边 + 齿孔覆盖区的 rect
   const bgFill = escSvgText(layout.backgroundColor)
   const perfRects: string[] = []
 
   if (orientation === 'portrait') {
-    // 竖图:齿孔在左右边
     if (borderLeftPx > 0) {
       perfRects.push(
         `<rect x="0" y="0" width="${borderLeftPx}" height="${canvasH}" fill="${bgFill}"/>`,
@@ -66,7 +62,6 @@ export const generateFilmFullBorder: FrameSvgGenerator = ({
       )
     }
   } else {
-    // 横图 / 方图:齿孔在上下边
     if (borderTopPx > 0) {
       perfRects.push(
         `<rect x="0" y="0" width="${canvasW}" height="${borderTopPx}" fill="${bgFill}"/>`,
@@ -82,12 +77,12 @@ export const generateFilmFullBorder: FrameSvgGenerator = ({
     }
   }
 
-  // 文字 slot(area 从 layout 数据读,不 if 判断横竖)
+  // 文字 slot · 复用 slotPlacement 的通用渲染(不再本文件内实现 renderSlotText)
   const textParts: string[] = []
   for (const slot of layout.slots) {
     const text = pickSlotText(slot, { modelLine, paramLine, dateLine })
     if (!text) continue
-    textParts.push(renderSlotText(slot, text, geometry, layout))
+    textParts.push(renderSlotTextGeneric(slot, text, geometry, layout))
   }
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}" height="${canvasH}" viewBox="0 0 ${canvasW} ${canvasH}">
@@ -107,50 +102,4 @@ function pickSlotText(
   if (slot.id === 'params') return texts.paramLine
   if (slot.id === 'date') return texts.dateLine
   return ''
-}
-
-/**
- * 按 slot.area 渲染文字 —— 与 Polaroid 的 renderSlotText 语义相同,
- * 但本 generator 支持 top/bottom/left/right 四种 area(Polaroid 只有 bottom)。
- *
- * 竖图的 left/right 区域:
- *   - anchor.x 是相对该边框条的宽度(0=贴外 1=贴图)
- *   - anchor.y 是相对 canvasH
- */
-function renderSlotText(slot: FrameContentSlot, text: string, g: FrameGeometry, layout: FrameLayout): string {
-  const fontPx = scaleByMinEdge(slot.fontSize, g.imgW, g.imgH)
-  const color = escSvgText(slot.colorOverride ?? layout.textColor)
-  const fontStack = escSvgText(resolveSvgFontStack(slot.fontFamily))
-
-  let x: number
-  let y: number
-  let transform = ''
-
-  if (slot.area === 'top') {
-    x = Math.round(slot.anchor.x * g.canvasW)
-    y = Math.round(slot.anchor.y * g.borderTopPx + fontPx * 0.35)
-  } else if (slot.area === 'bottom') {
-    x = Math.round(slot.anchor.x * g.canvasW)
-    y = g.imgOffsetY + g.imgH + Math.round(slot.anchor.y * g.borderBottomPx + fontPx * 0.35)
-  } else if (slot.area === 'left') {
-    // 竖图左边:文字垂直排列(用 SVG transform rotate -90 让字沿边走)
-    // anchor.x 相对 borderLeftPx(0=外,1=贴图);anchor.y 相对 canvasH(顶→底)
-    const anchorX = Math.round(slot.anchor.x * g.borderLeftPx)
-    const anchorY = Math.round(slot.anchor.y * g.canvasH)
-    x = 0
-    y = 0
-    transform = ` transform="translate(${anchorX},${anchorY}) rotate(-90)"`
-  } else if (slot.area === 'right') {
-    // 竖图右边:文字竖排,方向相反(rotate 90)
-    const anchorX = g.imgOffsetX + g.imgW + Math.round(slot.anchor.x * g.borderRightPx)
-    const anchorY = Math.round(slot.anchor.y * g.canvasH)
-    x = 0
-    y = 0
-    transform = ` transform="translate(${anchorX},${anchorY}) rotate(90)"`
-  } else {
-    // overlay 或未知 —— 本 generator 不支持,留空(避免意外输出)
-    return ''
-  }
-
-  return `<text x="${x}" y="${y}" font-family="${fontStack}" font-size="${fontPx}" fill="${color}" text-anchor="${alignToSvgAnchor(slot.align)}"${transform}>${escSvgText(text)}</text>`
 }

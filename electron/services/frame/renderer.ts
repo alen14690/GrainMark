@@ -15,6 +15,7 @@ import { generateEditorialCaption, generateGallery } from './generators/bottomTe
 import { generateFilmFullBorder } from './generators/filmFullBorder.js'
 import { generateMinimalBar } from './generators/minimalBar.js'
 import { generatePolaroidClassic } from './generators/polaroidClassic.js'
+import { generateSpineEdition } from './generators/spineEdition.js'
 import { getFrameStyle } from './registry.js'
 
 /** 风格 id → SVG generator 映射(阶段 2 逐个补) */
@@ -25,6 +26,7 @@ const GENERATORS: Partial<Record<FrameStyleId, FrameSvgGenerator>> = {
   'gallery-black': generateGallery,
   'gallery-white': generateGallery,
   'editorial-caption': generateEditorialCaption,
+  'spine-edition': generateSpineEdition,
 }
 
 /**

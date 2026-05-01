@@ -521,6 +521,84 @@ const EDITORIAL_CAPTION: FrameStyle = {
 }
 
 // ============================================================================
+// Spine Edition · 书脊式(阶段 2 · 2026-05-01)
+// ============================================================================
+//
+// 设计(artifact/design/frame-system-2026-05-01.md · 组 D3):
+//   - 横图:底部胶片黑粗带 10%,带内左侧 Georgia 白字机型 + 右侧橙红日期
+//   - 竖图:右侧胶片黑粗带 8%,带内从上到下 rotate(90) 排列:机型 + 日期
+//   - "书脊"的视觉隐喻 —— 像精装书的书脊印着书名
+//
+// 与 Film Full Border 的差异:
+//   - Film Full Border:两条平行边 + 齿孔图案(胶卷视觉)
+//   - Spine Edition:只一条厚带 + 文字竖排(书籍视觉)
+//   - 都涉及横竖方向 area 切换(bottom ↔ right),共享 Film 的"朝向真值"
+//     安全入口(读 layout 数据,不在 generator 散布 if)
+
+const SPINE_EDITION: FrameStyle = {
+  id: 'spine-edition',
+  name: '书脊式',
+  description: '横图底带 / 竖图右带 · 致敬精装书脊排版',
+  landscape: {
+    borderTop: 0,
+    borderBottom: BORDER.spineEdition.bandLandscape,
+    borderLeft: 0,
+    borderRight: 0,
+    backgroundColor: COLOR.filmBlack,
+    textColor: COLOR.paperWhite,
+    slots: [
+      {
+        id: 'model',
+        area: 'bottom',
+        anchor: { x: 0.05, y: 0.55 },
+        fontSize: FONT_SIZE.spine,
+        align: 'left',
+        fontFamily: 'georgia',
+      },
+      {
+        id: 'date',
+        area: 'bottom',
+        anchor: { x: 0.95, y: 0.55 },
+        fontSize: FONT_SIZE.caption,
+        align: 'right',
+        fontFamily: 'courier',
+        colorOverride: COLOR.dateStampOrange,
+      },
+    ],
+  },
+  portrait: {
+    borderTop: 0,
+    borderBottom: 0,
+    borderLeft: 0,
+    borderRight: BORDER.spineEdition.bandPortrait,
+    backgroundColor: COLOR.filmBlack,
+    textColor: COLOR.paperWhite,
+    slots: [
+      {
+        // 竖图:机型在右带 · 垂直向上读(从下到上)
+        id: 'model',
+        area: 'right',
+        anchor: { x: 0.5, y: 0.9 },
+        fontSize: FONT_SIZE.spine,
+        align: 'left',
+        fontFamily: 'georgia',
+      },
+      {
+        // 日期在右带 · 垂直向上读(从下到上,靠底部)
+        id: 'date',
+        area: 'right',
+        anchor: { x: 0.5, y: 0.1 },
+        fontSize: FONT_SIZE.caption,
+        align: 'left',
+        fontFamily: 'courier',
+        colorOverride: COLOR.dateStampOrange,
+      },
+    ],
+  },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+// ============================================================================
 // 注册表
 // ============================================================================
 
@@ -531,6 +609,7 @@ REGISTRY.set(FILM_FULL_BORDER.id, FILM_FULL_BORDER)
 REGISTRY.set(GALLERY_BLACK.id, GALLERY_BLACK)
 REGISTRY.set(GALLERY_WHITE.id, GALLERY_WHITE)
 REGISTRY.set(EDITORIAL_CAPTION.id, EDITORIAL_CAPTION)
+REGISTRY.set(SPINE_EDITION.id, SPINE_EDITION)
 
 /** 列出已注册的全部 FrameStyle */
 export function listFrameStyles(): FrameStyle[] {
