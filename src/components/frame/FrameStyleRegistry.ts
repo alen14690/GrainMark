@@ -16,6 +16,7 @@ import type { Photo } from '../../../shared/types'
 import { BottomTextLayout } from './layouts/BottomTextLayout'
 import { EditorialCaptionLayout } from './layouts/EditorialCaptionLayout'
 import { FilmFullBorderLayout } from './layouts/FilmFullBorderLayout'
+import { HairlineLayout } from './layouts/HairlineLayout'
 import { MinimalBarLayout } from './layouts/MinimalBarLayout'
 import { PlaceholderFrameLayout } from './layouts/PlaceholderFrameLayout'
 import { PolaroidClassicLayout } from './layouts/PolaroidClassicLayout'
@@ -39,7 +40,7 @@ export interface FrameLayoutProps {
 }
 
 const LAYOUT_REGISTRY: Partial<Record<FrameStyleId, ComponentType<FrameLayoutProps>>> = {
-  // 阶段 2:实装风格
+  // 阶段 2:必保 8 风格全部实装
   'minimal-bar': MinimalBarLayout,
   'polaroid-classic': PolaroidClassicLayout,
   'film-full-border': FilmFullBorderLayout,
@@ -47,8 +48,8 @@ const LAYOUT_REGISTRY: Partial<Record<FrameStyleId, ComponentType<FrameLayoutPro
   'gallery-white': BottomTextLayout,
   'editorial-caption': EditorialCaptionLayout,
   'spine-edition': SpineEditionLayout,
-  // 阶段 2 后续:hairline
-  // 未实装时 FramePreviewHost 会走"尚未实装"友好 fallback
+  hairline: HairlineLayout,
+  // 阶段 3 再补:sx70-square / negative-strip / point-and-shoot-stamp / contax-label
 }
 
 /** 占位布局导出:给未注册的风格调用方手动 fallback 用(可选) */

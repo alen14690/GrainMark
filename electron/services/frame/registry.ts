@@ -599,6 +599,68 @@ const SPINE_EDITION: FrameStyle = {
 }
 
 // ============================================================================
+// Hairline · 画廊细线(阶段 2 · 2026-05-01)
+// ============================================================================
+//
+// 设计(artifact/design/frame-system-2026-05-01.md · 组 A2):
+//   - 图片周围 1.5% 处一根极细线(hairlineStroke #202020)
+//   - 右下角外接一行小字参数
+//   - 视觉极简,画廊展览质感
+//   - 与 Minimal Bar 的区别:Minimal Bar 有完整底栏占位;Hairline 只一根线 + 小字
+//
+// 实现注意:
+//   - "线在图内 1.5%" = 图片真正宽高留 97% 给照片 + 3% 给线框缓冲
+//     但这对 border* 的语义不符 —— 这里用 2% 外边框承载 "线 + 小字"
+//   - 右下角小字:slot area='overlay',直接叠在原图右下角(非扩边)
+
+const HAIRLINE: FrameStyle = {
+  id: 'hairline',
+  name: '画廊细线',
+  description: '四周发丝线 + 右下角参数小字,极简画廊展览感',
+  landscape: {
+    // 四周薄边 2%(容纳线 + 右下小字)
+    borderTop: 0.02,
+    borderBottom: 0.02,
+    borderLeft: 0.02,
+    borderRight: 0.02,
+    backgroundColor: COLOR.paperWhite,
+    textColor: COLOR.inkGray,
+    slots: [
+      {
+        // 参数在右下角,area='overlay' 叠在原图右下 · 字极小 · softGray
+        id: 'params',
+        area: 'overlay',
+        anchor: { x: 0.97, y: 0.97 },
+        fontSize: FONT_SIZE.smallLabel,
+        align: 'right',
+        fontFamily: 'mono',
+        colorOverride: COLOR.softGray,
+      },
+    ],
+  },
+  portrait: {
+    borderTop: 0.02,
+    borderBottom: 0.02,
+    borderLeft: 0.02,
+    borderRight: 0.02,
+    backgroundColor: COLOR.paperWhite,
+    textColor: COLOR.inkGray,
+    slots: [
+      {
+        id: 'params',
+        area: 'overlay',
+        anchor: { x: 0.97, y: 0.97 },
+        fontSize: FONT_SIZE.smallLabel,
+        align: 'right',
+        fontFamily: 'mono',
+        colorOverride: COLOR.softGray,
+      },
+    ],
+  },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+// ============================================================================
 // 注册表
 // ============================================================================
 
@@ -610,6 +672,7 @@ REGISTRY.set(GALLERY_BLACK.id, GALLERY_BLACK)
 REGISTRY.set(GALLERY_WHITE.id, GALLERY_WHITE)
 REGISTRY.set(EDITORIAL_CAPTION.id, EDITORIAL_CAPTION)
 REGISTRY.set(SPINE_EDITION.id, SPINE_EDITION)
+REGISTRY.set(HAIRLINE.id, HAIRLINE)
 
 /** 列出已注册的全部 FrameStyle */
 export function listFrameStyles(): FrameStyle[] {

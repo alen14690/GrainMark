@@ -13,6 +13,7 @@ import type { FrameStyleId, FrameStyleOverrides } from '../../../shared/types.js
 import { type FrameSvgGenerator, renderWithGenerator } from './composite.js'
 import { generateEditorialCaption, generateGallery } from './generators/bottomTextGenerator.js'
 import { generateFilmFullBorder } from './generators/filmFullBorder.js'
+import { generateHairline } from './generators/hairline.js'
 import { generateMinimalBar } from './generators/minimalBar.js'
 import { generatePolaroidClassic } from './generators/polaroidClassic.js'
 import { generateSpineEdition } from './generators/spineEdition.js'
@@ -27,6 +28,7 @@ const GENERATORS: Partial<Record<FrameStyleId, FrameSvgGenerator>> = {
   'gallery-white': generateGallery,
   'editorial-caption': generateEditorialCaption,
   'spine-edition': generateSpineEdition,
+  hairline: generateHairline,
 }
 
 /**
