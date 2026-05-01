@@ -14,6 +14,7 @@ import type { ComponentType } from 'react'
 import type { FrameStyle, FrameStyleId, FrameStyleOverrides } from '../../../shared/types'
 import type { Photo } from '../../../shared/types'
 import { BottomTextLayout } from './layouts/BottomTextLayout'
+import { EditorialCaptionLayout } from './layouts/EditorialCaptionLayout'
 import { FilmFullBorderLayout } from './layouts/FilmFullBorderLayout'
 import { MinimalBarLayout } from './layouts/MinimalBarLayout'
 import { PlaceholderFrameLayout } from './layouts/PlaceholderFrameLayout'
@@ -44,7 +45,8 @@ const LAYOUT_REGISTRY: Partial<Record<FrameStyleId, ComponentType<FrameLayoutPro
   // Gallery 兄弟风格共用 BottomTextLayout(layout 数据分 black/white 两份)
   'gallery-black': BottomTextLayout,
   'gallery-white': BottomTextLayout,
-  // 阶段 2 后续:editorial-caption / spine-edition / hairline
+  'editorial-caption': EditorialCaptionLayout,
+  // 阶段 2 后续:spine-edition / hairline
   // 未实装时 FramePreviewHost 会走"尚未实装"友好 fallback
 }
 

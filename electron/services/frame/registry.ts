@@ -426,6 +426,101 @@ const GALLERY_WHITE: FrameStyle = {
 }
 
 // ============================================================================
+// Editorial Caption · 卡片新闻(阶段 2 · 2026-05-01)
+// ============================================================================
+//
+// 设计(artifact/design/frame-system-2026-05-01.md · 组 D4):
+//   - 纸白背景 · 图片下方外接一块 caption 区(12%/10% 底边)
+//   - caption 顶部一根极细黑线分隔(画册/杂志排版惯例)
+//   - 左边:粗体大字机型(Inter semibold,现代出版感)
+//   - 右边:小字参数(mono,对齐 right)
+//   - 居中:日期小字(mono softGray)
+//
+// 与 Gallery 的区别:
+//   - Gallery 三行居中堆叠(端庄画册气);Editorial 左右分隔(杂志版式)
+//   - Editorial 底部比 Gallery 浅(12% vs 14%)· 分隔线是标志性视觉元素
+
+const EDITORIAL_CAPTION: FrameStyle = {
+  id: 'editorial-caption',
+  name: '卡片新闻',
+  description: '纸白 + 细线分隔 + 左粗体右参数 · 杂志版式',
+  landscape: {
+    borderTop: 0,
+    borderBottom: BORDER.editorialCaption.bottomLandscape,
+    borderLeft: 0,
+    borderRight: 0,
+    backgroundColor: COLOR.paperWhite,
+    textColor: COLOR.inkGray,
+    slots: [
+      {
+        // 机型左侧粗体大字
+        id: 'model',
+        area: 'bottom',
+        anchor: { x: 0.05, y: 0.45 },
+        fontSize: FONT_SIZE.mainTitle,
+        align: 'left',
+        fontFamily: 'inter',
+      },
+      {
+        // 参数右侧小字
+        id: 'params',
+        area: 'bottom',
+        anchor: { x: 0.95, y: 0.45 },
+        fontSize: FONT_SIZE.caption,
+        align: 'right',
+        fontFamily: 'mono',
+      },
+      {
+        // 日期居中小字,略靠下
+        id: 'date',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.8 },
+        fontSize: FONT_SIZE.smallLabel,
+        align: 'center',
+        fontFamily: 'mono',
+        colorOverride: COLOR.softGray,
+      },
+    ],
+  },
+  portrait: {
+    borderTop: 0,
+    borderBottom: BORDER.editorialCaption.bottomPortrait,
+    borderLeft: 0,
+    borderRight: 0,
+    backgroundColor: COLOR.paperWhite,
+    textColor: COLOR.inkGray,
+    slots: [
+      {
+        id: 'model',
+        area: 'bottom',
+        anchor: { x: 0.05, y: 0.45 },
+        fontSize: FONT_SIZE.mainTitle,
+        align: 'left',
+        fontFamily: 'inter',
+      },
+      {
+        id: 'params',
+        area: 'bottom',
+        anchor: { x: 0.95, y: 0.45 },
+        fontSize: FONT_SIZE.caption,
+        align: 'right',
+        fontFamily: 'mono',
+      },
+      {
+        id: 'date',
+        area: 'bottom',
+        anchor: { x: 0.5, y: 0.8 },
+        fontSize: FONT_SIZE.smallLabel,
+        align: 'center',
+        fontFamily: 'mono',
+        colorOverride: COLOR.softGray,
+      },
+    ],
+  },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+// ============================================================================
 // 注册表
 // ============================================================================
 
@@ -435,6 +530,7 @@ REGISTRY.set(POLAROID_CLASSIC.id, POLAROID_CLASSIC)
 REGISTRY.set(FILM_FULL_BORDER.id, FILM_FULL_BORDER)
 REGISTRY.set(GALLERY_BLACK.id, GALLERY_BLACK)
 REGISTRY.set(GALLERY_WHITE.id, GALLERY_WHITE)
+REGISTRY.set(EDITORIAL_CAPTION.id, EDITORIAL_CAPTION)
 
 /** 列出已注册的全部 FrameStyle */
 export function listFrameStyles(): FrameStyle[] {

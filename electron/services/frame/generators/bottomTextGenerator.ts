@@ -32,10 +32,17 @@ import { alignToSvgAnchor, escSvgText, resolveSvgFontStack } from '../typography
 export interface BottomTextGeneratorOptions {
   /** 哪些字体族默认带 italic(Georgia 等衬线字的手写感) */
   italicFontFamilies?: Array<'georgia' | 'typewriter'>
+  /**
+   * 在 bottom 区域的顶部画一根分隔线(Editorial 风格用,杂志版式的视觉标志)。
+   * - 颜色:走 layout.textColor(纸白底黑字风格线会是黑的,反之亦然)
+   * - 线宽:minEdge × 0.001(~2-4px,极细) · 不受 scale 影响
+   */
+  topSeparator?: boolean
 }
 
 export function createBottomTextGenerator(options: BottomTextGeneratorOptions = {}): FrameSvgGenerator {
   const italicSet = new Set<'georgia' | 'typewriter'>(options.italicFontFamilies ?? ['georgia'])
+  const withSeparator = options.topSeparator === true
 
   return (ctx: FrameGeneratorContext) => {
     const { geometry, paramLine, modelLine, dateLine, artistLine, style } = ctx
@@ -44,6 +51,16 @@ export function createBottomTextGenerator(options: BottomTextGeneratorOptions = 
     const barTop = imgOffsetY + imgH
     const barH = borderBottomPx
     const bgFill = escSvgText(layout.backgroundColor)
+
+    // 分隔线(Editorial 风格专用) · 粗度按 minEdge × 0.001,最小 1px
+    const separatorParts: string[] = []
+    if (withSeparator && barH > 0) {
+      const sepStroke = Math.max(scaleByMinEdge(0.001, geometry.imgW, geometry.imgH), 1)
+      const sepColor = escSvgText(layout.textColor)
+      separatorParts.push(
+        `<line x1="${Math.round(canvasW * 0.05)}" y1="${barTop + Math.round(barH * 0.08)}" x2="${Math.round(canvasW * 0.95)}" y2="${barTop + Math.round(barH * 0.08)}" stroke="${sepColor}" stroke-width="${sepStroke}" opacity="0.3"/>`,
+      )
+    }
 
     const textParts: string[] = []
     for (const slot of layout.slots) {
@@ -56,6 +73,7 @@ export function createBottomTextGenerator(options: BottomTextGeneratorOptions = 
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}" height="${canvasH}" viewBox="0 0 ${canvasW} ${canvasH}">
   <!-- style=${escSvgText(style.id)} -->
   <rect x="0" y="0" width="${canvasW}" height="${canvasH}" fill="${bgFill}"/>
+  ${separatorParts.join('\n  ')}
   ${textParts.join('\n  ')}
 </svg>`
   }
@@ -104,4 +122,15 @@ function renderBottomSlotText(
  */
 export const generateGallery: FrameSvgGenerator = createBottomTextGenerator({
   italicFontFamilies: ['georgia'],
+})
+
+/**
+ * Editorial Caption 的 generator。
+ *
+ * 与 Gallery 的差异:开启 topSeparator 在 caption 顶部画一根极细黑线
+ * (杂志版式的标志性视觉元素)。
+ */
+export const generateEditorialCaption: FrameSvgGenerator = createBottomTextGenerator({
+  italicFontFamilies: [], // Editorial 用 Inter 粗体,不 italic
+  topSeparator: true,
 })
