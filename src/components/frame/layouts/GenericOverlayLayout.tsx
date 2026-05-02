@@ -311,6 +311,7 @@ function GlassLine({
         whiteSpace: 'nowrap',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
+        maxWidth: '100%',
         lineHeight: 1.3,
       }}
     >
@@ -415,6 +416,7 @@ function renderOilTexture(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.modelText || '—'}
@@ -429,6 +431,7 @@ function renderOilTexture(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.paramText || '—'}
@@ -500,6 +503,7 @@ function renderWatercolorCaption(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.modelText || '—'}
@@ -513,6 +517,7 @@ function renderWatercolorCaption(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.paramText || '—'}
@@ -608,6 +613,7 @@ function renderAmbientGlow(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.paramText || '—'}
@@ -748,6 +754,7 @@ function renderCinemaScope(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           <span style={{ color: '#FF6B00', marginRight: 6 }}>●</span>
@@ -775,6 +782,7 @@ function renderCinemaScope(ctx: StageFiveContext) {
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
+          maxWidth: '100%',
         }}
       >
         {ctx.paramText || '—'}
@@ -829,6 +837,7 @@ function renderNeonEdge(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.modelText || '—'}
@@ -839,6 +848,7 @@ function renderNeonEdge(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.paramText || '—'}
@@ -921,6 +931,7 @@ function renderSwissGrid(ctx: StageFiveContext) {
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
+              maxWidth: '100%',
             }}
           >
             {ctx.modelText || '—'}
@@ -934,6 +945,7 @@ function renderSwissGrid(ctx: StageFiveContext) {
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
+              maxWidth: '100%',
             }}
           >
             {ctx.exif.lensModel || '—'}
@@ -1038,6 +1050,7 @@ function renderContactSheet(ctx: StageFiveContext) {
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
+              maxWidth: '100%',
               lineHeight: 1.3,
             }}
           >
@@ -1195,6 +1208,7 @@ function renderOilClassic(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.modelText || '—'}
@@ -1207,6 +1221,7 @@ function renderOilClassic(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.paramText || '—'}
@@ -1275,6 +1290,7 @@ function renderAmbientVinyl(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.modelText || '—'}
@@ -1288,6 +1304,7 @@ function renderAmbientVinyl(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.paramText || '—'}
@@ -1351,6 +1368,7 @@ function renderAmbientAura(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.modelText || '—'}
@@ -1364,6 +1382,7 @@ function renderAmbientAura(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.paramText || '—'}
@@ -1429,6 +1448,7 @@ function renderAmbientSoft(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.modelText || '—'}
@@ -1442,6 +1462,7 @@ function renderAmbientSoft(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.paramText || '—'}
@@ -1505,6 +1526,7 @@ function renderAmbientDark(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.modelText || '—'}
@@ -1518,6 +1540,7 @@ function renderAmbientDark(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.paramText || '—'}
@@ -1599,6 +1622,7 @@ function renderAmbientGradient(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.modelText || '—'}
@@ -1612,6 +1636,7 @@ function renderAmbientGradient(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.paramText || '—'}
@@ -1759,6 +1784,7 @@ function renderAmbientColored(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.paramText || '—'}
@@ -1861,6 +1887,7 @@ function renderCinemaTimestamp(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.modelText || '—'}
@@ -1874,6 +1901,7 @@ function renderCinemaTimestamp(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.paramText || '—'}
@@ -1925,6 +1953,7 @@ function renderEditorialMinimal(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.modelText || '—'}
@@ -1938,6 +1967,7 @@ function renderEditorialMinimal(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.paramText || '—'}
@@ -1992,6 +2022,7 @@ function renderFloatingCaption(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.modelText || '—'}
@@ -2005,6 +2036,7 @@ function renderFloatingCaption(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.paramText || '—'}
@@ -2040,6 +2072,7 @@ function renderStampCorner(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.modelText || '—'}
@@ -2053,6 +2086,7 @@ function renderStampCorner(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.paramText || '—'}
