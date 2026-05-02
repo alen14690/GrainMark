@@ -17,7 +17,7 @@ declare function ipc(channel: 'taste:categories'): Promise<Array<{ id: TasteCate
 declare function ipc(channel: 'taste:extract', path: string): Promise<{ palette: ColorPalette; scheme: ColorScheme }>
 declare function ipc(channel: 'taste:get-scheme', refId: string): Promise<ColorScheme>
 
-export function TasteReferencePage() {
+export default function TasteReferencePage() {
   const [categories, setCategories] = useState<Array<{ id: TasteCategory; label: string }>>([])
   const [activeCategory, setActiveCategory] = useState<TasteCategory | 'all'>('all')
   const [presets, setPresets] = useState<TasteRef[]>([])
