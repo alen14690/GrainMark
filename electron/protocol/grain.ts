@@ -17,7 +17,7 @@ import { pathToFileURL } from 'node:url'
  * RAW 支持（Pass 2.8）：photo / preview kind 对 RAW 文件会透明地返回内嵌 JPEG，
  * UI 层不需感知。对非 RAW 走 net.fetch(file://) 零开销透传。
  */
-import { net, protocol } from 'electron'
+import { app, net, protocol } from 'electron'
 import { logger } from '../services/logger/logger.js'
 import { orientImage, isRawFormat, resolvePreviewBuffer } from '../services/raw/index.js'
 import { UnsupportedRawError } from '../services/raw/rawDecoder.js'
@@ -29,6 +29,8 @@ const MAP: Record<string, () => string> = {
   lut: () => getLUTDir(),
   // Editor 大图预览缓存（renderPreview 输出 > 2MB 时走这个）
   'preview-tmp': () => getPreviewCacheDir(),
+  // 品牌 Logo（Settings 上传的）
+  logo: () => path.join(app.getPath('userData'), 'logos'),
 }
 
 /** photo id → 绝对路径 的解析器（由 photoStore 注入） */

@@ -321,7 +321,8 @@ export default function Settings() {
                       <div className="w-14 h-14 rounded-lg bg-bg-0 border border-bg-1 flex items-center justify-center overflow-hidden flex-shrink-0">
                         {hasLogo ? (
                           <img
-                            src={`file://${logoPath}`}
+                            key={logoPath}
+                            src={`grain://logo/${encodeURIComponent(logoPath!.split('/').pop()!)}?v=${Date.now()}`}
                             alt={brand.name}
                             className="max-w-[90%] max-h-[90%] object-contain"
                             draggable={false}
