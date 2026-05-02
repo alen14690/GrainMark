@@ -68,7 +68,7 @@ function FrameTabBody({
 
   useEffect(() => {
     const s = styles.find((x) => x.id === activeId)
-    if (s) setOverrides(s.defaultOverrides)
+    if (s) setOverrides((prev) => ({ ...s.defaultOverrides, logoPath: prev.logoPath }))
   }, [activeId, styles])
 
   // 自动匹配品牌 Logo：按 EXIF make 匹配 · 无 make 时默认 leica 兜底
