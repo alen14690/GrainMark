@@ -82,7 +82,16 @@ function deepMerge<T>(base: T, patch: Partial<T>): T {
       p !== null &&
       !Array.isArray(p)
     ) {
-      out[key] = deepMerge(b, p as Record<string, unknown>)
+      // 如果 patch 对象是空的 → 直接替换（用于"清空"场景如删除所有 brandLogos）
+      // 如果 patch 对象的 key 集合与 base 不同（有增删）→ 直接替换（用于删除某个 brandLogo）
+      const pKeys = Object.keys(p)
+      const bKeys = Object.keys(b)
+      const hasDeletedKeys = bKeys.some((k) => !pKeys.includes(k))
+      if (pKeys.length === 0 || hasDeletedKeys) {
+        out[key] = p
+      } else {
+        out[key] = deepMerge(b, p as Record<string, unknown>)
+      }
     } else if (p !== undefined) {
       out[key] = p
     }
