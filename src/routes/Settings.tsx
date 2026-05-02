@@ -285,28 +285,24 @@ export default function Settings() {
                   const logoPath = settings.watermark.brandLogos[brand.id]
                   const hasLogo = !!logoPath
 
-                  const handleUpload = () => {
-                    const input = document.createElement('input')
-                    input.type = 'file'
-                    input.accept = 'image/png,image/jpeg,image/webp,image/svg+xml'
-                    input.onchange = async () => {
-                      const file = input.files?.[0]
-                      if (!file) return
-                      const filePath = (file as File & { path?: string }).path
-                      if (!filePath) return
-                      try {
-                        const dest = await ipc('frame:upload-logo', brand.id, filePath)
-                        update({
-                          watermark: {
-                            ...settings.watermark,
-                            brandLogos: { ...settings.watermark.brandLogos, [brand.id]: dest },
-                          },
-                        })
-                      } catch (err) {
-                        window.alert(`Logo 上传失败: ${(err as Error).message}`)
-                      }
+                  const handleUpload = async () => {
+                    try {
+                      const files = await ipc('dialog:selectFiles', {
+                        filters: [{ name: 'Logo 图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'svg'] }],
+                        multi: false,
+                      })
+                      if (!files || files.length === 0) return
+                      const filePath = files[0]
+                      const dest = await ipc('frame:upload-logo', brand.id, filePath)
+                      update({
+                        watermark: {
+                          ...settings.watermark,
+                          brandLogos: { ...settings.watermark.brandLogos, [brand.id]: dest },
+                        },
+                      })
+                    } catch (err) {
+                      window.alert(`Logo 上传失败: ${(err as Error).message}`)
                     }
-                    input.click()
                   }
 
                   const handleDelete = async () => {
