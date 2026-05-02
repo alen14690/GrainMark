@@ -736,6 +736,12 @@ export interface IpcApi {
     activeFilterName: string | null,
     activeFilterCategory: string | null,
   ) => Promise<AIAnalysisResult>
+
+  // 口味参考集
+  'taste:presets': (category?: string) => Promise<TasteReference[]>
+  'taste:categories': () => Promise<Array<{ id: TasteCategory; label: string }>>
+  'taste:extract': (imagePath: string) => Promise<{ palette: ColorPalette; scheme: ColorScheme }>
+  'taste:get-scheme': (refId: string) => Promise<ColorScheme>
 }
 
 // ============ LLM 配置（M5-LLM-A） ============
@@ -930,3 +936,72 @@ export interface AIAnalysisFailure {
 export type AIAnalysisResult = AIAnalysisSuccess | AIAnalysisFailure
 
 export type IpcChannel = keyof IpcApi
+
+// ============ 口味参考集 ============
+
+/** 参考图分类 */
+export type TasteCategory =
+  | 'landscape' // 风光
+  | 'portrait' // 人像
+  | 'street' // 街拍
+  | 'architecture' // 建筑
+  | 'food' // 美食
+  | 'dark-moody' // 暗调
+  | 'film' // 胶片
+  | 'minimal' // 极简
+
+/** 从参考图提取的色彩特征 */
+export interface ColorPalette {
+  /** 主色 (hex) */
+  dominant: string
+  /** 辅色 (2-3 个 hex) */
+  secondary: string[]
+  /** 强调色 (hex) */
+  accent: string
+  /** 色温估算 (2000K-10000K) */
+  temperature: number
+  /** 平均饱和度 (0-100) */
+  saturation: number
+  /** 平均明度 (0-100) */
+  brightness: number
+  /** 对比度 (0-100) */
+  contrast: number
+}
+
+/** 配色方案（可应用到用户照片） */
+export interface ColorScheme {
+  id: string
+  name: string
+  /** 来源参考图 ID */
+  sourceRefId?: string
+  palette: ColorPalette
+  /** HSL 色相偏移参数 */
+  hslShifts: Array<{ hueRange: [number, number]; hShift: number; sShift: number; lShift: number }>
+  /** 色温偏移 (负=冷 正=暖) */
+  temperatureShift: number
+  /** 饱和度乘数 (1.0=不变) */
+  saturationMul: number
+  /** 亮度偏移 */
+  brightnessShift: number
+  /** 分离色调 */
+  splitToning: { highlights: string; shadows: string; balance: number }
+}
+
+/** 预置参考图条目 */
+export interface TasteReference {
+  id: string
+  /** Unsplash photo ID */
+  unsplashId: string
+  /** 缩略图 URL (Unsplash CDN) */
+  thumbUrl: string
+  /** 常规尺寸 URL */
+  regularUrl: string
+  /** 摄影师名 */
+  photographer: string
+  /** 分类 */
+  category: TasteCategory
+  /** 预提取的色彩特征（预计算后内置） */
+  palette: ColorPalette
+  /** 预生成的配色方案 */
+  scheme: ColorScheme
+}

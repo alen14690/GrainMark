@@ -444,6 +444,12 @@ export const IPC_SCHEMAS = {
   // 2026-04-26 新增：让渲染进程的 perf / 用户操作事件落盘到 userData/logs/perf.ndjson
   // 单纯的数据收集通道，无副作用；不走 PathGuard（没有路径字段）
   'perf:log': PerfLogEventSchema,
+
+  // ============ 口味参考集 ============
+  'taste:presets': null,
+  'taste:categories': null,
+  'taste:extract': z.tuple([PathSchema]),
+  'taste:get-scheme': z.tuple([z.string()]),
 } as const
 
 export type IpcChannelName = keyof typeof IPC_SCHEMAS
