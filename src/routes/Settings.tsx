@@ -318,16 +318,16 @@ export default function Settings() {
                       className="flex items-center gap-3 px-2 py-2 rounded text-[11px] border border-bg-1 hover:border-brand-amber/20"
                     >
                       {/* Logo 预览缩略图 */}
-                      <div className="w-12 h-12 rounded-lg bg-bg-0 border border-bg-1 flex items-center justify-center overflow-hidden flex-shrink-0">
+                      <div className="w-14 h-14 rounded-lg bg-bg-0 border border-bg-1 flex items-center justify-center overflow-hidden flex-shrink-0">
                         {hasLogo ? (
                           <img
                             src={`file://${logoPath}`}
                             alt={brand.name}
-                            className="w-full h-full object-contain p-1"
+                            className="max-w-[90%] max-h-[90%] object-contain"
                             draggable={false}
                           />
                         ) : (
-                          <ImgIcon className="w-4 h-4 text-fg-3 opacity-40" />
+                          <ImgIcon className="w-5 h-5 text-fg-3 opacity-40" />
                         )}
                       </div>
                       {/* 品牌名 */}
