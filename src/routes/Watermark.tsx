@@ -98,7 +98,7 @@ function FrameTabBody({
   }
 
   return (
-    <div className="grid grid-cols-[240px_1fr_220px] gap-4 h-[calc(100vh-5rem)]">
+    <div className="grid grid-cols-[240px_1fr_220px] gap-4 h-[calc(100vh-7rem)] overflow-hidden">
       {/* 风格列表 · 按质感簇分组展示(2026-05-01) */}
       <aside className="card p-3 overflow-y-auto">
         <div className="text-[11px] text-fg-2 uppercase tracking-wider font-mono px-2 mb-2 sticky top-0 bg-bg-1 py-1 -my-1 z-10">
