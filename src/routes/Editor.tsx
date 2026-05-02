@@ -43,6 +43,40 @@ import { usePerfStore } from '../stores/perfStore'
 
 type RightPanelTab = 'filters' | 'adjust' | 'frame'
 
+// ---- 草稿持久化（P0：编辑状态不丢失）----
+const DRAFT_PREFIX = 'grainmark:draft:'
+const DRAFT_EXPIRE_MS = 7 * 24 * 60 * 60 * 1000 // 7 天过期
+
+interface DraftData {
+  pipeline: import('../../shared/types').FilterPipeline | null
+  frameConfig: import('../stores/editStore').FrameConfig | null
+  filterId: string | null
+  timestamp: number
+}
+
+function saveDraft(photoId: string, data: DraftData): void {
+  try {
+    localStorage.setItem(DRAFT_PREFIX + photoId, JSON.stringify(data))
+  } catch { /* 存满了就算了 */ }
+}
+
+function loadDraft(photoId: string): DraftData | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_PREFIX + photoId)
+    if (!raw) return null
+    const data = JSON.parse(raw) as DraftData
+    if (Date.now() - data.timestamp > DRAFT_EXPIRE_MS) {
+      localStorage.removeItem(DRAFT_PREFIX + photoId)
+      return null
+    }
+    return data
+  } catch { return null }
+}
+
+function clearDraft(photoId: string): void {
+  localStorage.removeItem(DRAFT_PREFIX + photoId)
+}
+
 export default function Editor() {
   const { photoId } = useParams()
   // P0-6：精准 selector —— 只在"当前这张照片"或"第一张照片"真变时才重渲
@@ -118,7 +152,38 @@ export default function Editor() {
     loadFromPreset(activeFilter ?? null)
   }, [activeFilter, loadFromPreset])
 
-  // 离开 Editor 清空编辑态
+  // 草稿恢复：进入 Editor 时检查 localStorage 是否有该照片的未完成编辑
+  const draftRestoredRef = useRef(false)
+  useEffect(() => {
+    if (!photoId || draftRestoredRef.current) return
+    const draft = loadDraft(photoId)
+    if (draft && draft.pipeline) {
+      // 恢复草稿 pipeline（覆盖 loadFromPreset 的结果）
+      useEditStore.setState((s) => {
+        s.currentPipeline = draft.pipeline
+        s._dirty = true
+      })
+      draftRestoredRef.current = true
+    }
+  }, [photoId])
+
+  // 草稿自动保存：pipeline 变化时 debounce 存入 localStorage
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (!photoId || !currentPipeline) return
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(() => {
+      saveDraft(photoId, {
+        pipeline: currentPipeline,
+        frameConfig: frameConfig ?? null,
+        filterId: activeFilterId ?? null,
+        timestamp: Date.now(),
+      })
+    }, 2000) // 2 秒 debounce
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current) }
+  }, [photoId, currentPipeline, frameConfig, activeFilterId])
+
+  // 离开 Editor 时不清空编辑态（草稿已保存），只清理内存中的 history/future 释放内存
   useEffect(() => {
     return () => {
       clearEdits()
@@ -291,6 +356,8 @@ export default function Editor() {
       if (result) {
         setExportToast(result)
         setTimeout(() => setExportToast(null), 6000)
+        // 导出成功后清除草稿（避免下次进入恢复已导出的旧状态）
+        if (photoId) clearDraft(photoId)
       }
     } catch (err) {
       console.error('[export]', err)
