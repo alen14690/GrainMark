@@ -412,6 +412,9 @@ export const IPC_SCHEMAS = {
 
   'frame:templates': null,
   'frame:render': FrameRenderSchema,
+  'frame:upload-logo': z.tuple([z.string().min(1).max(32), PathSchema]),
+  'frame:delete-logo': z.string().min(1).max(32),
+  'frame:list-logos': null,
 
   'ai:listModels': null,
   'ai:downloadModel': z.string().min(1).max(128),

@@ -658,6 +658,12 @@ export interface IpcApi {
     styleId: FrameStyleId,
     overrides: FrameStyleOverrides,
   ) => Promise<string>
+  /** 上传品牌 Logo · brandId 为品牌标识(如 'leica'/'sony') · 返回存储后的绝对路径 */
+  'frame:upload-logo': (brandId: string, srcPath: string) => Promise<string>
+  /** 删除已上传的品牌 Logo */
+  'frame:delete-logo': (brandId: string) => Promise<void>
+  /** 列出已上传的全部品牌 Logo · 返回 { brandId → absolutePath } */
+  'frame:list-logos': () => Promise<Record<string, string>>
 
   // AI
   'ai:listModels': () => Promise<AIModel[]>
