@@ -1,4 +1,4 @@
-import { Download, Film, Sparkles, Trash2, Upload, User } from 'lucide-react'
+import { Download, Sparkles, Trash2, Upload, User } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { FilterCategory } from '../../shared/types'
 import { ipc } from '../lib/ipc'
@@ -15,6 +15,80 @@ const CATEGORIES: { id: FilterCategory | 'all'; label: string }[] = [
   { id: 'extracted', label: '已提取' },
   { id: 'custom', label: '自定义' },
 ]
+
+/**
+ * 按滤镜类别选配 Unsplash 示例照片 + CSS 色调模拟
+ * 照片来源：Unsplash (免费商用授权)
+ * CSS filter 模拟滤镜色调效果（非精确还原，仅用于预览区氛围展示）
+ */
+const CATEGORY_PREVIEW: Record<string, { photo: string; css: string }> = {
+  // 彩色负片：暖色调 · 柔和对比
+  'negative-color': {
+    photo: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&q=75',
+    css: 'saturate(0.85) contrast(0.9) sepia(0.15) brightness(1.05)',
+  },
+  // 黑白：去饱和 · 高对比
+  'negative-bw': {
+    photo: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=400&q=75',
+    css: 'grayscale(1) contrast(1.15) brightness(1.05)',
+  },
+  // 反转片：高饱和 · 强对比
+  slide: {
+    photo: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=400&q=75',
+    css: 'saturate(1.3) contrast(1.15) brightness(0.95)',
+  },
+  // 电影胶片：偏暖 · 低饱和 · 偏青暗部
+  cinema: {
+    photo: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=400&q=75',
+    css: 'saturate(0.8) contrast(1.1) sepia(0.2) brightness(0.9)',
+  },
+  // 拍立得：褪色 · 暖调 · 低对比
+  instant: {
+    photo: 'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=400&q=75',
+    css: 'saturate(0.7) contrast(0.85) sepia(0.25) brightness(1.1)',
+  },
+  // 数码风格：清晰 · 干净
+  digital: {
+    photo: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=400&q=75',
+    css: 'saturate(1.1) contrast(1.05) brightness(1.02)',
+  },
+  // 已提取 / 自定义 / 油画：通用照片
+  extracted: {
+    photo: 'https://images.unsplash.com/photo-1477346611705-65d1883cee1e?w=400&q=75',
+    css: 'saturate(0.9) contrast(1.05)',
+  },
+  custom: {
+    photo: 'https://images.unsplash.com/photo-1505765050516-f72dcac9c60e?w=400&q=75',
+    css: 'saturate(1.0) contrast(1.0)',
+  },
+  'oil-painting': {
+    photo: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=400&q=75',
+    css: 'saturate(0.75) contrast(0.9) sepia(0.1) brightness(1.08)',
+  },
+}
+
+/** 根据滤镜名称微调 CSS 效果 */
+function getFilterPreviewStyle(name: string, category: string): string {
+  const base = CATEGORY_PREVIEW[category]?.css ?? 'saturate(1) contrast(1)'
+  const lower = name.toLowerCase()
+  // 黑白类滤镜强制灰度
+  if (lower.includes('b&w') || lower.includes('黑白') || lower.includes('mono') || category === 'negative-bw') {
+    return 'grayscale(1) contrast(1.15) brightness(1.05)'
+  }
+  // Portra 系列：柔和暖色
+  if (lower.includes('portra')) return 'saturate(0.82) contrast(0.88) sepia(0.12) brightness(1.08)'
+  // Cinestill / 夜景：暖黄偏红
+  if (lower.includes('cinestill') || lower.includes('800t')) return 'saturate(0.9) contrast(1.1) sepia(0.2) hue-rotate(-10deg) brightness(0.92)'
+  // Fuji 系列：偏绿微冷
+  if (lower.includes('fuji') || lower.includes('fujifilm')) return 'saturate(0.88) contrast(1.05) hue-rotate(5deg) brightness(1.02)'
+  // Kodak Gold / Ektar：暖黄高饱和
+  if (lower.includes('gold') || lower.includes('ektar')) return 'saturate(1.15) contrast(1.05) sepia(0.15) brightness(1.02)'
+  // Teal & Orange
+  if (lower.includes('teal') || lower.includes('orange')) return 'saturate(1.1) contrast(1.1) hue-rotate(-5deg)'
+  // 日系
+  if (lower.includes('日系') || lower.includes('japanese')) return 'saturate(0.75) contrast(0.85) brightness(1.15) sepia(0.05)'
+  return base
+}
 
 export default function Filters() {
   const filters = useAppStore((s) => s.filters)
@@ -81,10 +155,14 @@ export default function Filters() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {filtered.map((f) => (
           <div key={f.id} className="card p-4 hover:border-bg-3 transition-colors group">
-            <div className="aspect-video rounded-lg bg-gradient-to-br from-bg-2 to-bg-1 mb-3 relative overflow-hidden">
-              <div className="absolute inset-0 flex items-center justify-center text-bg-3">
-                <Film className="w-8 h-8" />
-              </div>
+            <div className="aspect-video rounded-lg mb-3 relative overflow-hidden bg-bg-1">
+              <img
+                src={CATEGORY_PREVIEW[f.category]?.photo ?? CATEGORY_PREVIEW.custom.photo}
+                alt={f.name}
+                loading="lazy"
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{ filter: getFilterPreviewStyle(f.name, f.category) }}
+              />
               <span className="absolute inset-0 film-grain" />
               {f.source === 'extracted' && (
                 <div className="absolute top-2 left-2 pill-accent text-[10px]">
