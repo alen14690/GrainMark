@@ -210,7 +210,7 @@ function scale(ratio: number, ctx: StageFiveContext): number {
   return Math.max(Math.round(ratio * Math.min(ctx.containerWidth, ctx.containerHeight)), 8)
 }
 
-/** 品牌 Logo · 与参数文字配合显示(放在文字行左侧或上方) */
+/** 品牌 Logo · 与参数文字配合显示 */
 function BrandLogo({ ctx, height }: { ctx: StageFiveContext; height?: number }) {
   if (!ctx.logoSrc) return null
   const h = height ?? scale(0.035, ctx)
@@ -352,6 +352,7 @@ function renderGlassChip(ctx: StageFiveContext) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.06)', borderRadius: 999, padding: `${scale(0.008, ctx)}px ${scale(0.014, ctx)}px`, border: '1px solid rgba(255,255,255,0.1)' }}>
           <span style={{ width: scale(0.022, ctx), height: scale(0.022, ctx), borderRadius: '50%', background: 'linear-gradient(135deg, #ff8c42, #ff3a3a)', flexShrink: 0 }} />
           <div style={{ fontFamily: "'JetBrains Mono', monospace", minWidth: 0 }}>
+            <BrandLogo ctx={ctx} />
             <GlassLine size={scale(0.013, ctx)} weight={600}>{ctx.modelText || '—'}</GlassLine>
             <GlassLine size={scale(0.01, ctx)} color="rgba(255,255,255,0.7)" mt={1}>{ctx.paramText || '—'}</GlassLine>
           </div>
@@ -419,6 +420,7 @@ function renderOilTexture(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
+          <BrandLogo ctx={ctx} />
           {ctx.modelText || '—'}
         </div>
         <div
@@ -506,6 +508,7 @@ function renderWatercolorCaption(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
+          <BrandLogo ctx={ctx} />
           {ctx.modelText || '—'}
         </div>
         <div
@@ -601,6 +604,7 @@ function renderAmbientGlow(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
+          <BrandLogo ctx={ctx} />
           {ctx.modelText || '—'}
         </div>
         <div
@@ -678,6 +682,7 @@ function renderBokehPillar(ctx: StageFiveContext) {
           textOverflow: 'ellipsis',
         }}
       >
+        <BrandLogo ctx={ctx} />
         {ctx.modelText || '—'}
       </div>
       <div
@@ -758,6 +763,7 @@ function renderCinemaScope(ctx: StageFiveContext) {
           }}
         >
           <span style={{ color: '#FF6B00', marginRight: 6 }}>●</span>
+          <BrandLogo ctx={ctx} />
           REC · {ctx.modelText || '—'}
         </span>
       </div>
@@ -840,6 +846,7 @@ function renderNeonEdge(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
+          <BrandLogo ctx={ctx} />
           {ctx.modelText || '—'}
         </div>
         <div
@@ -934,6 +941,7 @@ function renderSwissGrid(ctx: StageFiveContext) {
               maxWidth: '100%',
             }}
           >
+            <BrandLogo ctx={ctx} />
             {ctx.modelText || '—'}
           </div>
           <div
@@ -1010,6 +1018,7 @@ function renderContactSheet(ctx: StageFiveContext) {
           overflow: 'hidden',
         }}
       >
+        <BrandLogo ctx={ctx} />
         KODAK GOLD 200 · {ctx.modelText || '—'}
       </div>
       {/* 照片 */}
@@ -1211,6 +1220,7 @@ function renderOilClassic(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
+          <BrandLogo ctx={ctx} />
           {ctx.modelText || '—'}
         </div>
         <div
@@ -1293,6 +1303,7 @@ function renderAmbientVinyl(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
+          <BrandLogo ctx={ctx} />
           {ctx.modelText || '—'}
         </div>
         <div
@@ -1371,6 +1382,7 @@ function renderAmbientAura(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
+          <BrandLogo ctx={ctx} />
           {ctx.modelText || '—'}
         </div>
         <div
@@ -1451,6 +1463,7 @@ function renderAmbientSoft(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
+          <BrandLogo ctx={ctx} />
           {ctx.modelText || '—'}
         </div>
         <div
@@ -1529,6 +1542,7 @@ function renderAmbientDark(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
+          <BrandLogo ctx={ctx} />
           {ctx.modelText || '—'}
         </div>
         <div
@@ -1625,6 +1639,7 @@ function renderAmbientGradient(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
+          <BrandLogo ctx={ctx} />
           {ctx.modelText || '—'}
         </div>
         <div
@@ -1773,6 +1788,7 @@ function renderAmbientColored(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
+          <BrandLogo ctx={ctx} />
           {ctx.modelText || '—'}
         </div>
         <div
@@ -1843,6 +1859,7 @@ function renderCinemaLetterbox(ctx: StageFiveContext) {
             maxWidth: '80%',
           }}
         >
+          <BrandLogo ctx={ctx} />
           {ctx.modelText || '—'}
         </div>
         <div
@@ -1890,6 +1907,7 @@ function renderCinemaTimestamp(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
+          <BrandLogo ctx={ctx} />
           {ctx.modelText || '—'}
         </div>
         <div
@@ -1956,6 +1974,7 @@ function renderEditorialMinimal(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
+          <BrandLogo ctx={ctx} />
           {ctx.modelText || '—'}
         </div>
         <div
@@ -2025,6 +2044,7 @@ function renderFloatingCaption(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
+          <BrandLogo ctx={ctx} />
           {ctx.modelText || '—'}
         </div>
         <div
@@ -2075,6 +2095,7 @@ function renderStampCorner(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
+          <BrandLogo ctx={ctx} />
           {ctx.modelText || '—'}
         </div>
         <div
