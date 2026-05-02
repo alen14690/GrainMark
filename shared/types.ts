@@ -570,7 +570,14 @@ export interface AppSettings {
   watermark: {
     artistName: string
     copyright: string
-    defaultLogoPath: string | null
+    /**
+     * 品牌 Logo 路径映射(brandId → 绝对路径)
+     *
+     * 在 Settings → 水印 → Logo 区域管理 · 一次上传永久生效
+     * 边框渲染时按 EXIF make 自动匹配品牌 · 找到对应 Logo 路径
+     * 没有匹配到品牌时默认使用 leica 兜底
+     */
+    brandLogos: Record<string, string>
     defaultTemplateId: WatermarkTemplateId
     enabledByDefault: boolean
   }

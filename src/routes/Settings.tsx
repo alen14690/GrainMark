@@ -10,6 +10,7 @@ import {
   Stamp,
 } from 'lucide-react'
 import { useState } from 'react'
+import { CAMERA_BRANDS } from '../../shared/frame-brands'
 import type { AppSettings } from '../../shared/types'
 import { ipc } from '../lib/ipc'
 import { useAppStore } from '../stores/appStore'
@@ -275,11 +276,73 @@ export default function Settings() {
                 />
               </Row>
               <Row label="默认 Logo (PNG)" desc="请确保你有权使用该 Logo">
-                <button type="button" className="btn-secondary text-[12px]">
-                  <ImgIcon className="w-3.5 h-3.5" />
-                  {settings.watermark.defaultLogoPath ? '更换' : '上传'} Logo
-                </button>
+                <div className="text-[10.5px] text-fg-3">在下方按品牌管理</div>
               </Row>
+              {/* 多品牌 Logo 管理(持久化到 settings.watermark.brandLogos) */}
+              <div className="space-y-1 mt-2 pt-2 border-t border-bg-1">
+                <div className="text-[10.5px] text-fg-2 font-medium mb-1">品牌 Logo · 按 EXIF 自动匹配</div>
+                {CAMERA_BRANDS.map((brand) => {
+                  const hasLogo = !!settings.watermark.brandLogos[brand.id]
+                  return (
+                    <div
+                      key={brand.id}
+                      className="flex items-center justify-between gap-2 px-2 py-1.5 rounded text-[11px] border border-transparent hover:bg-bg-1"
+                    >
+                      <span className="text-fg-2 font-medium">{brand.name}</span>
+                      <div className="flex items-center gap-2">
+                        {hasLogo && <span className="text-[9px] text-green-500">✓</span>}
+                        <button
+                          type="button"
+                          className="btn-secondary text-[10.5px] px-2 py-0.5"
+                          onClick={() => {
+                            const input = document.createElement('input')
+                            input.type = 'file'
+                            input.accept = 'image/png,image/jpeg,image/webp,image/svg+xml'
+                            input.onchange = async () => {
+                              const file = input.files?.[0]
+                              if (!file) return
+                              const filePath = (file as File & { path?: string }).path
+                              if (!filePath) return
+                              try {
+                                const dest = await ipc('frame:upload-logo', brand.id, filePath)
+                                update({
+                                  watermark: {
+                                    ...settings.watermark,
+                                    brandLogos: { ...settings.watermark.brandLogos, [brand.id]: dest },
+                                  },
+                                })
+                              } catch (err) {
+                                window.alert(`Logo 上传失败: ${(err as Error).message}`)
+                              }
+                            }
+                            input.click()
+                          }}
+                        >
+                          <ImgIcon className="w-3 h-3" />
+                          {hasLogo ? '更换' : '上传'}
+                        </button>
+                        {hasLogo && (
+                          <button
+                            type="button"
+                            className="text-fg-3 hover:text-red-400 text-[10.5px]"
+                            onClick={async () => {
+                              await ipc('frame:delete-logo', brand.id)
+                              const next = { ...settings.watermark.brandLogos }
+                              delete next[brand.id]
+                              update({ watermark: { ...settings.watermark, brandLogos: next } })
+                            }}
+                          >
+                            删除
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+                <div className="text-[9.5px] text-fg-3 leading-relaxed mt-1.5">
+                  边框渲染时自动按照片 EXIF 品牌匹配 · 未匹配到品牌时默认使用 Leica Logo 兜底
+                </div>
+              </div>
               <Row label="默认启用水印">
                 <Switch
                   checked={settings.watermark.enabledByDefault}
@@ -422,10 +485,14 @@ export default function Settings() {
                 />
               </Row>
               <Row label="清除缩略图缓存">
-                <button type="button" className="btn-secondary text-[11.5px]">清除</button>
+                <button type="button" className="btn-secondary text-[11.5px]">
+                  清除
+                </button>
               </Row>
               <Row label="导出全部数据">
-                <button type="button" className="btn-secondary text-[11.5px]">导出 .zip</button>
+                <button type="button" className="btn-secondary text-[11.5px]">
+                  导出 .zip
+                </button>
               </Row>
             </Section>
           )}

@@ -35,7 +35,7 @@ function defaultSettings(): AppSettings {
     watermark: {
       artistName: '',
       copyright: '',
-      defaultLogoPath: null,
+      brandLogos: {},
       defaultTemplateId: 'minimal-bar',
       enabledByDefault: false,
     },

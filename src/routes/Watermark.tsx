@@ -17,11 +17,11 @@
  *   - 所有 12 个边框风格都按横竖自适应渲染,字号按短边归一化
  *   - Editor / Batch 的水印流程仍走老 IPC(用户不感知)
  */
-import { Camera, Check, ImageIcon, Stamp, Trash2 } from 'lucide-react'
+import { Camera, Check, Stamp } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { CAMERA_BRANDS, matchBrandByMake } from '../../shared/frame-brands'
+import { matchBrandByMake } from '../../shared/frame-brands'
 import { DEFAULT_FRAME_SHOW_FIELDS } from '../../shared/frame-text'
-import type { FrameStyle, FrameStyleId, FrameStyleOverrides } from '../../shared/types'
+import type { AppSettings, FrameStyle, FrameStyleId, FrameStyleOverrides } from '../../shared/types'
 import { FramePreviewHost } from '../components/frame/FramePreviewHost'
 import { ipc } from '../lib/ipc'
 import { useAppStore } from '../stores/appStore'
@@ -52,8 +52,7 @@ function FrameTabBody({
   const [activeId, setActiveId] = useState<FrameStyleId>('ambient-glow')
   const [overrides, setOverrides] = useState<FrameStyleOverrides>({ showFields: DEFAULT_FRAME_SHOW_FIELDS })
   const [rendering, setRendering] = useState(false)
-  // 品牌 Logo 管理
-  const [brandLogos, setBrandLogos] = useState<Record<string, string>>({})
+  const [settings, setSettings] = useState<AppSettings | null>(null)
 
   useEffect(() => {
     ipc('frame:templates').then((list) => {
@@ -63,8 +62,8 @@ function FrameTabBody({
         setOverrides(list[0].defaultOverrides)
       }
     })
-    // 加载已上传的品牌 Logo
-    ipc('frame:list-logos').then(setBrandLogos)
+    // 加载全局设置(取品牌 Logo 映射)
+    ipc('settings:get').then(setSettings)
   }, [])
 
   useEffect(() => {
@@ -72,13 +71,14 @@ function FrameTabBody({
     if (s) setOverrides(s.defaultOverrides)
   }, [activeId, styles])
 
-  // 自动匹配品牌 Logo：根据当前照片的 EXIF make 查找对应品牌 Logo
+  // 自动匹配品牌 Logo：按 EXIF make 匹配 · 无 make 时默认 leica 兜底
   useEffect(() => {
-    if (!refPhoto) return
-    const brandId = matchBrandByMake(refPhoto.exif.make)
-    const logoPath = brandId ? brandLogos[brandId] : undefined
+    if (!settings) return
+    const brandLogos = settings.watermark.brandLogos ?? {}
+    const brandId = matchBrandByMake(refPhoto?.exif.make) ?? 'leica' // 无 make 默认 leica
+    const logoPath = brandLogos[brandId] ?? brandLogos.leica // 匹配不到也用 leica 兜底
     setOverrides((o) => ({ ...o, logoPath: logoPath ?? undefined }))
-  }, [refPhoto, brandLogos])
+  }, [refPhoto, settings])
 
   const activeStyle = styles.find((s) => s.id === activeId) ?? null
 
@@ -92,40 +92,6 @@ function FrameTabBody({
       window.alert(`边框渲染失败:${(err as Error).message}`)
     } finally {
       setRendering(false)
-    }
-  }
-
-  async function handleUploadLogo(brandId: string) {
-    // 使用 Electron dialog 选择文件(通过隐藏 input)
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = 'image/png,image/jpeg,image/webp,image/svg+xml'
-    input.onchange = async () => {
-      const file = input.files?.[0]
-      if (!file) return
-      // Electron 环境下 file.path 是绝对路径
-      const filePath = (file as File & { path?: string }).path
-      if (!filePath) return
-      try {
-        const dest = await ipc('frame:upload-logo', brandId, filePath)
-        setBrandLogos((prev) => ({ ...prev, [brandId]: dest }))
-      } catch (err) {
-        window.alert(`Logo 上传失败: ${(err as Error).message}`)
-      }
-    }
-    input.click()
-  }
-
-  async function handleDeleteLogo(brandId: string) {
-    try {
-      await ipc('frame:delete-logo', brandId)
-      setBrandLogos((prev) => {
-        const next = { ...prev }
-        delete next[brandId]
-        return next
-      })
-    } catch {
-      // ignore
     }
   }
 
@@ -227,60 +193,6 @@ function FrameTabBody({
             value={overrides.artistName ?? ''}
             onChange={(e) => setOverrides((o) => ({ ...o, artistName: e.target.value }))}
           />
-        </div>
-
-        {/* 品牌 Logo 管理 */}
-        <div>
-          <div className="text-[11px] text-fg-2 uppercase tracking-wider font-mono mb-1.5">品牌 Logo</div>
-          <div className="text-[10px] text-fg-3 mb-2">
-            上传对应品牌 Logo · 拍摄时自动按 EXIF 相机品牌匹配显示
-            {refPhoto?.exif.make && (
-              <span className="ml-1 text-brand-amber">
-                (当前: {matchBrandByMake(refPhoto.exif.make) ?? '未匹配'})
-              </span>
-            )}
-          </div>
-          <div className="space-y-1 max-h-48 overflow-y-auto">
-            {CAMERA_BRANDS.map((brand) => (
-              <div
-                key={brand.id}
-                className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded text-[11px] ${
-                  matchBrandByMake(refPhoto?.exif.make) === brand.id
-                    ? 'bg-brand-amber/10 border border-brand-amber/20'
-                    : 'border border-transparent hover:bg-bg-1'
-                }`}
-              >
-                <span className="text-fg-2 font-medium min-w-0 truncate">{brand.name}</span>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  {brandLogos[brand.id] ? (
-                    <>
-                      <span className="text-[9px] text-green-500">已上传</span>
-                      <button
-                        type="button"
-                        className="text-fg-3 hover:text-red-400 p-0.5"
-                        onClick={() => handleDeleteLogo(brand.id)}
-                        title="删除 Logo"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      type="button"
-                      className="text-fg-3 hover:text-brand-amber p-0.5"
-                      onClick={() => handleUploadLogo(brand.id)}
-                      title="上传 Logo"
-                    >
-                      <ImageIcon className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="text-[9.5px] text-fg-3 mt-1.5 leading-relaxed">
-            ⚠ GrainMark 不内置任何品牌 Logo · 请上传你已获授权的文件
-          </div>
         </div>
 
         <button
