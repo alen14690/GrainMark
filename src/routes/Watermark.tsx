@@ -49,7 +49,7 @@ function FrameTabBody({
 }: { refPhoto: ReturnType<typeof useAppStore.getState>['photos'][number] | null }) {
   const [styles, setStyles] = useState<FrameStyle[]>([])
   // 2026-05-01 默认选中第一个阶段 5 风格(玻璃拟态) · 老 'minimal-bar' 属于 classic 已不在公共列表
-  const [activeId, setActiveId] = useState<FrameStyleId>('frosted-glass')
+  const [activeId, setActiveId] = useState<FrameStyleId>('ambient-glow')
   const [overrides, setOverrides] = useState<FrameStyleOverrides>({ showFields: DEFAULT_FRAME_SHOW_FIELDS })
   const [rendering, setRendering] = useState(false)
 
@@ -230,8 +230,8 @@ function fieldLabel(k: string): string {
 // ============================================================================
 
 const GROUP_ORDER: readonly Exclude<FrameStyle['group'], 'classic'>[] = [
-  'glass',
   'ambient',
+  'glass',
   'cinema',
   'oil',
   'editorial',

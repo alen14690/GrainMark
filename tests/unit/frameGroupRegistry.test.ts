@@ -2,7 +2,7 @@
  * frameGroupRegistry — 阶段 5 · 分组元数据契约测试(2026-05-01)
  *
  * 2026-05-01 重要变更(用户反馈"经典那部分不要了"):
- *   - UI 层只展示阶段 5 的 23 个新风格(6 簇)
+ *   - UI 层只展示阶段 5 的 31 个新风格(6 簇)
  *   - classic 12 风格保留注册但不在公共列表
  *   - FRAME_STYLE_GROUPS_ORDERED 不含 'classic' · 只 6 个
  *
@@ -13,8 +13,8 @@
  *   G4 LABELS/SUBTITLES 对所有 FrameStyleGroup 都提供文案(含 classic 兜底)
  *   G5 getFrameStylesByGroup()默认过滤 classic · includeClassic:true 含全部
  *   G6 listPublicFrameStyles 总数 = 14(阶段 5 公开 · 防多/少注册)
- *   G7 阶段 5 的 23 个新 id 都已注册并归到对应 group
- *   G8 listFrameStyles 含 classic 的 26 个(12 老 + 23 新 · 防老 style 被误删)
+ *   G7 阶段 5 的 31 个新 id 都已注册并归到对应 group
+ *   G8 listFrameStyles 含 classic 的 26 个(12 老 + 31 新 · 防老 style 被误删)
  *   G9 蓝军:每个公共 group style 的竖图底栏专业水准 · 零边框风格豁免
  *   G10 蓝军:列表排序稳定
  *   G11 蓝军:registry 无 ESM 循环依赖(stage5 defaultOverrides 可读)
@@ -110,10 +110,10 @@ describe('FrameStyle 分组注册契约(阶段 5 · 2026-05-01)', () => {
   })
 
   it('G6 · listPublicFrameStyles 总数 = 14(阶段 5 公开数量 · 防漂移)', () => {
-    expect(listPublicFrameStyles().length).toBe(23)
+    expect(listPublicFrameStyles().length).toBe(31)
   })
 
-  it('G7 · 阶段 5 的 23 个新 id 都已注册并归到对应 group', () => {
+  it('G7 · 阶段 5 的 31 个新 id 都已注册并归到对应 group', () => {
     const byId = new Map(listFrameStyles().map((s) => [s.id, s]))
     const expectedStage5: Array<[FrameStyleId, FrameStyle['group']]> = [
       ['frosted-glass', 'glass'],
@@ -139,7 +139,7 @@ describe('FrameStyle 分组注册契约(阶段 5 · 2026-05-01)', () => {
   })
 
   it('G8 · listFrameStyles 总数 = 26(12 classic + 14 stage5 · 内部兼容老调用方)', () => {
-    expect(listFrameStyles().length).toBe(35)
+    expect(listFrameStyles().length).toBe(43)
   })
 
   it('G9 · 蓝军:每个公共 group style 竖图要么零边框 overlay 要么有真实边框', () => {
@@ -175,7 +175,7 @@ describe('FrameStyle 分组注册契约(阶段 5 · 2026-05-01)', () => {
 
   it('G11 · 蓝军:registry 模块加载无 ESM 循环依赖(stage5 的 defaultOverrides 可读)', async () => {
     const { STAGE5_STYLES } = await import('../../electron/services/frame/registry-stage5')
-    expect(STAGE5_STYLES.length).toBe(23)
+    expect(STAGE5_STYLES.length).toBe(31)
     for (const s of STAGE5_STYLES) {
       expect(
         s.defaultOverrides,

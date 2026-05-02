@@ -1079,8 +1079,8 @@ export function registerFrameStyle(style: FrameStyle): FrameStyle | null {
  * 注:'classic' 仍在 FrameStyleGroup 类型里(老 style 兼容),但不在公共展示顺序里。
  */
 export const FRAME_STYLE_GROUPS_ORDERED = [
-  'glass',
   'ambient',
+  'glass',
   'cinema',
   'oil',
   'editorial',

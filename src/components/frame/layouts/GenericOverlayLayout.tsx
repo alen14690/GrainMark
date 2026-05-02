@@ -137,6 +137,15 @@ function renderByStyleId(ctx: StageFiveContext): React.ReactNode {
       return renderAmbientDark(ctx)
     case 'ambient-gradient':
       return renderAmbientGradient(ctx)
+    case 'ambient-mist':
+    case 'ambient-twilight':
+    case 'ambient-ocean':
+    case 'ambient-forest':
+    case 'ambient-film':
+    case 'ambient-cream':
+    case 'ambient-rose':
+    case 'ambient-mono':
+      return renderAmbientColored(ctx)
     // cinema
     case 'cinema-scope':
       return renderCinemaScope(ctx)
@@ -213,11 +222,11 @@ function renderFrostedGlass(ctx: StageFiveContext) {
           bottom: `${containerHeight * 0.05}px`,
           padding: `${scale(0.018, ctx)}px ${scale(0.022, ctx)}px`,
           borderRadius: 14,
-          background: 'rgba(255, 255, 255, 0.18)',
-          backdropFilter: 'blur(24px) saturate(160%)',
-          WebkitBackdropFilter: 'blur(24px) saturate(160%)',
-          border: '1px solid rgba(255, 255, 255, 0.3)',
-          boxShadow: '0 8px 28px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.5)',
+          background: 'rgba(255, 255, 255, 0.08)',
+          backdropFilter: 'blur(20px) saturate(140%)',
+          WebkitBackdropFilter: 'blur(20px) saturate(140%)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3)',
           color: '#ffffff',
           zIndex: 10,
           fontFamily: "'Inter', system-ui, sans-serif",
@@ -283,9 +292,9 @@ function renderGlassChip(ctx: StageFiveContext) {
           alignItems: 'center',
           gap: 10,
           padding: `${scale(0.012, ctx)}px ${scale(0.018, ctx)}px ${scale(0.012, ctx)}px ${scale(0.01, ctx)}px`,
-          backdropFilter: 'blur(20px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-          background: 'rgba(20, 20, 20, 0.48)',
+          backdropFilter: 'blur(16px) saturate(140%)',
+          WebkitBackdropFilter: 'blur(16px) saturate(140%)',
+          background: 'rgba(20, 20, 20, 0.35)',
           border: '1px solid rgba(255,255,255,0.15)',
           borderRadius: 999,
           boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
@@ -808,6 +817,15 @@ function renderSwissGrid(ctx: StageFiveContext) {
   const { containerWidth, containerHeight, orientation } = ctx
   const captionH = (orientation === 'portrait' ? 0.22 : 0.18) * containerHeight
   const pad = containerWidth * 0.05
+  // swiss-grid 独立显示 lensModel · paramText 需要排除 lens 避免重复
+  const paramsNoLens = [
+    ctx.exif.focalLength ? `${ctx.exif.focalLength}mm` : null,
+    ctx.exif.fNumber ? `f/${ctx.exif.fNumber}` : null,
+    ctx.exif.exposureTime ? `${ctx.exif.exposureTime}s` : null,
+    ctx.exif.iso ? `ISO ${ctx.exif.iso}` : null,
+  ]
+    .filter(Boolean)
+    .join('  ·  ')
   return (
     <div style={{ position: 'absolute', inset: 0, background: '#F5F2EA' }}>
       {/* 照片(占据上半部分,留底部 caption) */}
@@ -895,7 +913,7 @@ function renderSwissGrid(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
-          {ctx.paramText || '—'}
+          {paramsNoLens || '—'}
         </div>
       </div>
     </div>
@@ -1031,11 +1049,11 @@ function renderGlassGradient(ctx: StageFiveContext) {
           padding: `${scale(0.018, ctx)}px ${scale(0.022, ctx)}px`,
           borderRadius: 14,
           background:
-            'linear-gradient(90deg, rgba(120,80,220,0.25), rgba(80,180,220,0.2), rgba(220,120,80,0.25))',
-          backdropFilter: 'blur(24px) saturate(160%)',
-          WebkitBackdropFilter: 'blur(24px) saturate(160%)',
-          border: '1px solid rgba(255, 255, 255, 0.3)',
-          boxShadow: '0 8px 28px rgba(0,0,0,0.35)',
+            'linear-gradient(90deg, rgba(120,80,220,0.12), rgba(80,180,220,0.1), rgba(220,120,80,0.12))',
+          backdropFilter: 'blur(20px) saturate(140%)',
+          WebkitBackdropFilter: 'blur(20px) saturate(140%)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
           color: '#ffffff',
           zIndex: 10,
         }}
@@ -1544,6 +1562,147 @@ function renderAmbientGradient(ctx: StageFiveContext) {
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: `${scale(0.013, ctx)}px`,
             color: 'rgba(255,220,180,0.75)',
+            marginTop: 3,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {ctx.paramText || '—'}
+        </div>
+      </div>
+    </>
+  )
+}
+
+// 8 个色调 ambient 变体共用的渲染函数
+const AMBIENT_COLOR_MAP: Record<
+  string,
+  { bg: string; filter: string; overlay: string; modelColor: string; paramColor: string }
+> = {
+  'ambient-mist': {
+    bg: '#0D1520',
+    filter: 'blur(60px) saturate(80%) brightness(0.5)',
+    overlay: 'rgba(13,21,32,0.5)',
+    modelColor: 'rgba(200,220,240,0.9)',
+    paramColor: 'rgba(160,190,220,0.7)',
+  },
+  'ambient-twilight': {
+    bg: '#1A0D1F',
+    filter: 'blur(60px) saturate(120%) brightness(0.5)',
+    overlay: 'rgba(26,13,31,0.4)',
+    modelColor: 'rgba(255,200,150,0.9)',
+    paramColor: 'rgba(200,160,200,0.7)',
+  },
+  'ambient-ocean': {
+    bg: '#060E18',
+    filter: 'blur(60px) saturate(100%) brightness(0.4)',
+    overlay: 'rgba(6,14,24,0.5)',
+    modelColor: 'rgba(150,200,240,0.9)',
+    paramColor: 'rgba(100,160,220,0.65)',
+  },
+  'ambient-forest': {
+    bg: '#081208',
+    filter: 'blur(60px) saturate(120%) brightness(0.4)',
+    overlay: 'rgba(8,18,8,0.5)',
+    modelColor: 'rgba(180,220,170,0.9)',
+    paramColor: 'rgba(140,180,130,0.65)',
+  },
+  'ambient-film': {
+    bg: '#080808',
+    filter: 'blur(50px) saturate(60%) brightness(0.3)',
+    overlay: 'rgba(8,8,8,0.6)',
+    modelColor: 'rgba(255,255,255,0.8)',
+    paramColor: 'rgba(255,255,255,0.45)',
+  },
+  'ambient-cream': {
+    bg: '#FDF8F0',
+    filter: 'blur(60px) saturate(80%) brightness(1.4)',
+    overlay: 'rgba(253,248,240,0.4)',
+    modelColor: '#3A3020',
+    paramColor: 'rgba(90,70,40,0.6)',
+  },
+  'ambient-rose': {
+    bg: '#1F0D14',
+    filter: 'blur(60px) saturate(140%) brightness(0.5)',
+    overlay: 'rgba(31,13,20,0.4)',
+    modelColor: 'rgba(255,200,210,0.9)',
+    paramColor: 'rgba(220,160,180,0.65)',
+  },
+  'ambient-mono': {
+    bg: '#0A0A0A',
+    filter: 'blur(60px) saturate(0%) brightness(0.4)',
+    overlay: 'rgba(10,10,10,0.5)',
+    modelColor: 'rgba(255,255,255,0.88)',
+    paramColor: 'rgba(255,255,255,0.5)',
+  },
+}
+
+function renderAmbientColored(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight, orientation, imageSrc } = ctx
+  const colors = AMBIENT_COLOR_MAP[ctx.styleId] ?? AMBIENT_COLOR_MAP['ambient-mist']!
+  const photoSide = orientation === 'portrait' ? 0.06 : 0.07
+  return (
+    <>
+      <div style={{ position: 'absolute', inset: 0, background: colors.bg, zIndex: 0 }} />
+      {imageSrc && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: `url(${imageSrc})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            filter: colors.filter,
+            transform: 'scale(1.5)',
+            zIndex: 1,
+          }}
+        />
+      )}
+      <div style={{ position: 'absolute', inset: 0, background: colors.overlay, zIndex: 2 }} />
+      <div
+        style={{
+          position: 'absolute',
+          top: containerHeight * 0.07,
+          left: containerWidth * photoSide,
+          right: containerWidth * photoSide,
+          bottom: containerHeight * (orientation === 'portrait' ? 0.2 : 0.16),
+          boxShadow: '0 20px 56px rgba(0,0,0,0.5)',
+          borderRadius: 3,
+          overflow: 'hidden',
+          zIndex: 3,
+          backgroundColor: '#000',
+        }}
+      >
+        <PhotoCover src={imageSrc} />
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          left: '10%',
+          right: '10%',
+          bottom: `${containerHeight * 0.05}px`,
+          textAlign: 'center',
+          zIndex: 5,
+        }}
+      >
+        <div
+          style={{
+            color: colors.modelColor,
+            fontSize: `${scale(orientation === 'portrait' ? 0.022 : 0.018, ctx)}px`,
+            fontWeight: 500,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {ctx.modelText || '—'}
+        </div>
+        <div
+          style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: `${scale(0.013, ctx)}px`,
+            color: colors.paramColor,
             marginTop: 3,
             whiteSpace: 'nowrap',
             overflow: 'hidden',

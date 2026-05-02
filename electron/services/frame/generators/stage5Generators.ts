@@ -443,7 +443,7 @@ const generateNeonEdge: FrameSvgGenerator = (ctx: FrameGeneratorContext) => {
 // ============================================================================
 
 const generateSwissGrid: FrameSvgGenerator = (ctx: FrameGeneratorContext) => {
-  const { geometry, modelLine, paramLine, exif, style } = ctx
+  const { geometry, modelLine, exif, style } = ctx
   const { canvasW, canvasH, layout, orientation } = geometry
   const me = minEdge(geometry)
   const fontTitle = me * (orientation === 'portrait' ? 0.034 : 0.028)
@@ -452,6 +452,16 @@ const generateSwissGrid: FrameSvgGenerator = (ctx: FrameGeneratorContext) => {
   const pad = canvasW * 0.05
   const captionBottom = canvasH * 0.04
   const lensText = (exif.lensModel ?? '').toUpperCase() || '—'
+  // swiss-grid 独立显示 lensModel · 参数行排除 lens 避免重复
+  const paramsNoLens =
+    [
+      exif.focalLength ? `${exif.focalLength}mm` : null,
+      exif.fNumber ? `f/${exif.fNumber}` : null,
+      exif.exposureTime ? `${exif.exposureTime}s` : null,
+      exif.iso ? `ISO ${exif.iso}` : null,
+    ]
+      .filter(Boolean)
+      .join('  ·  ') || '—'
   const lineY = canvasH - captionBottom - fontTitle - fontLens * 1.2 - 8
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}" height="${canvasH}" viewBox="0 0 ${canvasW} ${canvasH}">
   <!-- style=${ESC(style.id)} bg=${ESC(layout.backgroundColor)} -->
@@ -481,7 +491,7 @@ const generateSwissGrid: FrameSvgGenerator = (ctx: FrameGeneratorContext) => {
   ${drawText({
     x: canvasW - pad,
     y: canvasH - captionBottom - fontParam,
-    text: truncateByWidth(paramLine, canvasW * 0.38, fontParam, fontParam * 0.06),
+    text: truncateByWidth(paramsNoLens, canvasW * 0.38, fontParam, fontParam * 0.06),
     fontSizePx: fontParam,
     fontFamily: 'mono',
     color: '#444444',
@@ -781,6 +791,98 @@ const generateAmbientGradient: FrameSvgGenerator = (ctx: FrameGeneratorContext) 
 </svg>`
 }
 
+/** 共享：带色调渐变的 ambient generator（8 个新变体都走这个模式） */
+function makeAmbientColoredGenerator(opts: {
+  bgColor: string
+  gradId: string
+  gradStops: string
+  modelColor: string
+  paramColor: string
+}): FrameSvgGenerator {
+  return (ctx: FrameGeneratorContext) => {
+    const { geometry, modelLine, paramLine, style } = ctx
+    const { canvasW, canvasH, borderBottomPx, imgOffsetY, imgH } = geometry
+    const me = minEdge(geometry)
+    const fontModel = me * 0.018
+    const fontParam = me * 0.013
+    const plateTop = imgOffsetY + imgH
+    const centerY = plateTop + borderBottomPx / 2
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}" height="${canvasH}" viewBox="0 0 ${canvasW} ${canvasH}">
+  <!-- style=${ESC(style.id)} -->
+  <rect x="0" y="0" width="${canvasW}" height="${canvasH}" fill="${ESC(opts.bgColor)}"/>
+  <defs><radialGradient id="${opts.gradId}" cx="50%" cy="40%" r="60%">${opts.gradStops}</radialGradient></defs>
+  <rect x="0" y="0" width="${canvasW}" height="${canvasH}" fill="url(#${opts.gradId})"/>
+  ${drawText({ x: canvasW / 2, y: centerY - fontModel * 0.8, text: truncateByWidth(modelLine, canvasW * 0.8, fontModel), fontSizePx: fontModel, fontFamily: 'inter', color: opts.modelColor, weight: 500, align: 'center' })}
+  ${drawText({ x: canvasW / 2, y: centerY + fontParam * 0.5, text: truncateByWidth(paramLine, canvasW * 0.8, fontParam), fontSizePx: fontParam, fontFamily: 'mono', color: opts.paramColor, align: 'center' })}
+</svg>`
+  }
+}
+
+const generateAmbientMist = makeAmbientColoredGenerator({
+  bgColor: '#0D1520',
+  gradId: 'mist-g',
+  gradStops:
+    '<stop offset="0" stop-color="rgba(100,150,200,0.25)"/><stop offset="1" stop-color="rgba(13,21,32,0.7)"/>',
+  modelColor: 'rgba(200,220,240,0.9)',
+  paramColor: 'rgba(160,190,220,0.7)',
+})
+const generateAmbientTwilight = makeAmbientColoredGenerator({
+  bgColor: '#1A0D1F',
+  gradId: 'twi-g',
+  gradStops:
+    '<stop offset="0" stop-color="rgba(200,100,50,0.25)"/><stop offset="0.6" stop-color="rgba(120,60,140,0.2)"/><stop offset="1" stop-color="rgba(26,13,31,0.8)"/>',
+  modelColor: 'rgba(255,200,150,0.9)',
+  paramColor: 'rgba(200,160,200,0.7)',
+})
+const generateAmbientOcean = makeAmbientColoredGenerator({
+  bgColor: '#060E18',
+  gradId: 'ocean-g',
+  gradStops:
+    '<stop offset="0" stop-color="rgba(30,80,150,0.3)"/><stop offset="1" stop-color="rgba(6,14,24,0.8)"/>',
+  modelColor: 'rgba(150,200,240,0.9)',
+  paramColor: 'rgba(100,160,220,0.65)',
+})
+const generateAmbientForest = makeAmbientColoredGenerator({
+  bgColor: '#081208',
+  gradId: 'forest-g',
+  gradStops:
+    '<stop offset="0" stop-color="rgba(40,100,40,0.25)"/><stop offset="1" stop-color="rgba(8,18,8,0.8)"/>',
+  modelColor: 'rgba(180,220,170,0.9)',
+  paramColor: 'rgba(140,180,130,0.65)',
+})
+const generateAmbientFilm = makeAmbientColoredGenerator({
+  bgColor: '#080808',
+  gradId: 'film-g',
+  gradStops:
+    '<stop offset="0" stop-color="rgba(30,30,30,0.3)"/><stop offset="1" stop-color="rgba(8,8,8,0.9)"/>',
+  modelColor: 'rgba(255,255,255,0.8)',
+  paramColor: 'rgba(255,255,255,0.45)',
+})
+const generateAmbientCream = makeAmbientColoredGenerator({
+  bgColor: '#FDF8F0',
+  gradId: 'cream-g',
+  gradStops:
+    '<stop offset="0" stop-color="rgba(255,240,210,0.3)"/><stop offset="1" stop-color="rgba(253,248,240,0.5)"/>',
+  modelColor: '#3A3020',
+  paramColor: 'rgba(90,70,40,0.6)',
+})
+const generateAmbientRose = makeAmbientColoredGenerator({
+  bgColor: '#1F0D14',
+  gradId: 'rose-g',
+  gradStops:
+    '<stop offset="0" stop-color="rgba(180,60,100,0.2)"/><stop offset="1" stop-color="rgba(31,13,20,0.8)"/>',
+  modelColor: 'rgba(255,200,210,0.9)',
+  paramColor: 'rgba(220,160,180,0.65)',
+})
+const generateAmbientMono = makeAmbientColoredGenerator({
+  bgColor: '#0A0A0A',
+  gradId: 'mono-g',
+  gradStops:
+    '<stop offset="0" stop-color="rgba(60,60,60,0.3)"/><stop offset="1" stop-color="rgba(10,10,10,0.8)"/>',
+  modelColor: 'rgba(255,255,255,0.88)',
+  paramColor: 'rgba(255,255,255,0.5)',
+})
+
 // ============================================================================
 // CINEMA 扩展
 // ============================================================================
@@ -941,6 +1043,14 @@ export const STAGE5_GENERATORS = {
   'ambient-soft': generateAmbientSoft,
   'ambient-dark': generateAmbientDark,
   'ambient-gradient': generateAmbientGradient,
+  'ambient-mist': generateAmbientMist,
+  'ambient-twilight': generateAmbientTwilight,
+  'ambient-ocean': generateAmbientOcean,
+  'ambient-forest': generateAmbientForest,
+  'ambient-film': generateAmbientFilm,
+  'ambient-cream': generateAmbientCream,
+  'ambient-rose': generateAmbientRose,
+  'ambient-mono': generateAmbientMono,
   'cinema-scope': generateCinemaScope,
   'neon-edge': generateNeonEdge,
   'cinema-letterbox': generateCinemaLetterbox,
@@ -967,6 +1077,14 @@ export {
   generateAmbientSoft,
   generateAmbientDark,
   generateAmbientGradient,
+  generateAmbientMist,
+  generateAmbientTwilight,
+  generateAmbientOcean,
+  generateAmbientForest,
+  generateAmbientFilm,
+  generateAmbientCream,
+  generateAmbientRose,
+  generateAmbientMono,
   generateCinemaScope,
   generateNeonEdge,
   generateCinemaLetterbox,
