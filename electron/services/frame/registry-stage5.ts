@@ -445,6 +445,66 @@ const BOKEH_PILLAR: FrameStyle = {
 }
 
 // ============================================================================
+// AMBIENT 扩展(+8) · 圆角/阴影/玻璃/极光/霜雾/光圈/反射/暗角
+// ============================================================================
+
+const AMBIENT_ROUNDED: FrameStyle = {
+  id: 'ambient-rounded', name: '圆角氛围', description: '大圆角照片 + 深阴影浮起 · 柔和现代', group: 'ambient',
+  landscape: { borderTop: 0.05, borderBottom: 0.18, borderLeft: 0.08, borderRight: 0.08, backgroundColor: '#0D0D12', textColor: 'rgba(255,255,255,0.92)', slots: [{ id: 'model', area: 'bottom', anchor: { x: 0.5, y: 0.3 }, fontSize: 0.018, align: 'center', fontFamily: 'inter' }, { id: 'params', area: 'bottom', anchor: { x: 0.5, y: 0.7 }, fontSize: 0.013, align: 'center', fontFamily: 'mono', colorOverride: 'rgba(255,255,255,0.6)' }] },
+  portrait: { borderTop: 0.05, borderBottom: 0.22, borderLeft: 0.08, borderRight: 0.08, backgroundColor: '#0D0D12', textColor: 'rgba(255,255,255,0.92)', slots: [{ id: 'model', area: 'bottom', anchor: { x: 0.5, y: 0.25 }, fontSize: 0.022, align: 'center', fontFamily: 'inter' }, { id: 'params', area: 'bottom', anchor: { x: 0.5, y: 0.65 }, fontSize: 0.015, align: 'center', fontFamily: 'mono', colorOverride: 'rgba(255,255,255,0.6)' }] },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+const AMBIENT_ISLAND: FrameStyle = {
+  id: 'ambient-island', name: '浮岛阴影', description: '中圆角 + 超深阴影 · 照片如浮岛悬空 · 沉稳暗调', group: 'ambient',
+  landscape: { borderTop: 0.05, borderBottom: 0.16, borderLeft: 0.06, borderRight: 0.06, backgroundColor: '#080810', textColor: 'rgba(255,255,255,0.9)', slots: [{ id: 'model', area: 'bottom', anchor: { x: 0.5, y: 0.35 }, fontSize: 0.018, align: 'center', fontFamily: 'inter' }, { id: 'params', area: 'bottom', anchor: { x: 0.5, y: 0.7 }, fontSize: 0.013, align: 'center', fontFamily: 'mono', colorOverride: 'rgba(255,255,255,0.55)' }] },
+  portrait: { borderTop: 0.05, borderBottom: 0.2, borderLeft: 0.06, borderRight: 0.06, backgroundColor: '#080810', textColor: 'rgba(255,255,255,0.9)', slots: [{ id: 'model', area: 'bottom', anchor: { x: 0.5, y: 0.3 }, fontSize: 0.022, align: 'center', fontFamily: 'inter' }, { id: 'params', area: 'bottom', anchor: { x: 0.5, y: 0.65 }, fontSize: 0.015, align: 'center', fontFamily: 'mono', colorOverride: 'rgba(255,255,255,0.55)' }] },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+const AMBIENT_GLASS: FrameStyle = {
+  id: 'ambient-glass', name: '玻璃氛围', description: '氛围底色 + 底部圆角毛玻璃信息卡 · 融合 glass+ambient', group: 'ambient',
+  landscape: { borderTop: 0.04, borderBottom: 0.22, borderLeft: 0.05, borderRight: 0.05, backgroundColor: '#0A0A14', textColor: 'rgba(255,255,255,0.92)', slots: [{ id: 'model', area: 'bottom', anchor: { x: 0.5, y: 0.35 }, fontSize: 0.016, align: 'center', fontFamily: 'inter' }, { id: 'params', area: 'bottom', anchor: { x: 0.5, y: 0.7 }, fontSize: 0.012, align: 'center', fontFamily: 'mono', colorOverride: 'rgba(255,255,255,0.6)' }] },
+  portrait: { borderTop: 0.04, borderBottom: 0.26, borderLeft: 0.05, borderRight: 0.05, backgroundColor: '#0A0A14', textColor: 'rgba(255,255,255,0.92)', slots: [{ id: 'model', area: 'bottom', anchor: { x: 0.5, y: 0.3 }, fontSize: 0.02, align: 'center', fontFamily: 'inter' }, { id: 'params', area: 'bottom', anchor: { x: 0.5, y: 0.65 }, fontSize: 0.014, align: 'center', fontFamily: 'mono', colorOverride: 'rgba(255,255,255,0.6)' }] },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+const AMBIENT_AURORA: FrameStyle = {
+  id: 'ambient-aurora', name: '极光边缘', description: '旋转极光光晕 + 边缘辉光 · 科幻梦境感', group: 'ambient',
+  landscape: { borderTop: 0.06, borderBottom: 0.16, borderLeft: 0.07, borderRight: 0.07, backgroundColor: '#050510', textColor: 'rgba(255,255,255,0.9)', slots: [{ id: 'model', area: 'bottom', anchor: { x: 0.5, y: 0.35 }, fontSize: 0.018, align: 'center', fontFamily: 'inter' }, { id: 'params', area: 'bottom', anchor: { x: 0.5, y: 0.7 }, fontSize: 0.013, align: 'center', fontFamily: 'mono', colorOverride: 'rgba(255,255,255,0.55)' }] },
+  portrait: { borderTop: 0.06, borderBottom: 0.2, borderLeft: 0.07, borderRight: 0.07, backgroundColor: '#050510', textColor: 'rgba(255,255,255,0.9)', slots: [{ id: 'model', area: 'bottom', anchor: { x: 0.5, y: 0.3 }, fontSize: 0.022, align: 'center', fontFamily: 'inter' }, { id: 'params', area: 'bottom', anchor: { x: 0.5, y: 0.65 }, fontSize: 0.015, align: 'center', fontFamily: 'mono', colorOverride: 'rgba(255,255,255,0.55)' }] },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+const AMBIENT_FROST: FrameStyle = {
+  id: 'ambient-frost', name: '霜雾层叠', description: '大圆角 + 白描边 + 多层霜雾 · 冷调清晨感', group: 'ambient',
+  landscape: { borderTop: 0.05, borderBottom: 0.18, borderLeft: 0.06, borderRight: 0.06, backgroundColor: '#0C0C14', textColor: 'rgba(255,255,255,0.88)', slots: [{ id: 'model', area: 'bottom', anchor: { x: 0.5, y: 0.35 }, fontSize: 0.018, align: 'center', fontFamily: 'inter' }, { id: 'params', area: 'bottom', anchor: { x: 0.5, y: 0.7 }, fontSize: 0.013, align: 'center', fontFamily: 'mono', colorOverride: 'rgba(255,255,255,0.55)' }] },
+  portrait: { borderTop: 0.05, borderBottom: 0.22, borderLeft: 0.06, borderRight: 0.06, backgroundColor: '#0C0C14', textColor: 'rgba(255,255,255,0.88)', slots: [{ id: 'model', area: 'bottom', anchor: { x: 0.5, y: 0.28 }, fontSize: 0.022, align: 'center', fontFamily: 'inter' }, { id: 'params', area: 'bottom', anchor: { x: 0.5, y: 0.65 }, fontSize: 0.015, align: 'center', fontFamily: 'mono', colorOverride: 'rgba(255,255,255,0.55)' }] },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+const AMBIENT_BREATHE: FrameStyle = {
+  id: 'ambient-breathe', name: '呼吸光圈', description: '背景大圆形光环 · 照片被柔光环绕 · 静谧灵性', group: 'ambient',
+  landscape: { borderTop: 0.06, borderBottom: 0.18, borderLeft: 0.07, borderRight: 0.07, backgroundColor: '#080810', textColor: 'rgba(255,255,255,0.9)', slots: [{ id: 'model', area: 'bottom', anchor: { x: 0.5, y: 0.35 }, fontSize: 0.018, align: 'center', fontFamily: 'inter' }, { id: 'params', area: 'bottom', anchor: { x: 0.5, y: 0.7 }, fontSize: 0.013, align: 'center', fontFamily: 'mono', colorOverride: 'rgba(255,255,255,0.55)' }] },
+  portrait: { borderTop: 0.06, borderBottom: 0.22, borderLeft: 0.07, borderRight: 0.07, backgroundColor: '#080810', textColor: 'rgba(255,255,255,0.9)', slots: [{ id: 'model', area: 'bottom', anchor: { x: 0.5, y: 0.3 }, fontSize: 0.022, align: 'center', fontFamily: 'inter' }, { id: 'params', area: 'bottom', anchor: { x: 0.5, y: 0.65 }, fontSize: 0.015, align: 'center', fontFamily: 'mono', colorOverride: 'rgba(255,255,255,0.55)' }] },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+const AMBIENT_MIRROR: FrameStyle = {
+  id: 'ambient-mirror', name: '镜面反射', description: '照片下方倒影渐隐 · 玻璃桌面感 · 高级展示', group: 'ambient',
+  landscape: { borderTop: 0.04, borderBottom: 0.2, borderLeft: 0.06, borderRight: 0.06, backgroundColor: '#0A0A10', textColor: 'rgba(255,255,255,0.88)', slots: [{ id: 'model', area: 'bottom', anchor: { x: 0.5, y: 0.6 }, fontSize: 0.016, align: 'center', fontFamily: 'inter' }, { id: 'params', area: 'bottom', anchor: { x: 0.5, y: 0.85 }, fontSize: 0.012, align: 'center', fontFamily: 'mono', colorOverride: 'rgba(255,255,255,0.5)' }] },
+  portrait: { borderTop: 0.04, borderBottom: 0.24, borderLeft: 0.06, borderRight: 0.06, backgroundColor: '#0A0A10', textColor: 'rgba(255,255,255,0.88)', slots: [{ id: 'model', area: 'bottom', anchor: { x: 0.5, y: 0.55 }, fontSize: 0.02, align: 'center', fontFamily: 'inter' }, { id: 'params', area: 'bottom', anchor: { x: 0.5, y: 0.8 }, fontSize: 0.014, align: 'center', fontFamily: 'mono', colorOverride: 'rgba(255,255,255,0.5)' }] },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+const AMBIENT_VIGNETTE: FrameStyle = {
+  id: 'ambient-vignette', name: '暗角聚焦', description: '径向暗角 · 视觉聚焦中心 · 沉稳胶片暗房感', group: 'ambient',
+  landscape: { borderTop: 0.05, borderBottom: 0.16, borderLeft: 0.06, borderRight: 0.06, backgroundColor: '#080808', textColor: 'rgba(255,255,255,0.88)', slots: [{ id: 'model', area: 'bottom', anchor: { x: 0.5, y: 0.35 }, fontSize: 0.018, align: 'center', fontFamily: 'inter' }, { id: 'params', area: 'bottom', anchor: { x: 0.5, y: 0.7 }, fontSize: 0.013, align: 'center', fontFamily: 'mono', colorOverride: 'rgba(255,255,255,0.5)' }] },
+  portrait: { borderTop: 0.05, borderBottom: 0.2, borderLeft: 0.06, borderRight: 0.06, backgroundColor: '#080808', textColor: 'rgba(255,255,255,0.88)', slots: [{ id: 'model', area: 'bottom', anchor: { x: 0.5, y: 0.3 }, fontSize: 0.022, align: 'center', fontFamily: 'inter' }, { id: 'params', area: 'bottom', anchor: { x: 0.5, y: 0.65 }, fontSize: 0.015, align: 'center', fontFamily: 'mono', colorOverride: 'rgba(255,255,255,0.5)' }] },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+// ============================================================================
 // CINEMA(2) · 电影 / 霓虹
 // ============================================================================
 
@@ -638,70 +698,6 @@ const SWISS_GRID: FrameStyle = {
         align: 'left',
         fontFamily: 'mono',
         colorOverride: '#444444',
-      },
-    ],
-  },
-  defaultOverrides: DEFAULT_OVERRIDES,
-}
-
-const CONTACT_SHEET: FrameStyle = {
-  id: 'contact-sheet',
-  name: '印相小样',
-  description: '顶部胶卷橙带 · 底部参数多列网格 · KODAK 风',
-  group: 'editorial',
-  landscape: {
-    borderTop: 0.03, // 橙带高度
-    borderBottom: 0.16,
-    borderLeft: 0.04,
-    borderRight: 0.04,
-    backgroundColor: '#EDE8D9',
-    textColor: '#2A2A2A',
-    accentColor: '#D4A017', // 橙带色
-    slots: [
-      {
-        id: 'model',
-        area: 'top',
-        anchor: { x: 0.5, y: 0.5 },
-        fontSize: 0.011,
-        align: 'center',
-        fontFamily: 'courier',
-        colorOverride: '#3A2A00',
-      },
-      {
-        id: 'params',
-        area: 'bottom',
-        anchor: { x: 0.04, y: 0.5 },
-        fontSize: 0.013,
-        align: 'left',
-        fontFamily: 'courier',
-      },
-    ],
-  },
-  portrait: {
-    borderTop: 0.03,
-    borderBottom: 0.2,
-    borderLeft: 0.04,
-    borderRight: 0.04,
-    backgroundColor: '#EDE8D9',
-    textColor: '#2A2A2A',
-    accentColor: '#D4A017',
-    slots: [
-      {
-        id: 'model',
-        area: 'top',
-        anchor: { x: 0.5, y: 0.5 },
-        fontSize: 0.013,
-        align: 'center',
-        fontFamily: 'courier',
-        colorOverride: '#3A2A00',
-      },
-      {
-        id: 'params',
-        area: 'bottom',
-        anchor: { x: 0.04, y: 0.5 },
-        fontSize: 0.016,
-        align: 'left',
-        fontFamily: 'courier',
       },
     ],
   },
@@ -2134,6 +2130,225 @@ const STAMP_CORNER: FrameStyle = {
 }
 
 // ============================================================================
+
+// ============================================================================
+// SIMPLE · 简约经典
+// ============================================================================
+
+const WHITE_CLASSIC: FrameStyle = {
+  id: 'white-classic',
+  name: '经典白边',
+  description: '纯白底 · 底部居中品牌+机型+参数 · 最经典的摄影分享格式',
+  group: 'simple',
+  landscape: {
+    borderTop: 0.06, borderBottom: 0.18, borderLeft: 0.06, borderRight: 0.06,
+    backgroundColor: '#FFFFFF', textColor: '#1A1A1A',
+    slots: [
+      { id: 'model', area: 'bottom', anchor: { x: 0.5, y: 0.3 }, fontSize: 0.018, align: 'center', fontFamily: 'inter' },
+      { id: 'params', area: 'bottom', anchor: { x: 0.5, y: 0.7 }, fontSize: 0.013, align: 'center', fontFamily: 'mono', colorOverride: '#666666' },
+    ],
+  },
+  portrait: {
+    borderTop: 0.05, borderBottom: 0.2, borderLeft: 0.05, borderRight: 0.05,
+    backgroundColor: '#FFFFFF', textColor: '#1A1A1A',
+    slots: [
+      { id: 'model', area: 'bottom', anchor: { x: 0.5, y: 0.3 }, fontSize: 0.022, align: 'center', fontFamily: 'inter' },
+      { id: 'params', area: 'bottom', anchor: { x: 0.5, y: 0.7 }, fontSize: 0.015, align: 'center', fontFamily: 'mono', colorOverride: '#666666' },
+    ],
+  },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+const SEPARATOR_LINE: FrameStyle = {
+  id: 'separator-line',
+  name: '简约分隔线',
+  description: '白底 · 一条极细分隔线 · 左侧 Logo+机型 · 右侧参数',
+  group: 'simple',
+  landscape: {
+    borderTop: 0.04, borderBottom: 0.12, borderLeft: 0.04, borderRight: 0.04,
+    backgroundColor: '#FFFFFF', textColor: '#333333',
+    slots: [
+      { id: 'model', area: 'bottom', anchor: { x: 0.05, y: 0.6 }, fontSize: 0.015, align: 'left', fontFamily: 'inter' },
+      { id: 'params', area: 'bottom', anchor: { x: 0.95, y: 0.6 }, fontSize: 0.012, align: 'right', fontFamily: 'mono', colorOverride: '#888888' },
+    ],
+  },
+  portrait: {
+    borderTop: 0.04, borderBottom: 0.14, borderLeft: 0.04, borderRight: 0.04,
+    backgroundColor: '#FFFFFF', textColor: '#333333',
+    slots: [
+      { id: 'model', area: 'bottom', anchor: { x: 0.05, y: 0.55 }, fontSize: 0.018, align: 'left', fontFamily: 'inter' },
+      { id: 'params', area: 'bottom', anchor: { x: 0.95, y: 0.55 }, fontSize: 0.014, align: 'right', fontFamily: 'mono', colorOverride: '#888888' },
+    ],
+  },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+const ROUNDED_SHADOW: FrameStyle = {
+  id: 'rounded-shadow',
+  name: '圆角浮层',
+  description: '浅灰底 · 大圆角照片 · 深阴影浮起感 · 现代感强',
+  group: 'simple',
+  landscape: {
+    borderTop: 0.08, borderBottom: 0.16, borderLeft: 0.08, borderRight: 0.08,
+    backgroundColor: '#F0F0F0', textColor: '#333333',
+    slots: [
+      { id: 'model', area: 'bottom', anchor: { x: 0.5, y: 0.4 }, fontSize: 0.015, align: 'center', fontFamily: 'inter' },
+      { id: 'params', area: 'bottom', anchor: { x: 0.5, y: 0.7 }, fontSize: 0.012, align: 'center', fontFamily: 'mono', colorOverride: '#888888' },
+    ],
+  },
+  portrait: {
+    borderTop: 0.06, borderBottom: 0.18, borderLeft: 0.06, borderRight: 0.06,
+    backgroundColor: '#F0F0F0', textColor: '#333333',
+    slots: [
+      { id: 'model', area: 'bottom', anchor: { x: 0.5, y: 0.35 }, fontSize: 0.018, align: 'center', fontFamily: 'inter' },
+      { id: 'params', area: 'bottom', anchor: { x: 0.5, y: 0.7 }, fontSize: 0.014, align: 'center', fontFamily: 'mono', colorOverride: '#888888' },
+    ],
+  },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+const GRADIENT_BORDER: FrameStyle = {
+  id: 'gradient-border',
+  name: '渐变彩边',
+  description: '多彩渐变背景 · 照片居中 · 白色参数 · 年轻社交媒体风',
+  group: 'simple',
+  landscape: {
+    borderTop: 0.05, borderBottom: 0.14, borderLeft: 0.05, borderRight: 0.05,
+    backgroundColor: '#667eea', textColor: '#FFFFFF',
+    slots: [
+      { id: 'model', area: 'bottom', anchor: { x: 0.5, y: 0.4 }, fontSize: 0.015, align: 'center', fontFamily: 'inter' },
+      { id: 'params', area: 'bottom', anchor: { x: 0.5, y: 0.7 }, fontSize: 0.012, align: 'center', fontFamily: 'mono' },
+    ],
+  },
+  portrait: {
+    borderTop: 0.04, borderBottom: 0.16, borderLeft: 0.04, borderRight: 0.04,
+    backgroundColor: '#667eea', textColor: '#FFFFFF',
+    slots: [
+      { id: 'model', area: 'bottom', anchor: { x: 0.5, y: 0.35 }, fontSize: 0.018, align: 'center', fontFamily: 'inter' },
+      { id: 'params', area: 'bottom', anchor: { x: 0.5, y: 0.7 }, fontSize: 0.014, align: 'center', fontFamily: 'mono' },
+    ],
+  },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+const GEO_INFO: FrameStyle = {
+  id: 'geo-info',
+  name: '地理信息卡',
+  description: '白底 · 底部网格展示相机/位置/日期/天气 · 适合旅行记录',
+  group: 'simple',
+  landscape: {
+    borderTop: 0.04, borderBottom: 0.2, borderLeft: 0.04, borderRight: 0.04,
+    backgroundColor: '#FAFAFA', textColor: '#444444',
+    slots: [
+      { id: 'model', area: 'bottom', anchor: { x: 0.05, y: 0.2 }, fontSize: 0.013, align: 'left', fontFamily: 'inter' },
+      { id: 'params', area: 'bottom', anchor: { x: 0.05, y: 0.6 }, fontSize: 0.012, align: 'left', fontFamily: 'mono' },
+    ],
+  },
+  portrait: {
+    borderTop: 0.04, borderBottom: 0.22, borderLeft: 0.04, borderRight: 0.04,
+    backgroundColor: '#FAFAFA', textColor: '#444444',
+    slots: [
+      { id: 'model', area: 'bottom', anchor: { x: 0.05, y: 0.15 }, fontSize: 0.016, align: 'left', fontFamily: 'inter' },
+      { id: 'params', area: 'bottom', anchor: { x: 0.05, y: 0.55 }, fontSize: 0.014, align: 'left', fontFamily: 'mono' },
+    ],
+  },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+const MAGAZINE_COVER: FrameStyle = {
+  id: 'magazine-cover',
+  name: '杂志封面',
+  description: '照片全幅 · 底部渐变遮罩 · 大号衬线标题 · 杂志感十足',
+  group: 'editorial',
+  landscape: {
+    borderTop: 0, borderBottom: 0, borderLeft: 0, borderRight: 0,
+    backgroundColor: '#000000', textColor: '#FFFFFF',
+    slots: [
+      { id: 'model', area: 'overlay', anchor: { x: 0.05, y: 0.88 }, fontSize: 0.024, align: 'left', fontFamily: 'georgia' },
+      { id: 'params', area: 'overlay', anchor: { x: 0.05, y: 0.94 }, fontSize: 0.012, align: 'left', fontFamily: 'mono', colorOverride: 'rgba(255,255,255,0.6)' },
+    ],
+  },
+  portrait: {
+    borderTop: 0, borderBottom: 0, borderLeft: 0, borderRight: 0,
+    backgroundColor: '#000000', textColor: '#FFFFFF',
+    slots: [
+      { id: 'model', area: 'overlay', anchor: { x: 0.05, y: 0.86 }, fontSize: 0.028, align: 'left', fontFamily: 'georgia' },
+      { id: 'params', area: 'overlay', anchor: { x: 0.05, y: 0.93 }, fontSize: 0.014, align: 'left', fontFamily: 'mono', colorOverride: 'rgba(255,255,255,0.6)' },
+    ],
+  },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+const TRANSPARENT_OVERLAY: FrameStyle = {
+  id: 'transparent-overlay',
+  name: '透明浮动水印',
+  description: '无边框 · 照片全幅 · 右下角半透明毛玻璃小标 · 不破坏构图',
+  group: 'floating',
+  landscape: {
+    borderTop: 0, borderBottom: 0, borderLeft: 0, borderRight: 0,
+    backgroundColor: '#000000', textColor: '#FFFFFF',
+    slots: [
+      { id: 'model', area: 'overlay', anchor: { x: 0.95, y: 0.9 }, fontSize: 0.013, align: 'right', fontFamily: 'inter' },
+      { id: 'params', area: 'overlay', anchor: { x: 0.95, y: 0.95 }, fontSize: 0.01, align: 'right', fontFamily: 'mono', colorOverride: 'rgba(255,255,255,0.7)' },
+    ],
+  },
+  portrait: {
+    borderTop: 0, borderBottom: 0, borderLeft: 0, borderRight: 0,
+    backgroundColor: '#000000', textColor: '#FFFFFF',
+    slots: [
+      { id: 'model', area: 'overlay', anchor: { x: 0.95, y: 0.92 }, fontSize: 0.015, align: 'right', fontFamily: 'inter' },
+      { id: 'params', area: 'overlay', anchor: { x: 0.95, y: 0.96 }, fontSize: 0.012, align: 'right', fontFamily: 'mono', colorOverride: 'rgba(255,255,255,0.7)' },
+    ],
+  },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+const HALF_FRAME: FrameStyle = {
+  id: 'half-frame',
+  name: '半格双联',
+  description: '模拟半格相机 · 左右两张照片并排 · 底部机型参数',
+  group: 'collage',
+  landscape: {
+    borderTop: 0.02, borderBottom: 0.1, borderLeft: 0.02, borderRight: 0.02,
+    backgroundColor: '#1A1A1A', textColor: 'rgba(255,255,255,0.85)',
+    slots: [
+      { id: 'model', area: 'bottom', anchor: { x: 0.05, y: 0.5 }, fontSize: 0.012, align: 'left', fontFamily: 'mono' },
+      { id: 'params', area: 'bottom', anchor: { x: 0.95, y: 0.5 }, fontSize: 0.012, align: 'right', fontFamily: 'mono', colorOverride: 'rgba(255,255,255,0.6)' },
+    ],
+  },
+  portrait: {
+    borderTop: 0.02, borderBottom: 0.12, borderLeft: 0.02, borderRight: 0.02,
+    backgroundColor: '#1A1A1A', textColor: 'rgba(255,255,255,0.85)',
+    slots: [
+      { id: 'model', area: 'bottom', anchor: { x: 0.05, y: 0.45 }, fontSize: 0.014, align: 'left', fontFamily: 'mono' },
+      { id: 'params', area: 'bottom', anchor: { x: 0.95, y: 0.45 }, fontSize: 0.014, align: 'right', fontFamily: 'mono', colorOverride: 'rgba(255,255,255,0.6)' },
+    ],
+  },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
+const DIPTYCH: FrameStyle = {
+  id: 'diptych',
+  name: '双联拼图',
+  description: '白底 · 两张照片并排 · 底部统一参数 · 适合系列展示',
+  group: 'collage',
+  landscape: {
+    borderTop: 0.03, borderBottom: 0.1, borderLeft: 0.03, borderRight: 0.03,
+    backgroundColor: '#FFFFFF', textColor: '#666666',
+    slots: [
+      { id: 'model', area: 'bottom', anchor: { x: 0.5, y: 0.5 }, fontSize: 0.012, align: 'center', fontFamily: 'mono' },
+    ],
+  },
+  portrait: {
+    borderTop: 0.03, borderBottom: 0.12, borderLeft: 0.03, borderRight: 0.03,
+    backgroundColor: '#FFFFFF', textColor: '#666666',
+    slots: [
+      { id: 'model', area: 'bottom', anchor: { x: 0.5, y: 0.45 }, fontSize: 0.014, align: 'center', fontFamily: 'mono' },
+    ],
+  },
+  defaultOverrides: DEFAULT_OVERRIDES,
+}
+
 // 导出阶段 5 全部 14 个 style(供 registry.ts 批量 set)
 // ============================================================================
 
@@ -2163,16 +2378,36 @@ export const STAGE5_STYLES: readonly FrameStyle[] = [
   AMBIENT_CREAM,
   AMBIENT_ROSE,
   AMBIENT_MONO,
+  AMBIENT_ROUNDED,
+  AMBIENT_ISLAND,
+  AMBIENT_GLASS,
+  AMBIENT_AURORA,
+  AMBIENT_FROST,
+  AMBIENT_BREATHE,
+  AMBIENT_MIRROR,
+  AMBIENT_VIGNETTE,
   // cinema(4)
   CINEMA_SCOPE,
   NEON_EDGE,
   CINEMA_LETTERBOX,
   CINEMA_TIMESTAMP,
-  // editorial(3)
+  // editorial(2)
   SWISS_GRID,
-  CONTACT_SHEET,
   EDITORIAL_MINIMAL,
   // floating(2)
   FLOATING_CAPTION,
   STAMP_CORNER,
+  // simple(5)
+  WHITE_CLASSIC,
+  SEPARATOR_LINE,
+  ROUNDED_SHADOW,
+  GRADIENT_BORDER,
+  GEO_INFO,
+  // editorial(+1)
+  MAGAZINE_COVER,
+  // floating(+1)
+  TRANSPARENT_OVERLAY,
+  // collage(2)
+  HALF_FRAME,
+  DIPTYCH,
 ]

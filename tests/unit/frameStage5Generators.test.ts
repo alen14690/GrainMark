@@ -34,7 +34,6 @@ import {
   generateCinemaLetterbox,
   generateCinemaScope,
   generateCinemaTimestamp,
-  generateContactSheet,
   generateEditorialMinimal,
   generateFloatingCaption,
   generateFrostedGlass,
@@ -124,7 +123,6 @@ const CASES: GenCase[] = [
   { id: 'cinema-letterbox', gen: generateCinemaLetterbox, expectsModelInSvg: true, expectsParamInSvg: true },
   { id: 'cinema-timestamp', gen: generateCinemaTimestamp, expectsModelInSvg: true, expectsParamInSvg: true },
   { id: 'swiss-grid', gen: generateSwissGrid, expectsModelInSvg: true, expectsParamInSvg: true },
-  { id: 'contact-sheet', gen: generateContactSheet, expectsModelInSvg: true, expectsParamInSvg: false },
   {
     id: 'editorial-minimal',
     gen: generateEditorialMinimal,

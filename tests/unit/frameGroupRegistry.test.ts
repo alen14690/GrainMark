@@ -125,7 +125,6 @@ describe('FrameStyle 分组注册契约(阶段 5 · 2026-05-01)', () => {
       ['cinema-scope', 'cinema'],
       ['neon-edge', 'cinema'],
       ['swiss-grid', 'editorial'],
-      ['contact-sheet', 'editorial'],
       ['floating-caption', 'floating'],
       ['stamp-corner', 'floating'],
     ]

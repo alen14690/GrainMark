@@ -398,8 +398,10 @@ export type FrameStyleGroup =
   | 'oil' // 油画 / 水彩 —— serif italic + 纸质 noise
   | 'ambient' // 氛围模糊 —— 照片自身 blur 作底
   | 'cinema' // 电影 / 霓虹 —— 黑条幕 · 霓虹辉光
-  | 'editorial' // 印刷 / 杂志 —— swiss grid · contact sheet
-  | 'floating' // 浮动徽章 —— 外接浮卡 · 角章印戳
+  | 'editorial' // 印刷 / 杂志 —— swiss grid · magazine
+  | 'floating' // 浮动徽章 —— 外接浮卡 · 角章印戳 · 透明水印
+  | 'simple' // 简约经典 —— 白边 · 分隔线 · 圆角 · 渐变
+  | 'collage' // 拼接 —— 半格双联 · 双联拼图
 
 /** 每个 style 实例可被用户调整的部分 */
 export interface FrameStyleOverrides {
@@ -471,18 +473,35 @@ export type FrameStyleId =
   | 'ambient-cream'
   | 'ambient-rose'
   | 'ambient-mono'
+  | 'ambient-rounded'
+  | 'ambient-island'
+  | 'ambient-glass'
+  | 'ambient-aurora'
+  | 'ambient-frost'
+  | 'ambient-breathe'
+  | 'ambient-mirror'
+  | 'ambient-vignette'
   // cinema(4) · 电影 / 霓虹
   | 'cinema-scope'
   | 'neon-edge'
   | 'cinema-letterbox'
   | 'cinema-timestamp'
-  // editorial(3) · 印刷 / 杂志
+  // editorial(2) · 印刷 / 杂志
   | 'swiss-grid'
-  | 'contact-sheet'
   | 'editorial-minimal'
   // floating(2) · 浮动徽章
   | 'floating-caption'
   | 'stamp-corner'
+  // classic-new(9) · 经典/现代新增
+  | 'white-classic'
+  | 'separator-line'
+  | 'magazine-cover'
+  | 'transparent-overlay'
+  | 'rounded-shadow'
+  | 'half-frame'
+  | 'gradient-border'
+  | 'geo-info'
+  | 'diptych'
 
 // ============ AI 能力 ============
 

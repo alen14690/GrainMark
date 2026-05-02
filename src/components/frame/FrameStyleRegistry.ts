@@ -82,15 +82,35 @@ const LAYOUT_REGISTRY: Partial<Record<FrameStyleId, ComponentType<FrameLayoutPro
   'ambient-cream': GenericOverlayLayout,
   'ambient-rose': GenericOverlayLayout,
   'ambient-mono': GenericOverlayLayout,
+  'ambient-rounded': GenericOverlayLayout,
+  'ambient-island': GenericOverlayLayout,
+  'ambient-glass': GenericOverlayLayout,
+  'ambient-aurora': GenericOverlayLayout,
+  'ambient-frost': GenericOverlayLayout,
+  'ambient-breathe': GenericOverlayLayout,
+  'ambient-mirror': GenericOverlayLayout,
+  'ambient-vignette': GenericOverlayLayout,
   'cinema-scope': GenericOverlayLayout,
   'neon-edge': GenericOverlayLayout,
   'cinema-letterbox': GenericOverlayLayout,
   'cinema-timestamp': GenericOverlayLayout,
   'swiss-grid': GenericOverlayLayout,
-  'contact-sheet': GenericOverlayLayout,
   'editorial-minimal': GenericOverlayLayout,
   'floating-caption': GenericOverlayLayout,
   'stamp-corner': GenericOverlayLayout,
+  // simple(5)
+  'white-classic': GenericOverlayLayout,
+  'separator-line': GenericOverlayLayout,
+  'rounded-shadow': GenericOverlayLayout,
+  'gradient-border': GenericOverlayLayout,
+  'geo-info': GenericOverlayLayout,
+  // editorial(+1)
+  'magazine-cover': GenericOverlayLayout,
+  // floating(+1)
+  'transparent-overlay': GenericOverlayLayout,
+  // collage(2)
+  'half-frame': GenericOverlayLayout,
+  'diptych': GenericOverlayLayout,
 }
 
 /** 占位布局导出:给未注册的风格调用方手动 fallback 用(可选) */

@@ -1080,11 +1080,13 @@ export function registerFrameStyle(style: FrameStyle): FrameStyle | null {
  */
 export const FRAME_STYLE_GROUPS_ORDERED = [
   'ambient',
+  'simple',
   'glass',
   'cinema',
   'oil',
   'editorial',
   'floating',
+  'collage',
 ] as const satisfies readonly Exclude<FrameStyle['group'], 'classic'>[]
 
 /**
@@ -1095,23 +1097,27 @@ export const FRAME_STYLE_GROUPS_ORDERED = [
  */
 export const FRAME_STYLE_GROUP_LABELS: Record<FrameStyle['group'], string> = {
   classic: '经典', // 保留类型完整性 · UI 不展示
+  simple: '简约经典',
   glass: '玻璃拟态',
   oil: '油画 · 水彩',
   ambient: '氛围模糊',
   cinema: '电影 · 霓虹',
   editorial: '印刷 · 杂志',
   floating: '浮动徽章',
+  collage: '拼接',
 }
 
 /** 分组英文副标(UI 展示用,与 moodboard 页面一致) */
 export const FRAME_STYLE_GROUP_SUBTITLES: Record<FrameStyle['group'], string> = {
   classic: 'CLASSIC',
+  simple: 'SIMPLE · CLASSIC',
   glass: 'FROSTED GLASS',
   oil: 'OIL · WATERCOLOR',
   ambient: 'AMBIENT BLUR',
   cinema: 'CINEMA · NEON',
   editorial: 'EDITORIAL · PRINT',
   floating: 'FLOATING',
+  collage: 'COLLAGE',
 }
 
 /**
@@ -1126,12 +1132,14 @@ export function getFrameStylesByGroup(
 ): Record<FrameStyle['group'], FrameStyle[]> {
   const result = {
     classic: [] as FrameStyle[],
+    simple: [] as FrameStyle[],
     glass: [] as FrameStyle[],
     oil: [] as FrameStyle[],
     ambient: [] as FrameStyle[],
     cinema: [] as FrameStyle[],
     editorial: [] as FrameStyle[],
     floating: [] as FrameStyle[],
+    collage: [] as FrameStyle[],
   }
   const source = opts.includeClassic ? listFrameStyles() : listPublicFrameStyles()
   for (const style of source) {

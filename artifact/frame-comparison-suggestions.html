@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>边框效果补充建议 — GrainMark vs 边框水印大师</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, 'SF Pro Text', 'Inter', sans-serif;
+  background: #0A0B0F;
+  color: #E0E0E0;
+  padding: 40px 24px;
+  line-height: 1.6;
+}
+h1 { font-size: 24px; color: #fff; margin-bottom: 8px; }
+.subtitle { font-size: 14px; color: #888; margin-bottom: 40px; }
+.section { margin-bottom: 48px; }
+.section-title { font-size: 18px; color: #E8B86D; margin-bottom: 6px; font-weight: 600; }
+.section-desc { font-size: 13px; color: #888; margin-bottom: 20px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; }
+.card {
+  background: #14151A;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.card-preview {
+  aspect-ratio: 4/5;
+  position: relative;
+  overflow: hidden;
+}
+.card-info {
+  padding: 16px;
+}
+.card-name { font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+.card-desc { font-size: 12px; color: #888; }
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  margin-top: 8px;
+}
+.badge-new { background: rgba(76,175,80,0.15); color: #66BB6A; }
+.badge-hot { background: rgba(255,107,0,0.15); color: #FF8C42; }
+
+/* 照片占位 */
+.photo-placeholder {
+  width: 100%; height: 100%;
+  background: linear-gradient(135deg, #2C3E50 0%, #3498DB 50%, #2980B9 100%);
+  display: flex; align-items: center; justify-content: center;
+  color: rgba(255,255,255,0.3); font-size: 14px;
+}
+
+/* === 各效果样式 === */
+
+/* 1. 经典白边 */
+.style-white-border {
+  background: #fff;
+  padding: 8%;
+  display: flex; flex-direction: column; align-items: center;
+}
+.style-white-border .photo { width: 100%; flex: 1; background: linear-gradient(135deg, #2C3E50, #3498DB); border-radius: 0; }
+.style-white-border .meta {
+  margin-top: 5%;
+  text-align: center;
+  color: #1A1A1A;
+  font-family: 'Inter', sans-serif;
+}
+.style-white-border .meta .brand { font-size: 11px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; opacity: 0.6; }
+.style-white-border .meta .model { font-size: 13px; font-weight: 600; margin-top: 4px; }
+.style-white-border .meta .params { font-size: 10px; color: #666; margin-top: 3px; font-family: 'JetBrains Mono', monospace; }
+
+/* 2. 简约分隔线 */
+.style-separator {
+  background: #fff;
+  padding: 6% 6% 4%;
+  display: flex; flex-direction: column;
+}
+.style-separator .photo { width: 100%; flex: 1; background: linear-gradient(135deg, #2C3E50, #3498DB); }
+.style-separator .divider { width: 100%; height: 1px; background: #E0E0E0; margin: 4% 0; }
+.style-separator .meta {
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'Inter', sans-serif; color: #333;
+}
+.style-separator .meta .left { display: flex; align-items: center; gap: 8px; }
+.style-separator .meta .logo { width: 20px; height: 20px; background: #E63946; border-radius: 50%; }
+.style-separator .meta .model { font-size: 12px; font-weight: 600; }
+.style-separator .meta .params { font-size: 10px; color: #888; font-family: 'JetBrains Mono', monospace; }
+
+/* 3. 半格相机 */
+.style-half-frame {
+  background: #1A1A1A;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 3px;
+  padding: 3px;
+}
+.style-half-frame .photo { background: linear-gradient(135deg, #2C3E50, #3498DB); aspect-ratio: 2/3; }
+.style-half-frame .photo:nth-child(2) { background: linear-gradient(135deg, #8E44AD, #3498DB); }
+.style-half-frame .footer {
+  grid-column: 1 / -1;
+  padding: 8px 12px;
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 10px; color: #888; font-family: 'Courier New', monospace;
+}
+
+/* 4. 日历模板 */
+.style-calendar {
+  background: #FDF8F0;
+  padding: 5%;
+  display: flex; flex-direction: column; align-items: center;
+}
+.style-calendar .photo { width: 100%; flex: 1; background: linear-gradient(135deg, #2C3E50, #3498DB); border-radius: 4px; }
+.style-calendar .date-block {
+  margin-top: 5%;
+  text-align: center;
+  font-family: 'Georgia', serif;
+}
+.style-calendar .date-block .day { font-size: 36px; font-weight: 700; color: #1A1A1A; line-height: 1; }
+.style-calendar .date-block .month { font-size: 12px; color: #666; letter-spacing: 0.2em; text-transform: uppercase; margin-top: 2px; }
+.style-calendar .date-block .params { font-size: 9px; color: #999; margin-top: 8px; font-family: 'JetBrains Mono', monospace; }
+
+/* 5. 杂志封面 */
+.style-magazine {
+  background: #000;
+  position: relative;
+  display: flex; flex-direction: column;
+}
+.style-magazine .photo { width: 100%; flex: 1; background: linear-gradient(135deg, #2C3E50, #3498DB); }
+.style-magazine .overlay {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 20px;
+  background: linear-gradient(180deg, transparent, rgba(0,0,0,0.85));
+  color: #fff;
+}
+.style-magazine .overlay .title { font-size: 20px; font-weight: 700; font-family: 'Georgia', serif; letter-spacing: -0.02em; }
+.style-magazine .overlay .sub { font-size: 10px; color: rgba(255,255,255,0.6); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.15em; }
+.style-magazine .corner { position: absolute; top: 12px; right: 12px; font-size: 9px; color: rgba(255,255,255,0.5); font-family: 'Courier New', monospace; writing-mode: vertical-rl; }
+
+/* 6. 渐变色彩边框 */
+.style-gradient-border {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+  padding: 4%;
+  display: flex; flex-direction: column; align-items: center;
+}
+.style-gradient-border .photo { width: 100%; flex: 1; background: linear-gradient(135deg, #2C3E50, #3498DB); border-radius: 4px; }
+.style-gradient-border .meta {
+  margin-top: 4%;
+  text-align: center;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+.style-gradient-border .meta .model { font-size: 12px; font-weight: 600; }
+.style-gradient-border .meta .params { font-size: 10px; opacity: 0.8; margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
+
+/* 7. 透明水印（无边框） */
+.style-transparent {
+  position: relative;
+}
+.style-transparent .photo { width: 100%; height: 100%; background: linear-gradient(135deg, #2C3E50, #3498DB); }
+.style-transparent .watermark {
+  position: absolute; bottom: 12px; right: 12px;
+  background: rgba(0,0,0,0.4); backdrop-filter: blur(8px);
+  border-radius: 6px; padding: 6px 10px;
+  color: #fff; font-size: 10px;
+  font-family: 'Inter', sans-serif;
+}
+.style-transparent .watermark .model { font-weight: 600; }
+.style-transparent .watermark .params { opacity: 0.7; margin-top: 1px; font-family: 'JetBrains Mono', monospace; font-size: 9px; }
+
+/* 8. 地理信息边框 */
+.style-geo {
+  background: #FAFAFA;
+  padding: 5%;
+  display: flex; flex-direction: column;
+}
+.style-geo .photo { width: 100%; flex: 1; background: linear-gradient(135deg, #2C3E50, #3498DB); border-radius: 2px; }
+.style-geo .info {
+  margin-top: 4%;
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 8px; font-size: 10px; color: #444;
+}
+.style-geo .info .item { }
+.style-geo .info .label { font-size: 8px; color: #999; text-transform: uppercase; letter-spacing: 0.1em; }
+.style-geo .info .value { font-weight: 500; margin-top: 1px; }
+
+/* 9. 圆角阴影 */
+.style-rounded-shadow {
+  background: #F0F0F0;
+  padding: 8%;
+  display: flex; flex-direction: column; align-items: center;
+}
+.style-rounded-shadow .photo {
+  width: 100%; flex: 1;
+  background: linear-gradient(135deg, #2C3E50, #3498DB);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15), 0 8px 20px rgba(0,0,0,0.1);
+}
+.style-rounded-shadow .meta {
+  margin-top: 5%; text-align: center; color: #333;
+}
+.style-rounded-shadow .meta .model { font-size: 12px; font-weight: 500; }
+.style-rounded-shadow .meta .params { font-size: 10px; color: #888; margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
+
+/* 10. 拼图双联 */
+.style-diptych {
+  background: #fff;
+  padding: 3%;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 3px;
+}
+.style-diptych .photo { aspect-ratio: 3/4; background: linear-gradient(135deg, #2C3E50, #3498DB); }
+.style-diptych .photo:nth-child(2) { background: linear-gradient(135deg, #E74C3C, #F39C12); }
+.style-diptych .footer {
+  grid-column: 1 / -1;
+  padding: 8px 4px 0;
+  text-align: center;
+  font-size: 10px; color: #666;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.compare-table {
+  width: 100%; border-collapse: collapse; margin-top: 24px;
+  font-size: 13px;
+}
+.compare-table th, .compare-table td {
+  padding: 10px 14px; text-align: left;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.compare-table th { color: #E8B86D; font-weight: 500; }
+.compare-table .has { color: #66BB6A; }
+.compare-table .miss { color: #EF5350; }
+</style>
+</head>
+<body>
+
+<h1>边框效果补充建议</h1>
+<p class="subtitle">对比"边框水印大师"App，以下是 GrainMark 目前缺少但效果较好的边框风格样例</p>
+
+<!-- 对比表 -->
+<div class="section">
+  <div class="section-title">现有对比</div>
+  <div class="section-desc">✅ = GrainMark 已有 &nbsp; ❌ = 建议补充</div>
+  <table class="compare-table">
+    <tr><th>效果类型</th><th>边框水印大师</th><th>GrainMark</th><th>建议</th></tr>
+    <tr><td>品牌 Logo 水印</td><td class="has">✅</td><td class="has">✅</td><td>已有</td></tr>
+    <tr><td>氛围模糊背景</td><td class="has">✅</td><td class="has">✅（15个变体）</td><td>已有</td></tr>
+    <tr><td>玻璃底条</td><td class="has">✅</td><td class="has">✅（4个变体）</td><td>已有</td></tr>
+    <tr><td>电影黑条</td><td class="has">✅</td><td class="has">✅（4个变体）</td><td>已有</td></tr>
+    <tr><td>油画/水彩纸</td><td class="miss">❌</td><td class="has">✅（3个变体）</td><td>我们独有</td></tr>
+    <tr><td>经典白边 + 底部参数</td><td class="has">✅</td><td class="miss">❌</td><td>⭐ 建议补充</td></tr>
+    <tr><td>简约分隔线</td><td class="has">✅</td><td class="miss">❌</td><td>⭐ 建议补充</td></tr>
+    <tr><td>半格双图拼接</td><td class="has">✅</td><td class="miss">❌</td><td>⭐ 建议补充</td></tr>
+    <tr><td>日历/日期主题</td><td class="has">✅</td><td class="miss">❌</td><td>可选补充</td></tr>
+    <tr><td>杂志覆盖式</td><td class="has">✅</td><td class="miss">❌</td><td>⭐ 建议补充</td></tr>
+    <tr><td>渐变彩色边框</td><td class="has">✅</td><td class="miss">❌</td><td>可选补充</td></tr>
+    <tr><td>透明浮动水印（无边框）</td><td class="has">✅</td><td class="miss">❌</td><td>⭐ 建议补充</td></tr>
+    <tr><td>地理信息展示</td><td class="has">✅</td><td class="miss">❌</td><td>可选补充</td></tr>
+    <tr><td>圆角+大阴影</td><td class="has">✅</td><td class="miss">❌</td><td>⭐ 建议补充</td></tr>
+    <tr><td>双联/拼图</td><td class="has">✅</td><td class="miss">❌</td><td>可选补充</td></tr>
+  </table>
+</div>
+
+<!-- 效果样例 -->
+<div class="section">
+  <div class="section-title">⭐ 建议优先补充的效果样例</div>
+  <div class="section-desc">以下 6 个效果在同类 App 中热度最高，且与 GrainMark 现有风格差异化明显</div>
+
+  <div class="grid">
+    <!-- 1. 经典白边 -->
+    <div class="card">
+      <div class="card-preview">
+        <div class="style-white-border">
+          <div class="photo"></div>
+          <div class="meta">
+            <div class="brand">SONY</div>
+            <div class="model">ILCE-7SM3</div>
+            <div class="params">FE 70-200mm F2.8 GM OSS II</div>
+            <div class="params">200mm · f/5.6 · 1/125s · ISO 200</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-info">
+        <div class="card-name">经典白边</div>
+        <div class="card-desc">纯白底边框 · 底部居中品牌+机型+参数 · 最经典的摄影分享格式</div>
+        <span class="badge badge-hot">热度最高</span>
+      </div>
+    </div>
+
+    <!-- 2. 简约分隔线 -->
+    <div class="card">
+      <div class="card-preview">
+        <div class="style-separator">
+          <div class="photo"></div>
+          <div class="divider"></div>
+          <div class="meta">
+            <div class="left">
+              <div class="logo"></div>
+              <div class="model">SONY ILCE-7SM3</div>
+            </div>
+            <div class="params">200mm · f/5.6 · 1/125s</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-info">
+        <div class="card-name">简约分隔线</div>
+        <div class="card-desc">白底 · 一条极细分隔线 · 左侧Logo+机型 · 右侧参数 · 干净利落</div>
+        <span class="badge badge-hot">热度高</span>
+      </div>
+    </div>
+
+    <!-- 3. 杂志覆盖式 -->
+    <div class="card">
+      <div class="card-preview">
+        <div class="style-magazine">
+          <div class="photo"></div>
+          <div class="overlay">
+            <div class="title">SONY ILCE-7SM3</div>
+            <div class="sub">FE 70-200mm F2.8 · 200mm · f/5.6 · 1/125s · ISO 200</div>
+          </div>
+          <div class="corner">VOL.24</div>
+        </div>
+      </div>
+      <div class="card-info">
+        <div class="card-name">杂志封面</div>
+        <div class="card-desc">照片全幅 · 底部渐变遮罩 · 大号衬线标题 · 角落期号 · 杂志感十足</div>
+        <span class="badge badge-new">差异化</span>
+      </div>
+    </div>
+
+    <!-- 4. 透明浮动水印 -->
+    <div class="card">
+      <div class="card-preview">
+        <div class="style-transparent">
+          <div class="photo"></div>
+          <div class="watermark">
+            <div class="model">SONY ILCE-7SM3</div>
+            <div class="params">200mm · f/5.6 · 1/125s · ISO 200</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-info">
+        <div class="card-name">透明浮动水印</div>
+        <div class="card-desc">无边框 · 照片全幅显示 · 右下角半透明毛玻璃小标 · 不破坏构图</div>
+        <span class="badge badge-hot">最受欢迎</span>
+      </div>
+    </div>
+
+    <!-- 5. 圆角阴影 -->
+    <div class="card">
+      <div class="card-preview">
+        <div class="style-rounded-shadow">
+          <div class="photo"></div>
+          <div class="meta">
+            <div class="model">SONY ILCE-7SM3</div>
+            <div class="params">200mm · f/5.6 · 1/125s · ISO 200</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-info">
+        <div class="card-name">圆角浮层</div>
+        <div class="card-desc">浅灰底 · 大圆角照片 · 深阴影浮起感 · 底部简洁参数 · 现代感强</div>
+        <span class="badge badge-new">差异化</span>
+      </div>
+    </div>
+
+    <!-- 6. 半格双联 -->
+    <div class="card">
+      <div class="card-preview">
+        <div class="style-half-frame">
+          <div class="photo"></div>
+          <div class="photo"></div>
+          <div class="footer">
+            <span>SONY ILCE-7SM3</span>
+            <span>200mm · f/5.6 · 1/125s</span>
+          </div>
+        </div>
+      </div>
+      <div class="card-info">
+        <div class="card-name">半格双联</div>
+        <div class="card-desc">模拟半格相机 · 左右两张照片并排 · 底部机型参数 · 胶片感强</div>
+        <span class="badge badge-new">差异化</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 可选补充 -->
+<div class="section">
+  <div class="section-title">🔸 可选补充的效果样例</div>
+  <div class="section-desc">以下效果有一定用户需求，但优先级次于上面 6 个</div>
+
+  <div class="grid">
+    <!-- 日历 -->
+    <div class="card">
+      <div class="card-preview">
+        <div class="style-calendar">
+          <div class="photo"></div>
+          <div class="date-block">
+            <div class="day">17</div>
+            <div class="month">APRIL 2026</div>
+            <div class="params">SONY ILCE-7SM3 · 200mm · f/5.6</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-info">
+        <div class="card-name">日历主题</div>
+        <div class="card-desc">暖纸底色 · 大号日期数字 · 适合日常记录/朋友圈打卡</div>
+      </div>
+    </div>
+
+    <!-- 渐变彩色边框 -->
+    <div class="card">
+      <div class="card-preview">
+        <div class="style-gradient-border">
+          <div class="photo"></div>
+          <div class="meta">
+            <div class="model">SONY ILCE-7SM3</div>
+            <div class="params">200mm · f/5.6 · 1/125s · ISO 200</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-info">
+        <div class="card-name">渐变彩色边框</div>
+        <div class="card-desc">多彩渐变背景 · 照片居中 · 底部白色参数 · 年轻化/社交媒体风</div>
+      </div>
+    </div>
+
+    <!-- 地理信息 -->
+    <div class="card">
+      <div class="card-preview">
+        <div class="style-geo">
+          <div class="photo"></div>
+          <div class="info">
+            <div class="item"><div class="label">Camera</div><div class="value">SONY ILCE-7SM3</div></div>
+            <div class="item"><div class="label">Location</div><div class="value">39.9°N 116.4°E</div></div>
+            <div class="item"><div class="label">Date</div><div class="value">2026.04.17</div></div>
+            <div class="item"><div class="label">Weather</div><div class="value">☀️ 22°C</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="card-info">
+        <div class="card-name">地理信息卡</div>
+        <div class="card-desc">白底 · 底部网格展示相机/位置/日期/天气 · 适合旅行记录</div>
+      </div>
+    </div>
+
+    <!-- 拼图双联 -->
+    <div class="card">
+      <div class="card-preview">
+        <div class="style-diptych">
+          <div class="photo"></div>
+          <div class="photo"></div>
+          <div class="footer">SONY ILCE-7SM3 · 200mm · f/5.6 · 1/125s</div>
+        </div>
+      </div>
+      <div class="card-info">
+        <div class="card-name">双联拼图</div>
+        <div class="card-desc">白底 · 两张照片并排 · 底部统一参数 · 适合前后对比/系列展示</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 60px; padding: 24px; background: rgba(232,184,109,0.06); border-radius: 12px; border: 1px solid rgba(232,184,109,0.15);">
+  <div class="section-title" style="margin-bottom: 12px;">💡 补充建议总结</div>
+  <p style="font-size: 13px; color: #CCC; line-height: 1.8;">
+    <strong>优先补充（⭐ 推荐）</strong>：经典白边、简约分隔线、杂志封面、透明浮动水印、圆角浮层、半格双联<br>
+    <strong>可选补充</strong>：日历主题、渐变彩色边框、地理信息卡、双联拼图<br><br>
+    <strong>GrainMark 独有优势</strong>（对方没有的）：<br>
+    · 氛围模糊系列（15 个色调变体 — 对方仅有基础背景虚化）<br>
+    · 油画/水彩纸纹理系列<br>
+    · 霓虹辉光边<br>
+    · 电影时码/宽银幕多变体<br>
+    · 浮动徽章/角落印章<br>
+    · 瑞士网格印刷排版
+  </p>
+</div>
+
+</body>
+</html>

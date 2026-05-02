@@ -86,7 +86,9 @@ function FrameTabBody({
     if (!refPhoto?.path) return
     setRendering(true)
     try {
-      const url = await ipc('frame:render', refPhoto.path, activeId, overrides)
+      // 优先使用 thumbPath（已解码的 JPEG），避免 RAW 格式 Sharp 不支持
+      const renderPath = refPhoto.thumbPath ?? refPhoto.path
+      const url = await ipc('frame:render', renderPath, activeId, overrides)
       if (url) window.open(url, '_blank', 'width=1000,height=800')
     } catch (err) {
       window.alert(`边框渲染失败:${(err as Error).message}`)
@@ -96,9 +98,9 @@ function FrameTabBody({
   }
 
   return (
-    <div className="grid grid-cols-5 gap-5">
+    <div className="grid grid-cols-[240px_1fr_220px] gap-4 h-[calc(100vh-5rem)]">
       {/* 风格列表 · 按质感簇分组展示(2026-05-01) */}
-      <aside className="col-span-1 card p-3 max-h-[calc(100vh-6rem)] overflow-y-auto">
+      <aside className="card p-3 overflow-y-auto">
         <div className="text-[11px] text-fg-2 uppercase tracking-wider font-mono px-2 mb-2 sticky top-0 bg-bg-1 py-1 -my-1 z-10">
           边框风格 · {styles.length}
         </div>
@@ -113,7 +115,7 @@ function FrameTabBody({
               >
                 <span>{GROUP_LABELS[group]}</span>
                 <span className="text-fg-3 normal-case tracking-normal text-[9.5px]">
-                  {GROUP_SUBTITLES[group]} · {inGroup.length}
+                  {inGroup.length}
                 </span>
               </div>
               <div className="space-y-1">
@@ -140,8 +142,8 @@ function FrameTabBody({
       </aside>
 
       {/* 预览(FramePreviewHost 按 style.id 分派组件,彻底根治"切换无效") */}
-      <div className="col-span-3 card p-5">
-        <div className="text-[11px] text-fg-2 uppercase tracking-wider font-mono mb-3 flex items-center gap-2">
+      <div className="card p-4 flex flex-col overflow-hidden">
+        <div className="text-[11px] text-fg-2 uppercase tracking-wider font-mono mb-3 flex items-center gap-2 flex-shrink-0">
           <Stamp className="w-3.5 h-3.5" />
           预览 · {activeStyle?.name ?? '—'}
           {refPhoto?.exif.model && (
@@ -152,13 +154,13 @@ function FrameTabBody({
           )}
         </div>
 
-        <div className="aspect-[4/3] bg-bg-0 rounded-lg overflow-hidden">
+        <div className="flex-1 bg-bg-0 rounded-lg overflow-hidden min-h-0">
           <FramePreviewHost photo={refPhoto} style={activeStyle} overrides={overrides} />
         </div>
       </div>
 
       {/* 参数面板(字段可见性 / artistName) */}
-      <aside className="col-span-1 card p-4 space-y-4">
+      <aside className="card p-4 space-y-4 overflow-y-auto">
         <div>
           <div className="text-[11px] text-fg-2 uppercase tracking-wider font-mono mb-1.5">显示字段</div>
           <div className="space-y-1 text-[12px]">
@@ -242,27 +244,22 @@ function fieldLabel(k: string): string {
 
 const GROUP_ORDER: readonly Exclude<FrameStyle['group'], 'classic'>[] = [
   'ambient',
+  'simple',
   'glass',
   'cinema',
   'oil',
   'editorial',
   'floating',
+  'collage',
 ] as const
 
 const GROUP_LABELS: Record<Exclude<FrameStyle['group'], 'classic'>, string> = {
+  simple: '简约经典',
   glass: '玻璃拟态',
   oil: '油画 · 水彩',
   ambient: '氛围模糊',
   cinema: '电影 · 霓虹',
   editorial: '印刷 · 杂志',
   floating: '浮动徽章',
-}
-
-const GROUP_SUBTITLES: Record<Exclude<FrameStyle['group'], 'classic'>, string> = {
-  glass: 'FROSTED GLASS',
-  oil: 'OIL · WATERCOLOR',
-  ambient: 'AMBIENT BLUR',
-  cinema: 'CINEMA · NEON',
-  editorial: 'EDITORIAL · PRINT',
-  floating: 'FLOATING',
+  collage: '拼接',
 }

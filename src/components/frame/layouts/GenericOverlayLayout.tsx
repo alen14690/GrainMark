@@ -52,6 +52,14 @@ export function GenericOverlayLayout({
   // 所有阶段 5 风格都带独立 model slot(数据层 hasModelSlot=true) · 参数行排除 make/model
   const modelText = [photo.exif.make, photo.exif.model].filter(Boolean).join(' ').trim()
   const paramText = buildFrameParamLine(photo.exif, showFields, { excludeModelMake: true })
+  // 按逻辑分组：镜头型号独立一行，拍摄参数独立一行
+  const lensText = (showFields.lens && photo.exif.lensModel) ? photo.exif.lensModel : ''
+  const shootingParts: string[] = []
+  if (showFields.focalLength && photo.exif.focalLength) shootingParts.push(`${photo.exif.focalLength}mm`)
+  if (showFields.aperture && photo.exif.fNumber) shootingParts.push(`f/${photo.exif.fNumber}`)
+  if (showFields.shutter && photo.exif.exposureTime) shootingParts.push(`${photo.exif.exposureTime}s`)
+  if (showFields.iso && photo.exif.iso) shootingParts.push(`ISO ${photo.exif.iso}`)
+  const shootingText = shootingParts.join('  ·  ')
   const artistText = showFields.artist ? (overrides.artistName ?? photo.exif.artist ?? '') : ''
 
   const imageSrc = photo.thumbPath ? thumbSrc(photo) : undefined
@@ -71,9 +79,12 @@ export function GenericOverlayLayout({
     imageSrc,
     modelText,
     paramText,
+    lensText,
+    shootingText,
     artistText,
     exif: photo.exif,
     logoSrc,
+    photoAspect: (photo.width && photo.height) ? photo.width / photo.height : (resolvedOrientation === 'portrait' ? 2 / 3 : 3 / 2),
   }
 
   return (
@@ -106,9 +117,15 @@ interface StageFiveContext {
   imageSrc?: string
   modelText: string
   paramText: string
+  /** 镜头型号（独立一行） */
+  lensText: string
+  /** 拍摄参数：焦距 · 光圈 · 快门 · ISO（独立一行） */
+  shootingText: string
   artistText: string
   exif: PhotoExif
   logoSrc?: string
+  /** 照片原始宽高比 (width / height) · 用于动态计算照片容器避免留白或裁切 */
+  photoAspect: number
 }
 
 function renderByStyleId(ctx: StageFiveContext): React.ReactNode {
@@ -153,6 +170,22 @@ function renderByStyleId(ctx: StageFiveContext): React.ReactNode {
     case 'ambient-rose':
     case 'ambient-mono':
       return renderAmbientColored(ctx)
+    case 'ambient-rounded':
+      return renderAmbientRounded(ctx)
+    case 'ambient-island':
+      return renderAmbientIsland(ctx)
+    case 'ambient-glass':
+      return renderAmbientGlass(ctx)
+    case 'ambient-aurora':
+      return renderAmbientAurora(ctx)
+    case 'ambient-frost':
+      return renderAmbientFrost(ctx)
+    case 'ambient-breathe':
+      return renderAmbientBreathe(ctx)
+    case 'ambient-mirror':
+      return renderAmbientMirror(ctx)
+    case 'ambient-vignette':
+      return renderAmbientVignette(ctx)
     // cinema
     case 'cinema-scope':
       return renderCinemaScope(ctx)
@@ -165,15 +198,33 @@ function renderByStyleId(ctx: StageFiveContext): React.ReactNode {
     // editorial
     case 'swiss-grid':
       return renderSwissGrid(ctx)
-    case 'contact-sheet':
-      return renderContactSheet(ctx)
     case 'editorial-minimal':
       return renderEditorialMinimal(ctx)
+    case 'magazine-cover':
+      return renderMagazineCover(ctx)
     // floating
     case 'floating-caption':
       return renderFloatingCaption(ctx)
     case 'stamp-corner':
       return renderStampCorner(ctx)
+    case 'transparent-overlay':
+      return renderTransparentOverlay(ctx)
+    // simple
+    case 'white-classic':
+      return renderWhiteClassic(ctx)
+    case 'separator-line':
+      return renderSeparatorLine(ctx)
+    case 'rounded-shadow':
+      return renderRoundedShadow(ctx)
+    case 'gradient-border':
+      return renderGradientBorder(ctx)
+    case 'geo-info':
+      return renderGeoInfo(ctx)
+    // collage
+    case 'half-frame':
+      return renderHalfFrame(ctx)
+    case 'diptych':
+      return renderDiptych(ctx)
     default:
       return renderPlainPhoto(ctx)
   }
@@ -189,10 +240,83 @@ function PhotoCover({ src }: { src?: string }) {
     <img
       src={src}
       alt=""
-      className="absolute inset-0 w-full h-full object-cover"
       draggable={false}
-      style={{ zIndex: 1 }}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+        zIndex: 1,
+      }}
     />
+  )
+}
+
+/**
+ * 根据照片实际宽高比计算照片容器在给定可用区域内的最优尺寸
+ * 保证照片完整显示（不裁切、不留白）
+ *
+ * @param availW 可用宽度
+ * @param availH 可用高度
+ * @param photoAspect 照片宽高比 (w/h)
+ * @returns { width, height, offsetX, offsetY } 容器尺寸和居中偏移
+ */
+function photoFit(availW: number, availH: number, photoAspect: number) {
+  const areaAspect = availW / availH
+  let w: number
+  let h: number
+  if (photoAspect > areaAspect) {
+    // 照片更宽 → 宽度撑满，高度按比例缩小
+    w = availW
+    h = availW / photoAspect
+  } else {
+    // 照片更高 → 高度撑满，宽度按比例缩小
+    h = availH
+    w = availH * photoAspect
+  }
+  return {
+    width: Math.round(w),
+    height: Math.round(h),
+    offsetX: Math.round((availW - w) / 2),
+    offsetY: Math.round((availH - h) / 2),
+  }
+}
+
+/**
+ * 带宽高比自适应的照片容器
+ * 根据照片实际比例在可用区域内居中显示，不裁切不留白
+ */
+function FitPhotoBox({ ctx, top, left, right, bottom, shadow, radius, zIndex }: {
+  ctx: StageFiveContext
+  top: number
+  left: number
+  right: number
+  bottom: number
+  shadow?: string
+  radius?: number
+  zIndex?: number
+}) {
+  const availW = ctx.containerWidth - left - right
+  const availH = ctx.containerHeight - top - bottom
+  const pf = photoFit(availW, availH, ctx.photoAspect)
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top: top + pf.offsetY,
+        left: left + pf.offsetX,
+        width: pf.width,
+        height: pf.height,
+        boxShadow: shadow ?? 'none',
+        borderRadius: radius ?? 0,
+        overflow: 'hidden',
+        zIndex: zIndex ?? 2,
+        backgroundColor: '#000',
+      }}
+    >
+      <PhotoCover src={ctx.imageSrc} />
+    </div>
   )
 }
 
@@ -208,6 +332,110 @@ function renderPlainPhoto(ctx: StageFiveContext) {
 /** 计算与 minEdge 相对的字号 · 前端预览用 container minEdge 做比例参考 */
 function scale(ratio: number, ctx: StageFiveContext): number {
   return Math.max(Math.round(ratio * Math.min(ctx.containerWidth, ctx.containerHeight)), 8)
+}
+
+/**
+ * Logo + 机型文字的统一渲染组件
+ *
+ * 两种布局模式（由调用方根据可用空间决定）：
+ *   - 'top'（默认）：Logo 在机型文字正上方水平居中，适合有足够垂直空间的 caption 区域
+ *   - 'inline'：Logo 在机型文字左侧、与文字垂直居中，适合高度受限的底栏（glass/cinema 等）
+ *
+ * 使用 em 单位使 Logo 相对父元素字号自适应
+ */
+function LogoModel({ logoSrc, modelText, placement = 'top' }: {
+  logoSrc?: string
+  modelText: string
+  /** 'top' = Logo 在文字正上方居中; 'inline' = Logo 在文字左侧垂直居中 */
+  placement?: 'top' | 'inline'
+}) {
+  if (!logoSrc) {
+    return <>{modelText || '—'}</>
+  }
+  if (placement === 'inline') {
+    return (
+      <span
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '0.4em',
+        }}
+      >
+        <img
+          src={logoSrc}
+          alt=""
+          draggable={false}
+          style={{
+            height: '1.4em',
+            width: 'auto',
+            objectFit: 'contain',
+            opacity: 0.9,
+            flexShrink: 0,
+          }}
+        />
+        <span>{modelText || '—'}</span>
+      </span>
+    )
+  }
+  // placement === 'top': Logo 在文字正上方，整体宽度居中
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '0.3em',
+      }}
+    >
+      <img
+        src={logoSrc}
+        alt=""
+        draggable={false}
+        style={{
+          height: '1.8em',
+          width: 'auto',
+          objectFit: 'contain',
+          opacity: 0.9,
+        }}
+      />
+      <span>{modelText || '—'}</span>
+    </span>
+  )
+}
+
+/**
+ * 参数文本按逻辑分组显示为两行：
+ *   第 1 行：镜头型号（如 FE 70-200mm F2.8 GM OSS II）
+ *   第 2 行：拍摄参数（如 200mm · f/5.6 · 1/125s · ISO 200）
+ * 不随意折行，按语义分组换行
+ */
+function ParamLines({ lensText, shootingText, fontSize, color, letterSpacing, mono = true }: {
+  lensText: string
+  shootingText: string
+  fontSize: number
+  color?: string
+  letterSpacing?: string
+  mono?: boolean
+}) {
+  if (!lensText && !shootingText) return <div style={{ fontSize: `${fontSize}px`, color }}>—</div>
+  const baseStyle: React.CSSProperties = {
+    fontFamily: mono ? "'JetBrains Mono', monospace" : undefined,
+    fontSize: `${fontSize}px`,
+    color: color ?? 'inherit',
+    letterSpacing: letterSpacing ?? undefined,
+    lineHeight: 1.6,
+    textAlign: 'center',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    maxWidth: '100%',
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+      {lensText && <div style={baseStyle}>{lensText}</div>}
+      {shootingText && <div style={baseStyle}>{shootingText}</div>}
+    </div>
+  )
 }
 
 // ============================================================================
@@ -256,8 +484,9 @@ function renderFrostedGlass(ctx: StageFiveContext) {
         }}
       >
         <div style={{ flex: 1, minWidth: 0, color: '#fff', fontFamily: "'Inter', system-ui, sans-serif" }}>
-          <GlassLine size={scale(0.02, ctx)} weight={600}>{ctx.logoSrc && <img src={ctx.logoSrc} alt="" draggable={false} style={{ display: 'block', height: '2em', width: 'auto', margin: '0 auto 0.3em', objectFit: 'contain', opacity: 0.9 }} />}{ctx.modelText || '—'}</GlassLine>
-          <GlassLine size={scale(0.014, ctx)} color="rgba(255,255,255,0.75)" mono mt={2}>{ctx.paramText || '—'}</GlassLine>
+          <GlassLine size={scale(0.02, ctx)} weight={600}><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} placement="inline" /></GlassLine>
+          {ctx.lensText && <GlassLine size={scale(0.012, ctx)} color="rgba(255,255,255,0.7)" mono mt={2}>{ctx.lensText}</GlassLine>}
+          <GlassLine size={scale(0.012, ctx)} color="rgba(255,255,255,0.6)" mono mt={1}>{ctx.shootingText || '—'}</GlassLine>
         </div>
       </div>
     </div>
@@ -328,10 +557,10 @@ function renderGlassChip(ctx: StageFiveContext) {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.06)', borderRadius: 999, padding: `${scale(0.008, ctx)}px ${scale(0.014, ctx)}px`, border: '1px solid rgba(255,255,255,0.1)' }}>
-          <span style={{ width: scale(0.022, ctx), height: scale(0.022, ctx), borderRadius: '50%', background: 'linear-gradient(135deg, #ff8c42, #ff3a3a)', flexShrink: 0 }} />
           <div style={{ fontFamily: "'JetBrains Mono', monospace", minWidth: 0 }}>
-            <GlassLine size={scale(0.013, ctx)} weight={600}>{ctx.logoSrc && <img src={ctx.logoSrc} alt="" draggable={false} style={{ display: 'block', height: '2em', width: 'auto', margin: '0 auto 0.3em', objectFit: 'contain', opacity: 0.9 }} />}{ctx.modelText || '—'}</GlassLine>
-            <GlassLine size={scale(0.01, ctx)} color="rgba(255,255,255,0.7)" mt={1}>{ctx.paramText || '—'}</GlassLine>
+            <GlassLine size={scale(0.013, ctx)} weight={600}><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} placement="inline" /></GlassLine>
+            {ctx.lensText && <GlassLine size={scale(0.009, ctx)} color="rgba(255,255,255,0.65)" mt={1}>{ctx.lensText}</GlassLine>}
+            <GlassLine size={scale(0.009, ctx)} color="rgba(255,255,255,0.55)" mt={1}>{ctx.shootingText || '—'}</GlassLine>
           </div>
         </div>
       </div>
@@ -391,28 +620,11 @@ function renderOilTexture(ctx: StageFiveContext) {
             fontSize: `${scale(orientation === 'portrait' ? 0.034 : 0.03, ctx)}px`,
             fontWeight: 400,
             marginBottom: 4,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '100%',
+            lineHeight: 1.4,
           }}
-        >{ctx.logoSrc && <img src={ctx.logoSrc} alt="" draggable={false} style={{ display: 'block', height: '2em', width: 'auto', margin: '0 auto 0.3em', objectFit: 'contain', opacity: 0.9 }} />}{ctx.modelText || '—'}
+        ><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} />
         </div>
-        <div
-          style={{
-            fontFamily: "'Georgia', serif",
-            fontSize: `${scale(0.015, ctx)}px`,
-            color: '#7D6C4E',
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '100%',
-          }}
-        >
-          {ctx.paramText || '—'}
-        </div>
+        <ParamLines lensText={ctx.lensText} shootingText={ctx.shootingText} fontSize={scale(0.015, ctx)} color="#7D6C4E" letterSpacing="0.12em" mono={false} />
       </div>
     </>
   )
@@ -477,27 +689,11 @@ function renderWatercolorCaption(ctx: StageFiveContext) {
             fontSize: `${scale(orientation === 'portrait' ? 0.036 : 0.032, ctx)}px`,
             fontWeight: 400,
             marginBottom: 2,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '100%',
+            lineHeight: 1.4,
           }}
-        >{ctx.logoSrc && <img src={ctx.logoSrc} alt="" draggable={false} style={{ display: 'block', height: '2em', width: 'auto', margin: '0 auto 0.3em', objectFit: 'contain', opacity: 0.9 }} />}{ctx.modelText || '—'}
+        ><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} />
         </div>
-        <div
-          style={{
-            fontFamily: "'Georgia', serif",
-            fontStyle: 'italic',
-            fontSize: `${scale(0.016, ctx)}px`,
-            color: '#7D6C4E',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '100%',
-          }}
-        >
-          {ctx.paramText || '—'}
-        </div>
+        <ParamLines lensText={ctx.lensText} shootingText={ctx.shootingText} fontSize={scale(0.016, ctx)} color="#7D6C4E" mono={false} />
       </div>
     </>
   )
@@ -510,8 +706,9 @@ function renderWatercolorCaption(ctx: StageFiveContext) {
 function renderAmbientGlow(ctx: StageFiveContext) {
   const { containerWidth, containerHeight, orientation, imageSrc } = ctx
   const captionH = orientation === 'portrait' ? 0.2 : 0.14
-  const photoSide = orientation === 'portrait' ? 0.1 : 0.08
-  const photoTop = containerHeight * 0.06
+  const margin = containerWidth * 0.04
+  const topPad = containerHeight * 0.04
+  const bottomPad = containerHeight * captionH + containerHeight * 0.04
   return (
     <>
       {/* 背景 = 同张照片放大高斯模糊 */}
@@ -530,23 +727,8 @@ function renderAmbientGlow(ctx: StageFiveContext) {
         />
       )}
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 1 }} />
-      {/* 原图居中浮起(深阴影) */}
-      <div
-        style={{
-          position: 'absolute',
-          top: photoTop,
-          left: containerWidth * photoSide,
-          right: containerWidth * photoSide,
-          bottom: containerHeight * captionH + containerHeight * 0.06,
-          boxShadow: '0 18px 48px rgba(0,0,0,0.5)',
-          borderRadius: 2,
-          overflow: 'hidden',
-          zIndex: 2,
-          backgroundColor: '#000',
-        }}
-      >
-        <PhotoCover src={imageSrc} />
-      </div>
+      {/* 原图居中浮起 · 按照片比例自适应 */}
+      <FitPhotoBox ctx={ctx} top={topPad} left={margin} right={margin} bottom={bottomPad} shadow="0 18px 48px rgba(0,0,0,0.5)" radius={2} />
       {/* Caption */}
       <div
         style={{
@@ -570,36 +752,21 @@ function renderAmbientGlow(ctx: StageFiveContext) {
             fontSize: `${scale(orientation === 'portrait' ? 0.028 : 0.022, ctx)}px`,
             fontWeight: 500,
             letterSpacing: '0.05em',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '100%',
+            lineHeight: 1.4,
           }}
-        >{ctx.logoSrc && <img src={ctx.logoSrc} alt="" draggable={false} style={{ display: 'block', height: '2em', width: 'auto', margin: '0 auto 0.3em', objectFit: 'contain', opacity: 0.9 }} />}{ctx.modelText || '—'}
+        ><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} />
         </div>
-        <div
-          style={{
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: `${scale(0.016, ctx)}px`,
-            opacity: 0.8,
-            marginTop: 3,
-            letterSpacing: '0.06em',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '100%',
-          }}
-        >
-          {ctx.paramText || '—'}
-        </div>
+        <ParamLines lensText={ctx.lensText} shootingText={ctx.shootingText} fontSize={scale(0.016, ctx)} color="rgba(255,255,255,0.8)" letterSpacing="0.06em" />
       </div>
     </>
   )
 }
 
 function renderBokehPillar(ctx: StageFiveContext) {
-  const { containerWidth, containerHeight, orientation, imageSrc } = ctx
-  const pillarW = orientation === 'portrait' ? 0.2 : 0.15
+  const { containerWidth, containerHeight, imageSrc } = ctx
+  const margin = containerWidth * 0.04
+  const topPad = containerHeight * 0.04
+  const bottomPad = containerHeight * 0.1
   return (
     <>
       {imageSrc && (
@@ -617,23 +784,7 @@ function renderBokehPillar(ctx: StageFiveContext) {
         />
       )}
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1 }} />
-      {/* 中间原图柱 */}
-      <div
-        style={{
-          position: 'absolute',
-          top: `${containerHeight * 0.04}px`,
-          bottom: `${containerHeight * 0.1}px`,
-          left: `${containerWidth * pillarW}px`,
-          right: `${containerWidth * pillarW}px`,
-          boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
-          borderRadius: 2,
-          overflow: 'hidden',
-          zIndex: 2,
-          backgroundColor: '#000',
-        }}
-      >
-        <PhotoCover src={imageSrc} />
-      </div>
+      <FitPhotoBox ctx={ctx} top={topPad} left={margin} right={margin} bottom={bottomPad} shadow="0 20px 60px rgba(0,0,0,0.6)" radius={2} />
       {/* 底部左右两角小字 */}
       <div
         style={{
@@ -651,7 +802,7 @@ function renderBokehPillar(ctx: StageFiveContext) {
           overflow: 'hidden',
           textOverflow: 'ellipsis',
         }}
-      >{ctx.logoSrc && <img src={ctx.logoSrc} alt="" draggable={false} style={{ display: 'block', height: '2em', width: 'auto', margin: '0 auto 0.3em', objectFit: 'contain', opacity: 0.9 }} />}{ctx.modelText || '—'}
+      ><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} placement="inline" />
       </div>
       <div
         style={{
@@ -671,7 +822,7 @@ function renderBokehPillar(ctx: StageFiveContext) {
           textOverflow: 'ellipsis',
         }}
       >
-        {ctx.paramText || '—'}
+        {ctx.shootingText || '—'}
       </div>
     </>
   )
@@ -758,7 +909,7 @@ function renderCinemaScope(ctx: StageFiveContext) {
           maxWidth: '100%',
         }}
       >
-        {ctx.paramText || '—'}
+        {ctx.shootingText || '—'}
       </div>
     </div>
   )
@@ -812,18 +963,30 @@ function renderNeonEdge(ctx: StageFiveContext) {
             textOverflow: 'ellipsis',
             maxWidth: '100%',
           }}
-        >{ctx.logoSrc && <img src={ctx.logoSrc} alt="" draggable={false} style={{ display: 'block', height: '2em', width: 'auto', margin: '0 auto 0.3em', objectFit: 'contain', opacity: 0.9 }} />}{ctx.modelText || '—'}
+        ><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} placement="inline" />
         </div>
-        <div
+        {ctx.lensText && <div
           style={{
-            fontSize: `${scale(0.016, ctx)}px`,
+            fontSize: `${scale(0.014, ctx)}px`,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             maxWidth: '100%',
           }}
         >
-          {ctx.paramText || '—'}
+          {ctx.lensText}
+        </div>}
+        <div
+          style={{
+            fontSize: `${scale(0.013, ctx)}px`,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxWidth: '100%',
+            opacity: 0.8,
+          }}
+        >
+          {ctx.shootingText || '—'}
         </div>
       </div>
     </div>
@@ -838,15 +1001,6 @@ function renderSwissGrid(ctx: StageFiveContext) {
   const { containerWidth, containerHeight, orientation } = ctx
   const captionH = (orientation === 'portrait' ? 0.22 : 0.18) * containerHeight
   const pad = containerWidth * 0.05
-  // swiss-grid 独立显示 lensModel · paramText 需要排除 lens 避免重复
-  const paramsNoLens = [
-    ctx.exif.focalLength ? `${ctx.exif.focalLength}mm` : null,
-    ctx.exif.fNumber ? `f/${ctx.exif.fNumber}` : null,
-    ctx.exif.exposureTime ? `${ctx.exif.exposureTime}s` : null,
-    ctx.exif.iso ? `ISO ${ctx.exif.iso}` : null,
-  ]
-    .filter(Boolean)
-    .join('  ·  ')
   return (
     <div style={{ position: 'absolute', inset: 0, background: '#F5F2EA' }}>
       {/* 照片(占据上半部分,留底部 caption) */}
@@ -900,12 +1054,9 @@ function renderSwissGrid(ctx: StageFiveContext) {
               fontSize: `${scale(orientation === 'portrait' ? 0.034 : 0.028, ctx)}px`,
               letterSpacing: '-0.01em',
               marginBottom: 2,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              maxWidth: '100%',
+              lineHeight: 1.4,
             }}
-          >{ctx.logoSrc && <img src={ctx.logoSrc} alt="" draggable={false} style={{ display: 'block', height: '2em', width: 'auto', margin: '0 auto 0.3em', objectFit: 'contain', opacity: 0.9 }} />}{ctx.modelText || '—'}
+          ><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} />
           </div>
           <div
             style={{
@@ -929,128 +1080,15 @@ function renderSwissGrid(ctx: StageFiveContext) {
             color: '#444',
             letterSpacing: '0.06em',
             textAlign: orientation === 'portrait' ? 'left' : 'right',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '100%',
+            lineHeight: 1.6,
+            flexWrap: 'wrap',
           }}
         >
-          {paramsNoLens || '—'}
+          {ctx.shootingText || '—'}
         </div>
       </div>
     </div>
   )
-}
-
-function renderContactSheet(ctx: StageFiveContext) {
-  const { containerWidth, containerHeight, orientation } = ctx
-  const kodakBandH = containerHeight * 0.03
-  const captionH = (orientation === 'portrait' ? 0.2 : 0.16) * containerHeight
-  const pad = containerWidth * 0.04
-
-  const exifItems: Array<{ label: string; value: string }> = [
-    { label: 'CAMERA', value: ctx.exif.model || '—' },
-    { label: 'LENS', value: shortLens(ctx.exif.lensModel) },
-    { label: 'FOCAL', value: ctx.exif.focalLength ? `${ctx.exif.focalLength}mm` : '—' },
-    { label: 'APERTURE', value: ctx.exif.fNumber ? `f/${ctx.exif.fNumber}` : '—' },
-    { label: 'SHUTTER', value: ctx.exif.exposureTime || '—' },
-    { label: 'ISO', value: ctx.exif.iso ? `${ctx.exif.iso}` : '—' },
-  ]
-
-  return (
-    <div style={{ position: 'absolute', inset: 0, background: '#EDE8D9' }}>
-      {/* 顶部 KODAK 橙带 */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: kodakBandH,
-          background: '#D4A017',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontFamily: "'Courier New', monospace",
-          fontSize: `${Math.max(scale(0.01, ctx), 8)}px`,
-          letterSpacing: '0.3em',
-          fontWeight: 700,
-          color: '#3A2A00',
-          zIndex: 3,
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-        }}
-      >
-        KODAK GOLD 200 · {ctx.modelText || '—'}
-      </div>
-      {/* 照片 */}
-      <div
-        style={{
-          position: 'absolute',
-          top: kodakBandH + containerHeight * 0.02,
-          left: pad,
-          right: pad,
-          bottom: captionH,
-          overflow: 'hidden',
-          zIndex: 1,
-          backgroundColor: '#000',
-        }}
-      >
-        <PhotoCover src={ctx.imageSrc} />
-      </div>
-      {/* 底部参数 grid */}
-      <div
-        style={{
-          position: 'absolute',
-          left: pad,
-          right: pad,
-          bottom: containerHeight * 0.03,
-          display: 'grid',
-          gridTemplateColumns: orientation === 'portrait' ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
-          gap: `${scale(0.008, ctx)}px ${scale(0.016, ctx)}px`,
-          fontFamily: "'Courier New', monospace",
-          fontSize: `${scale(0.013, ctx)}px`,
-          color: '#2A2A2A',
-          zIndex: 5,
-        }}
-      >
-        {exifItems.map((item) => (
-          <div
-            key={item.label}
-            style={{
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              maxWidth: '100%',
-              lineHeight: 1.3,
-            }}
-          >
-            <span
-              style={{
-                fontSize: `${scale(0.01, ctx)}px`,
-                opacity: 0.55,
-                display: 'block',
-                textTransform: 'uppercase',
-                marginBottom: 2,
-                letterSpacing: '0.15em',
-                fontWeight: 700,
-              }}
-            >
-              {item.label}
-            </span>
-            <span>{item.value}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function shortLens(lens?: string): string {
-  if (!lens) return '—'
-  // "FE 70-200mm F2.8 GM OSS II" → "70-200mm F2.8"
-  const m = lens.match(/(\d+(?:-\d+)?mm(?:\s*F[\d.]+)?)/i)
-  return m?.[1] ?? lens.slice(0, 20)
 }
 
 // ============================================================================
@@ -1085,8 +1123,9 @@ function renderGlassGradient(ctx: StageFiveContext) {
         }}
       >
         <div style={{ flex: 1, minWidth: 0, color: '#fff', fontFamily: "'Inter', system-ui, sans-serif" }}>
-          <GlassLine size={scale(0.02, ctx)} weight={600}>{ctx.logoSrc && <img src={ctx.logoSrc} alt="" draggable={false} style={{ display: 'block', height: '2em', width: 'auto', margin: '0 auto 0.3em', objectFit: 'contain', opacity: 0.9 }} />}{ctx.modelText || '—'}</GlassLine>
-          <GlassLine size={scale(0.014, ctx)} color="rgba(255,255,255,0.75)" mono mt={2}>{ctx.paramText || '—'}</GlassLine>
+          <GlassLine size={scale(0.02, ctx)} weight={600}><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} placement="inline" /></GlassLine>
+          {ctx.lensText && <GlassLine size={scale(0.012, ctx)} color="rgba(255,255,255,0.7)" mono mt={2}>{ctx.lensText}</GlassLine>}
+          <GlassLine size={scale(0.012, ctx)} color="rgba(255,255,255,0.6)" mono mt={1}>{ctx.shootingText || '—'}</GlassLine>
         </div>
       </div>
     </div>
@@ -1122,8 +1161,9 @@ function renderGlassMinimal(ctx: StageFiveContext) {
         }}
       >
         <div style={{ flex: 1, minWidth: 0, color: '#fff' }}>
-          <GlassLine size={scale(0.012, ctx)} color="rgba(255,255,255,0.85)">{ctx.logoSrc && <img src={ctx.logoSrc} alt="" draggable={false} style={{ display: 'block', height: '2em', width: 'auto', margin: '0 auto 0.3em', objectFit: 'contain', opacity: 0.9 }} />}{ctx.modelText || '—'}</GlassLine>
-          <GlassLine size={scale(0.01, ctx)} color="rgba(255,255,255,0.55)" mt={1}>{ctx.paramText || '—'}</GlassLine>
+          <GlassLine size={scale(0.012, ctx)} color="rgba(255,255,255,0.85)"><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} placement="inline" /></GlassLine>
+          {ctx.lensText && <GlassLine size={scale(0.009, ctx)} color="rgba(255,255,255,0.5)" mt={1}>{ctx.lensText}</GlassLine>}
+          <GlassLine size={scale(0.009, ctx)} color="rgba(255,255,255,0.4)" mt={1}>{ctx.shootingText || '—'}</GlassLine>
         </div>
       </div>
     </div>
@@ -1174,26 +1214,11 @@ function renderOilClassic(ctx: StageFiveContext) {
             fontStyle: 'italic',
             fontSize: `${scale(0.02, ctx)}px`,
             marginBottom: 3,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '100%',
+            lineHeight: 1.4,
           }}
-        >{ctx.logoSrc && <img src={ctx.logoSrc} alt="" draggable={false} style={{ display: 'block', height: '2em', width: 'auto', margin: '0 auto 0.3em', objectFit: 'contain', opacity: 0.9 }} />}{ctx.modelText || '—'}
+        ><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} />
         </div>
-        <div
-          style={{
-            fontFamily: "'Georgia', serif",
-            fontSize: `${scale(0.013, ctx)}px`,
-            color: '#7D6C4E',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '100%',
-          }}
-        >
-          {ctx.paramText || '—'}
-        </div>
+        <ParamLines lensText={ctx.lensText} shootingText={ctx.shootingText} fontSize={scale(0.013, ctx)} color="#7D6C4E" mono={false} />
       </div>
     </div>
   )
@@ -1255,27 +1280,11 @@ function renderAmbientVinyl(ctx: StageFiveContext) {
           style={{
             fontSize: `${scale(orientation === 'portrait' ? 0.024 : 0.02, ctx)}px`,
             fontWeight: 500,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '100%',
+            lineHeight: 1.4,
           }}
-        >{ctx.logoSrc && <img src={ctx.logoSrc} alt="" draggable={false} style={{ display: 'block', height: '2em', width: 'auto', margin: '0 auto 0.3em', objectFit: 'contain', opacity: 0.9 }} />}{ctx.modelText || '—'}
+        ><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} />
         </div>
-        <div
-          style={{
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: `${scale(0.014, ctx)}px`,
-            opacity: 0.7,
-            marginTop: 3,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '100%',
-          }}
-        >
-          {ctx.paramText || '—'}
-        </div>
+        <ParamLines lensText={ctx.lensText} shootingText={ctx.shootingText} fontSize={scale(0.014, ctx)} color="rgba(255,255,255,0.7)" />
       </div>
     </>
   )
@@ -1301,22 +1310,7 @@ function renderAmbientAura(ctx: StageFiveContext) {
         />
       )}
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.2)', zIndex: 1 }} />
-      <div
-        style={{
-          position: 'absolute',
-          top: containerHeight * 0.08,
-          left: containerWidth * photoSide,
-          right: containerWidth * photoSide,
-          bottom: containerHeight * (orientation === 'portrait' ? 0.2 : 0.16),
-          boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
-          borderRadius: 4,
-          overflow: 'hidden',
-          zIndex: 2,
-          backgroundColor: '#000',
-        }}
-      >
-        <PhotoCover src={imageSrc} />
-      </div>
+      <FitPhotoBox ctx={ctx} top={containerHeight * 0.08} left={containerWidth * photoSide} right={containerWidth * photoSide} bottom={containerHeight * (orientation === 'portrait' ? 0.2 : 0.16)} shadow="0 24px 64px rgba(0,0,0,0.5)" radius={4} />
       <div
         style={{
           position: 'absolute',
@@ -1332,27 +1326,11 @@ function renderAmbientAura(ctx: StageFiveContext) {
           style={{
             fontSize: `${scale(orientation === 'portrait' ? 0.024 : 0.02, ctx)}px`,
             fontWeight: 500,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '100%',
+            lineHeight: 1.4,
           }}
-        >{ctx.logoSrc && <img src={ctx.logoSrc} alt="" draggable={false} style={{ display: 'block', height: '2em', width: 'auto', margin: '0 auto 0.3em', objectFit: 'contain', opacity: 0.9 }} />}{ctx.modelText || '—'}
+        ><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} />
         </div>
-        <div
-          style={{
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: `${scale(0.014, ctx)}px`,
-            opacity: 0.75,
-            marginTop: 3,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '100%',
-          }}
-        >
-          {ctx.paramText || '—'}
-        </div>
+        <ParamLines lensText={ctx.lensText} shootingText={ctx.shootingText} fontSize={scale(0.014, ctx)} color="rgba(255,255,255,0.75)" />
       </div>
     </>
   )
@@ -1380,22 +1358,7 @@ function renderAmbientSoft(ctx: StageFiveContext) {
           }}
         />
       )}
-      <div
-        style={{
-          position: 'absolute',
-          top: containerHeight * 0.08,
-          left: containerWidth * photoSide,
-          right: containerWidth * photoSide,
-          bottom: containerHeight * (orientation === 'portrait' ? 0.2 : 0.16),
-          boxShadow: '0 16px 48px rgba(0,0,0,0.1)',
-          borderRadius: 3,
-          overflow: 'hidden',
-          zIndex: 2,
-          backgroundColor: '#000',
-        }}
-      >
-        <PhotoCover src={imageSrc} />
-      </div>
+      <FitPhotoBox ctx={ctx} top={containerHeight * 0.08} left={containerWidth * photoSide} right={containerWidth * photoSide} bottom={containerHeight * (orientation === 'portrait' ? 0.2 : 0.16)} shadow="0 16px 48px rgba(0,0,0,0.1)" radius={3} />
       <div
         style={{
           position: 'absolute',
@@ -1411,27 +1374,11 @@ function renderAmbientSoft(ctx: StageFiveContext) {
           style={{
             fontSize: `${scale(orientation === 'portrait' ? 0.022 : 0.018, ctx)}px`,
             fontWeight: 500,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '100%',
+            lineHeight: 1.4,
           }}
-        >{ctx.logoSrc && <img src={ctx.logoSrc} alt="" draggable={false} style={{ display: 'block', height: '2em', width: 'auto', margin: '0 auto 0.3em', objectFit: 'contain', opacity: 0.9 }} />}{ctx.modelText || '—'}
+        ><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} />
         </div>
-        <div
-          style={{
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: `${scale(0.013, ctx)}px`,
-            color: '#888',
-            marginTop: 3,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '100%',
-          }}
-        >
-          {ctx.paramText || '—'}
-        </div>
+        <ParamLines lensText={ctx.lensText} shootingText={ctx.shootingText} fontSize={scale(0.013, ctx)} color="#888" />
       </div>
     </>
   )
@@ -1457,22 +1404,7 @@ function renderAmbientDark(ctx: StageFiveContext) {
         />
       )}
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(5,5,5,0.75)', zIndex: 1 }} />
-      <div
-        style={{
-          position: 'absolute',
-          top: containerHeight * 0.06,
-          left: containerWidth * photoSide,
-          right: containerWidth * photoSide,
-          bottom: containerHeight * (orientation === 'portrait' ? 0.18 : 0.14),
-          boxShadow: '0 20px 60px rgba(0,0,0,0.7)',
-          borderRadius: 2,
-          overflow: 'hidden',
-          zIndex: 2,
-          backgroundColor: '#000',
-        }}
-      >
-        <PhotoCover src={imageSrc} />
-      </div>
+      <FitPhotoBox ctx={ctx} top={containerHeight * 0.06} left={containerWidth * photoSide} right={containerWidth * photoSide} bottom={containerHeight * (orientation === 'portrait' ? 0.18 : 0.14)} shadow="0 20px 60px rgba(0,0,0,0.7)" radius={2} />
       <div
         style={{
           position: 'absolute',
@@ -1488,27 +1420,11 @@ function renderAmbientDark(ctx: StageFiveContext) {
             color: 'rgba(255,255,255,0.85)',
             fontSize: `${scale(orientation === 'portrait' ? 0.02 : 0.016, ctx)}px`,
             fontWeight: 400,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '100%',
+            lineHeight: 1.4,
           }}
-        >{ctx.logoSrc && <img src={ctx.logoSrc} alt="" draggable={false} style={{ display: 'block', height: '2em', width: 'auto', margin: '0 auto 0.3em', objectFit: 'contain', opacity: 0.9 }} />}{ctx.modelText || '—'}
+        ><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} />
         </div>
-        <div
-          style={{
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: `${scale(0.012, ctx)}px`,
-            color: 'rgba(255,255,255,0.5)',
-            marginTop: 3,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '100%',
-          }}
-        >
-          {ctx.paramText || '—'}
-        </div>
+        <ParamLines lensText={ctx.lensText} shootingText={ctx.shootingText} fontSize={scale(0.012, ctx)} color="rgba(255,255,255,0.5)" />
       </div>
     </>
   )
@@ -1552,22 +1468,7 @@ function renderAmbientGradient(ctx: StageFiveContext) {
           zIndex: 2,
         }}
       />
-      <div
-        style={{
-          position: 'absolute',
-          top: containerHeight * 0.06,
-          left: containerWidth * photoSide,
-          right: containerWidth * photoSide,
-          bottom: containerHeight * (orientation === 'portrait' ? 0.2 : 0.18),
-          boxShadow: '0 20px 56px rgba(0,0,0,0.5), 0 0 80px rgba(200,100,30,0.15)',
-          borderRadius: 3,
-          overflow: 'hidden',
-          zIndex: 3,
-          backgroundColor: '#000',
-        }}
-      >
-        <PhotoCover src={imageSrc} />
-      </div>
+      <FitPhotoBox ctx={ctx} top={containerHeight * 0.06} left={containerWidth * photoSide} right={containerWidth * photoSide} bottom={containerHeight * (orientation === 'portrait' ? 0.2 : 0.18)} shadow="0 20px 56px rgba(0,0,0,0.5), 0 0 80px rgba(200,100,30,0.15)" radius={3} zIndex={3} />
       <div
         style={{
           position: 'absolute',
@@ -1583,27 +1484,11 @@ function renderAmbientGradient(ctx: StageFiveContext) {
             color: 'rgba(255,255,255,0.92)',
             fontSize: `${scale(orientation === 'portrait' ? 0.022 : 0.018, ctx)}px`,
             fontWeight: 500,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '100%',
+            lineHeight: 1.4,
           }}
-        >{ctx.logoSrc && <img src={ctx.logoSrc} alt="" draggable={false} style={{ display: 'block', height: '2em', width: 'auto', margin: '0 auto 0.3em', objectFit: 'contain', opacity: 0.9 }} />}{ctx.modelText || '—'}
+        ><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} />
         </div>
-        <div
-          style={{
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: `${scale(0.013, ctx)}px`,
-            color: 'rgba(255,220,180,0.75)',
-            marginTop: 3,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '100%',
-          }}
-        >
-          {ctx.paramText || '—'}
-        </div>
+        <ParamLines lensText={ctx.lensText} shootingText={ctx.shootingText} fontSize={scale(0.013, ctx)} color="rgba(255,220,180,0.75)" />
       </div>
     </>
   )
@@ -1694,22 +1579,7 @@ function renderAmbientColored(ctx: StageFiveContext) {
         />
       )}
       <div style={{ position: 'absolute', inset: 0, background: colors.overlay, zIndex: 2 }} />
-      <div
-        style={{
-          position: 'absolute',
-          top: containerHeight * 0.07,
-          left: containerWidth * photoSide,
-          right: containerWidth * photoSide,
-          bottom: containerHeight * (orientation === 'portrait' ? 0.2 : 0.16),
-          boxShadow: '0 20px 56px rgba(0,0,0,0.5)',
-          borderRadius: 3,
-          overflow: 'hidden',
-          zIndex: 3,
-          backgroundColor: '#000',
-        }}
-      >
-        <PhotoCover src={imageSrc} />
-      </div>
+      <FitPhotoBox ctx={ctx} top={containerHeight * 0.07} left={containerWidth * photoSide} right={containerWidth * photoSide} bottom={containerHeight * (orientation === 'portrait' ? 0.2 : 0.16)} shadow="0 20px 56px rgba(0,0,0,0.5)" radius={3} zIndex={3} />
       <div
         style={{
           position: 'absolute',
@@ -1729,27 +1599,162 @@ function renderAmbientColored(ctx: StageFiveContext) {
             color: colors.modelColor,
             fontSize: `${scale(orientation === 'portrait' ? 0.022 : 0.018, ctx)}px`,
             fontWeight: 500,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '100%',
+            lineHeight: 1.4,
           }}
-        >{ctx.logoSrc && <img src={ctx.logoSrc} alt="" draggable={false} style={{ display: 'block', height: '2em', width: 'auto', margin: '0 auto 0.3em', objectFit: 'contain', opacity: 0.9 }} />}{ctx.modelText || '—'}
+        ><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} />
         </div>
-        <div
-          style={{
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: `${scale(0.013, ctx)}px`,
-            color: colors.paramColor,
-            marginTop: 3,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '100%',
-          }}
-        >
-          {ctx.paramText || '—'}
-        </div>
+        <ParamLines lensText={ctx.lensText} shootingText={ctx.shootingText} fontSize={scale(0.013, ctx)} color={colors.paramColor} />
+      </div>
+    </>
+  )
+}
+
+// ============================================================================
+// AMBIENT 新增 · 圆角/阴影/玻璃/极光/霜雾/光圈/反射/暗角
+// ============================================================================
+
+function renderAmbientRounded(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight, orientation, imageSrc } = ctx
+  const captionH = containerHeight * (orientation === 'portrait' ? 0.22 : 0.18)
+  const margin = containerWidth * 0.06
+  return (
+    <>
+      {imageSrc && <div style={{ position: 'absolute', inset: '-40px', backgroundImage: `url(${imageSrc})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(50px) saturate(140%) brightness(0.7)', zIndex: 0 }} />}
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 1 }} />
+      <FitPhotoBox ctx={ctx} top={containerHeight * 0.05} left={margin} right={margin} bottom={captionH} shadow="0 24px 80px rgba(0,0,0,0.6)" radius={20} />
+      <div style={{ position: 'absolute', left: '10%', right: '10%', bottom: containerHeight * 0.04, textAlign: 'center', zIndex: 5, color: 'rgba(255,255,255,0.92)' }}>
+        <div style={{ fontSize: `${scale(orientation === 'portrait' ? 0.022 : 0.018, ctx)}px`, fontWeight: 500, lineHeight: 1.4 }}><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} /></div>
+        <ParamLines lensText={ctx.lensText} shootingText={ctx.shootingText} fontSize={scale(0.013, ctx)} color="rgba(255,255,255,0.6)" />
+      </div>
+    </>
+  )
+}
+
+function renderAmbientIsland(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight, orientation, imageSrc } = ctx
+  const captionH = containerHeight * (orientation === 'portrait' ? 0.2 : 0.16)
+  const margin = containerWidth * 0.05
+  return (
+    <>
+      {imageSrc && <div style={{ position: 'absolute', inset: '-40px', backgroundImage: `url(${imageSrc})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(60px) saturate(120%) brightness(0.4)', zIndex: 0 }} />}
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.2)', zIndex: 1 }} />
+      <FitPhotoBox ctx={ctx} top={containerHeight * 0.05} left={margin} right={margin} bottom={captionH} shadow="0 30px 100px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.05)" radius={12} />
+      <div style={{ position: 'absolute', left: '10%', right: '10%', bottom: containerHeight * 0.04, textAlign: 'center', zIndex: 5, color: 'rgba(255,255,255,0.9)' }}>
+        <div style={{ fontSize: `${scale(orientation === 'portrait' ? 0.022 : 0.018, ctx)}px`, fontWeight: 500, lineHeight: 1.4 }}><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} /></div>
+        <ParamLines lensText={ctx.lensText} shootingText={ctx.shootingText} fontSize={scale(0.013, ctx)} color="rgba(255,255,255,0.55)" />
+      </div>
+    </>
+  )
+}
+
+function renderAmbientGlass(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight, orientation, imageSrc } = ctx
+  const glassH = containerHeight * (orientation === 'portrait' ? 0.2 : 0.18)
+  const margin = containerWidth * 0.04
+  return (
+    <>
+      {imageSrc && <div style={{ position: 'absolute', inset: '-40px', backgroundImage: `url(${imageSrc})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(40px) saturate(160%) brightness(0.6)', zIndex: 0 }} />}
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.2)', zIndex: 1 }} />
+      <FitPhotoBox ctx={ctx} top={containerHeight * 0.04} left={margin} right={margin} bottom={glassH + containerHeight * 0.03} shadow="0 20px 60px rgba(0,0,0,0.5)" radius={8} />
+      <div style={{ position: 'absolute', left: '4%', right: '4%', bottom: containerHeight * 0.025, height: glassH - containerHeight * 0.01, background: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 10, color: 'rgba(255,255,255,0.92)', padding: 12 }}>
+        <div style={{ fontSize: `${scale(0.016, ctx)}px`, fontWeight: 600, lineHeight: 1.4 }}><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} placement="inline" /></div>
+        <ParamLines lensText={ctx.lensText} shootingText={ctx.shootingText} fontSize={scale(0.011, ctx)} color="rgba(255,255,255,0.6)" />
+      </div>
+    </>
+  )
+}
+
+function renderAmbientAurora(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight, orientation, imageSrc } = ctx
+  const captionH = containerHeight * (orientation === 'portrait' ? 0.2 : 0.16)
+  const margin = containerWidth * 0.06
+  return (
+    <>
+      {imageSrc && <div style={{ position: 'absolute', inset: '-40px', backgroundImage: `url(${imageSrc})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(50px) saturate(150%) brightness(0.5)', zIndex: 0 }} />}
+      <div style={{ position: 'absolute', inset: '-30px', background: 'conic-gradient(from 45deg, rgba(120,80,220,0.2), rgba(80,200,220,0.15), rgba(255,120,80,0.15), rgba(120,80,220,0.2))', filter: 'blur(40px)', zIndex: 1 }} />
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 2 }} />
+      <FitPhotoBox ctx={ctx} top={containerHeight * 0.06} left={margin} right={margin} bottom={captionH} shadow="0 0 0 1px rgba(255,255,255,0.08), 0 20px 60px rgba(0,0,0,0.5), 0 0 50px rgba(120,80,220,0.15)" radius={6} zIndex={3} />
+      <div style={{ position: 'absolute', left: '10%', right: '10%', bottom: containerHeight * 0.04, textAlign: 'center', zIndex: 5, color: 'rgba(255,255,255,0.9)' }}>
+        <div style={{ fontSize: `${scale(orientation === 'portrait' ? 0.022 : 0.018, ctx)}px`, fontWeight: 500, lineHeight: 1.4 }}><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} /></div>
+        <ParamLines lensText={ctx.lensText} shootingText={ctx.shootingText} fontSize={scale(0.013, ctx)} color="rgba(255,255,255,0.55)" />
+      </div>
+    </>
+  )
+}
+
+function renderAmbientFrost(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight, orientation, imageSrc } = ctx
+  const captionH = containerHeight * (orientation === 'portrait' ? 0.22 : 0.18)
+  const margin = containerWidth * 0.05
+  const availW = containerWidth - margin * 2
+  const availH = containerHeight - containerHeight * 0.05 - captionH
+  const pf = photoFit(availW, availH, ctx.photoAspect)
+  return (
+    <>
+      {imageSrc && <div style={{ position: 'absolute', inset: '-40px', backgroundImage: `url(${imageSrc})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(70px) saturate(80%) brightness(0.5)', zIndex: 0 }} />}
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(180,200,230,0.03)', backdropFilter: 'blur(1px)', zIndex: 1 }} />
+      <div style={{ position: 'absolute', top: containerHeight * 0.05 + pf.offsetY, left: margin + pf.offsetX, width: pf.width, height: pf.height, borderRadius: 18, overflow: 'hidden', boxShadow: '0 16px 48px rgba(0,0,0,0.5)', border: '2px solid rgba(255,255,255,0.08)', zIndex: 2, backgroundColor: '#000' }}><PhotoCover src={imageSrc} /></div>
+      <div style={{ position: 'absolute', left: '10%', right: '10%', bottom: containerHeight * 0.04, textAlign: 'center', zIndex: 5, color: 'rgba(255,255,255,0.88)' }}>
+        <div style={{ fontSize: `${scale(orientation === 'portrait' ? 0.022 : 0.018, ctx)}px`, fontWeight: 500, lineHeight: 1.4 }}><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} /></div>
+        <ParamLines lensText={ctx.lensText} shootingText={ctx.shootingText} fontSize={scale(0.013, ctx)} color="rgba(255,255,255,0.55)" />
+      </div>
+    </>
+  )
+}
+
+function renderAmbientBreathe(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight, orientation, imageSrc } = ctx
+  const captionH = containerHeight * (orientation === 'portrait' ? 0.22 : 0.18)
+  const margin = containerWidth * 0.06
+  return (
+    <>
+      {imageSrc && <div style={{ position: 'absolute', inset: '-40px', backgroundImage: `url(${imageSrc})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(50px) saturate(140%) brightness(0.5)', zIndex: 0 }} />}
+      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -52%)', width: '80%', aspectRatio: '1', borderRadius: '50%', background: 'radial-gradient(circle, transparent 42%, rgba(100,160,240,0.06) 48%, rgba(100,160,240,0.1) 50%, rgba(100,160,240,0.06) 52%, transparent 58%)', boxShadow: '0 0 80px rgba(100,160,240,0.06)', zIndex: 1 }} />
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)', zIndex: 1 }} />
+      <FitPhotoBox ctx={ctx} top={containerHeight * 0.06} left={margin} right={margin} bottom={captionH} shadow="0 24px 70px rgba(0,0,0,0.5)" radius={4} />
+      <div style={{ position: 'absolute', left: '10%', right: '10%', bottom: containerHeight * 0.04, textAlign: 'center', zIndex: 5, color: 'rgba(255,255,255,0.9)' }}>
+        <div style={{ fontSize: `${scale(orientation === 'portrait' ? 0.022 : 0.018, ctx)}px`, fontWeight: 500, lineHeight: 1.4 }}><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} /></div>
+        <ParamLines lensText={ctx.lensText} shootingText={ctx.shootingText} fontSize={scale(0.013, ctx)} color="rgba(255,255,255,0.55)" />
+      </div>
+    </>
+  )
+}
+
+function renderAmbientMirror(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight, imageSrc } = ctx
+  const margin = containerWidth * 0.05
+  const captionH = containerHeight * 0.12
+  const reflectH = containerHeight * 0.1
+  const availW = containerWidth - margin * 2
+  const availH = containerHeight - containerHeight * 0.04 - reflectH - captionH - containerHeight * 0.02
+  const pf = photoFit(availW, availH, ctx.photoAspect)
+  return (
+    <>
+      {imageSrc && <div style={{ position: 'absolute', inset: '-40px', backgroundImage: `url(${imageSrc})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(50px) saturate(140%) brightness(0.4)', zIndex: 0 }} />}
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 1 }} />
+      <div style={{ position: 'absolute', top: containerHeight * 0.04 + pf.offsetY, left: margin + pf.offsetX, width: pf.width, height: pf.height, borderRadius: 4, overflow: 'hidden', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', zIndex: 2, backgroundColor: '#000' }}><PhotoCover src={imageSrc} /></div>
+      {/* 倒影 */}
+      <div style={{ position: 'absolute', top: containerHeight * 0.04 + pf.offsetY + pf.height + 4, left: margin + pf.offsetX, width: pf.width, height: reflectH, borderRadius: 4, overflow: 'hidden', transform: 'scaleY(-1)', opacity: 0.15, filter: 'blur(3px)', zIndex: 2, maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.5), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.5), transparent)' }}><PhotoCover src={imageSrc} /></div>
+      <div style={{ position: 'absolute', left: '10%', right: '10%', bottom: containerHeight * 0.03, textAlign: 'center', zIndex: 5, color: 'rgba(255,255,255,0.88)' }}>
+        <div style={{ fontSize: `${scale(0.016, ctx)}px`, fontWeight: 500, lineHeight: 1.4 }}><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} /></div>
+        <ParamLines lensText={ctx.lensText} shootingText={ctx.shootingText} fontSize={scale(0.011, ctx)} color="rgba(255,255,255,0.5)" />
+      </div>
+    </>
+  )
+}
+
+function renderAmbientVignette(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight, orientation, imageSrc } = ctx
+  const captionH = containerHeight * (orientation === 'portrait' ? 0.2 : 0.16)
+  const margin = containerWidth * 0.05
+  return (
+    <>
+      {imageSrc && <div style={{ position: 'absolute', inset: '-40px', backgroundImage: `url(${imageSrc})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(60px) saturate(100%) brightness(0.35)', zIndex: 0 }} />}
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at center, transparent 25%, rgba(0,0,0,0.7) 100%)', zIndex: 1 }} />
+      <FitPhotoBox ctx={ctx} top={containerHeight * 0.05} left={margin} right={margin} bottom={captionH} shadow="0 20px 60px rgba(0,0,0,0.6)" radius={3} />
+      <div style={{ position: 'absolute', left: '10%', right: '10%', bottom: containerHeight * 0.04, textAlign: 'center', zIndex: 5, color: 'rgba(255,255,255,0.88)' }}>
+        <div style={{ fontSize: `${scale(orientation === 'portrait' ? 0.022 : 0.018, ctx)}px`, fontWeight: 500, lineHeight: 1.4 }}><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} /></div>
+        <ParamLines lensText={ctx.lensText} shootingText={ctx.shootingText} fontSize={scale(0.013, ctx)} color="rgba(255,255,255,0.5)" />
       </div>
     </>
   )
@@ -1803,7 +1808,7 @@ function renderCinemaLetterbox(ctx: StageFiveContext) {
             textOverflow: 'ellipsis',
             maxWidth: '80%',
           }}
-        >{ctx.logoSrc && <img src={ctx.logoSrc} alt="" draggable={false} style={{ display: 'block', height: '2em', width: 'auto', margin: '0 auto 0.3em', objectFit: 'contain', opacity: 0.9 }} />}{ctx.modelText || '—'}
+        ><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} placement="inline" />
         </div>
         <div
           style={{
@@ -1816,7 +1821,7 @@ function renderCinemaLetterbox(ctx: StageFiveContext) {
             maxWidth: '80%',
           }}
         >
-          {ctx.paramText || '—'}
+          {ctx.shootingText || '—'}
         </div>
       </div>
     </div>
@@ -1849,7 +1854,7 @@ function renderCinemaTimestamp(ctx: StageFiveContext) {
             textOverflow: 'ellipsis',
             maxWidth: '100%',
           }}
-        >{ctx.logoSrc && <img src={ctx.logoSrc} alt="" draggable={false} style={{ display: 'block', height: '2em', width: 'auto', margin: '0 auto 0.3em', objectFit: 'contain', opacity: 0.9 }} />}{ctx.modelText || '—'}
+        ><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} placement="inline" />
         </div>
         <div
           style={{
@@ -1863,7 +1868,7 @@ function renderCinemaTimestamp(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
-          {ctx.paramText || '—'}
+          {ctx.shootingText || '—'}
         </div>
       </div>
     </>
@@ -1909,27 +1914,11 @@ function renderEditorialMinimal(ctx: StageFiveContext) {
           style={{
             fontFamily: "'Inter', system-ui, sans-serif",
             fontSize: `${scale(0.014, ctx)}px`,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '100%',
+            lineHeight: 1.4,
           }}
-        >{ctx.logoSrc && <img src={ctx.logoSrc} alt="" draggable={false} style={{ display: 'block', height: '2em', width: 'auto', margin: '0 auto 0.3em', objectFit: 'contain', opacity: 0.9 }} />}{ctx.modelText || '—'}
+        ><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} />
         </div>
-        <div
-          style={{
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: `${scale(0.011, ctx)}px`,
-            color: '#888',
-            marginTop: 2,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '100%',
-          }}
-        >
-          {ctx.paramText || '—'}
-        </div>
+        <ParamLines lensText={ctx.lensText} shootingText={ctx.shootingText} fontSize={scale(0.011, ctx)} color="#888" />
       </div>
     </div>
   )
@@ -1982,7 +1971,7 @@ function renderFloatingCaption(ctx: StageFiveContext) {
             textOverflow: 'ellipsis',
             maxWidth: '100%',
           }}
-        >{ctx.logoSrc && <img src={ctx.logoSrc} alt="" draggable={false} style={{ display: 'block', height: '2em', width: 'auto', margin: '0 auto 0.3em', objectFit: 'contain', opacity: 0.9 }} />}{ctx.modelText || '—'}
+        ><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} placement="inline" />
         </div>
         <div
           style={{
@@ -1996,7 +1985,7 @@ function renderFloatingCaption(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
-          {ctx.paramText || '—'}
+          {ctx.shootingText || '—'}
         </div>
       </div>
     </>
@@ -2031,7 +2020,7 @@ function renderStampCorner(ctx: StageFiveContext) {
             textOverflow: 'ellipsis',
             maxWidth: '100%',
           }}
-        >{ctx.logoSrc && <img src={ctx.logoSrc} alt="" draggable={false} style={{ display: 'block', height: '2em', width: 'auto', margin: '0 auto 0.3em', objectFit: 'contain', opacity: 0.9 }} />}{ctx.modelText || '—'}
+        ><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} placement="inline" />
         </div>
         <div
           style={{
@@ -2045,9 +2034,180 @@ function renderStampCorner(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
-          {ctx.paramText || '—'}
+          {ctx.shootingText || '—'}
         </div>
       </div>
     </>
+  )
+}
+
+// ============================================================================
+// SIMPLE · 简约经典（新增 5 个）
+// ============================================================================
+
+function renderWhiteClassic(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight, orientation } = ctx
+  const pad = containerWidth * 0.06
+  const captionH = containerHeight * (orientation === 'portrait' ? 0.2 : 0.18)
+  return (
+    <div style={{ position: 'absolute', inset: 0, background: '#FFFFFF' }}>
+      <FitPhotoBox ctx={ctx} top={pad} left={pad} right={pad} bottom={captionH} />
+      <div style={{ position: 'absolute', left: '10%', right: '10%', bottom: containerHeight * 0.04, textAlign: 'center', zIndex: 5, color: '#1A1A1A' }}>
+        <div style={{ fontSize: `${scale(orientation === 'portrait' ? 0.022 : 0.018, ctx)}px`, fontWeight: 600, lineHeight: 1.4 }}>
+          <LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} />
+        </div>
+        <ParamLines lensText={ctx.lensText} shootingText={ctx.shootingText} fontSize={scale(0.013, ctx)} color="#666" />
+      </div>
+    </div>
+  )
+}
+
+function renderSeparatorLine(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight, orientation } = ctx
+  const pad = containerWidth * 0.05
+  const captionH = containerHeight * (orientation === 'portrait' ? 0.14 : 0.12)
+  return (
+    <div style={{ position: 'absolute', inset: 0, background: '#FFFFFF' }}>
+      <FitPhotoBox ctx={ctx} top={containerHeight * 0.04} left={pad} right={pad} bottom={captionH} />
+      <div style={{ position: 'absolute', left: pad, right: pad, bottom: captionH - 4, height: 1, background: '#E0E0E0', zIndex: 3 }} />
+      <div style={{ position: 'absolute', left: pad, right: pad, bottom: containerHeight * 0.03, display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 5, color: '#333' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: `${scale(0.015, ctx)}px`, fontWeight: 600, minWidth: 0 }}>
+          <LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} placement="inline" />
+        </div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: `${scale(0.011, ctx)}px`, color: '#888', whiteSpace: 'nowrap', flexShrink: 0 }}>{ctx.shootingText || '—'}</div>
+      </div>
+    </div>
+  )
+}
+
+function renderRoundedShadow(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight, orientation } = ctx
+  const pad = containerWidth * 0.08
+  const captionH = containerHeight * (orientation === 'portrait' ? 0.18 : 0.16)
+  const availW = containerWidth - pad * 2
+  const availH = containerHeight - pad - captionH
+  const pf = photoFit(availW, availH, ctx.photoAspect)
+  return (
+    <div style={{ position: 'absolute', inset: 0, background: '#F0F0F0' }}>
+      <div style={{ position: 'absolute', top: pad + pf.offsetY, left: pad + pf.offsetX, width: pf.width, height: pf.height, borderRadius: 16, overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.15), 0 8px 20px rgba(0,0,0,0.1)', zIndex: 2, backgroundColor: '#000' }}>
+        <PhotoCover src={ctx.imageSrc} />
+      </div>
+      <div style={{ position: 'absolute', left: '10%', right: '10%', bottom: containerHeight * 0.04, textAlign: 'center', zIndex: 5, color: '#333' }}>
+        <div style={{ fontSize: `${scale(0.015, ctx)}px`, fontWeight: 500, lineHeight: 1.4 }}><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} /></div>
+        <ParamLines lensText={ctx.lensText} shootingText={ctx.shootingText} fontSize={scale(0.011, ctx)} color="#888" />
+      </div>
+    </div>
+  )
+}
+
+function renderGradientBorder(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight, orientation } = ctx
+  const pad = containerWidth * 0.04
+  const captionH = containerHeight * (orientation === 'portrait' ? 0.16 : 0.14)
+  return (
+    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)' }}>
+      <FitPhotoBox ctx={ctx} top={pad} left={pad} right={pad} bottom={captionH} radius={4} shadow="0 12px 40px rgba(0,0,0,0.2)" />
+      <div style={{ position: 'absolute', left: '10%', right: '10%', bottom: containerHeight * 0.03, textAlign: 'center', zIndex: 5, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>
+        <div style={{ fontSize: `${scale(0.015, ctx)}px`, fontWeight: 600, lineHeight: 1.4 }}><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} /></div>
+        <ParamLines lensText={ctx.lensText} shootingText={ctx.shootingText} fontSize={scale(0.011, ctx)} color="rgba(255,255,255,0.8)" />
+      </div>
+    </div>
+  )
+}
+
+function renderGeoInfo(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight, orientation } = ctx
+  const pad = containerWidth * 0.05
+  const captionH = containerHeight * (orientation === 'portrait' ? 0.22 : 0.2)
+  const geoItems = [
+    { label: 'CAMERA', value: ctx.modelText || '—' },
+    { label: 'LENS', value: ctx.lensText || '—' },
+    { label: 'PARAMS', value: ctx.shootingText || '—' },
+    { label: 'DATE', value: ctx.exif.dateTimeOriginal || '—' },
+  ]
+  return (
+    <div style={{ position: 'absolute', inset: 0, background: '#FAFAFA' }}>
+      <FitPhotoBox ctx={ctx} top={pad} left={pad} right={pad} bottom={captionH} radius={2} />
+      <div style={{ position: 'absolute', left: pad, right: pad, bottom: containerHeight * 0.03, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: `${scale(0.006, ctx)}px ${scale(0.02, ctx)}px`, zIndex: 5, color: '#444' }}>
+        {geoItems.map(item => (
+          <div key={item.label} style={{ lineHeight: 1.3 }}>
+            <div style={{ fontSize: `${scale(0.008, ctx)}px`, color: '#999', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>{item.label}</div>
+            <div style={{ fontSize: `${scale(0.012, ctx)}px`, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.value}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function renderMagazineCover(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight } = ctx
+  return (
+    <div style={{ position: 'absolute', inset: 0, background: '#000' }}>
+      <PhotoCover src={ctx.imageSrc} />
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.8) 100%)', zIndex: 2, pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', left: containerWidth * 0.05, right: containerWidth * 0.15, bottom: containerHeight * 0.05, zIndex: 5, color: '#fff' }}>
+        <div style={{ fontFamily: "'Georgia', serif", fontSize: `${scale(0.028, ctx)}px`, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+          <LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} />
+        </div>
+        <div style={{ fontSize: `${scale(0.012, ctx)}px`, color: 'rgba(255,255,255,0.6)', marginTop: 6, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
+          {ctx.lensText && <span>{ctx.lensText}  ·  </span>}{ctx.shootingText || '—'}
+        </div>
+      </div>
+      <div style={{ position: 'absolute', top: containerHeight * 0.04, right: containerWidth * 0.04, fontSize: `${scale(0.01, ctx)}px`, color: 'rgba(255,255,255,0.4)', fontFamily: "'Courier New', monospace", writingMode: 'vertical-rl', zIndex: 5, letterSpacing: '0.15em' }}>
+        VOL.{new Date().getFullYear()}
+      </div>
+    </div>
+  )
+}
+
+function renderTransparentOverlay(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight } = ctx
+  return (
+    <div style={{ position: 'absolute', inset: 0, background: '#000' }}>
+      <PhotoCover src={ctx.imageSrc} />
+      <div style={{ position: 'absolute', right: containerWidth * 0.03, bottom: containerHeight * 0.03, background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderRadius: 8, padding: `${scale(0.008, ctx)}px ${scale(0.012, ctx)}px`, border: '1px solid rgba(255,255,255,0.1)', zIndex: 10, color: '#fff', maxWidth: '60%' }}>
+        <div style={{ fontSize: `${scale(0.012, ctx)}px`, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} placement="inline" />
+        </div>
+        <div style={{ fontSize: `${scale(0.009, ctx)}px`, opacity: 0.7, marginTop: 1, fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ctx.shootingText || '—'}</div>
+      </div>
+    </div>
+  )
+}
+
+function renderHalfFrame(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight } = ctx
+  const gap = 3
+  const captionH = containerHeight * 0.1
+  const photoH = containerHeight - captionH - gap
+  const photoW = (containerWidth - gap * 3) / 2
+  return (
+    <div style={{ position: 'absolute', inset: 0, background: '#1A1A1A' }}>
+      <div style={{ position: 'absolute', top: gap, left: gap, width: photoW, height: photoH, overflow: 'hidden', zIndex: 1, backgroundColor: '#000' }}><PhotoCover src={ctx.imageSrc} /></div>
+      <div style={{ position: 'absolute', top: gap, left: gap + photoW + gap, width: photoW, height: photoH, overflow: 'hidden', zIndex: 1, backgroundColor: '#111' }}><PhotoCover src={ctx.imageSrc} /></div>
+      <div style={{ position: 'absolute', left: gap * 2, right: gap * 2, bottom: containerHeight * 0.03, display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 5, fontFamily: "'JetBrains Mono', monospace", fontSize: `${scale(0.011, ctx)}px`, color: 'rgba(255,255,255,0.75)' }}>
+        <span><LogoModel logoSrc={ctx.logoSrc} modelText={ctx.modelText} placement="inline" /></span>
+        <span style={{ color: 'rgba(255,255,255,0.5)' }}>{ctx.shootingText || '—'}</span>
+      </div>
+    </div>
+  )
+}
+
+function renderDiptych(ctx: StageFiveContext) {
+  const { containerWidth, containerHeight } = ctx
+  const pad = containerWidth * 0.03
+  const gap = 3
+  const captionH = containerHeight * 0.1
+  const photoH = containerHeight - captionH - pad
+  const photoW = (containerWidth - pad * 2 - gap) / 2
+  return (
+    <div style={{ position: 'absolute', inset: 0, background: '#FFFFFF' }}>
+      <div style={{ position: 'absolute', top: pad, left: pad, width: photoW, height: photoH, overflow: 'hidden', zIndex: 1, backgroundColor: '#000' }}><PhotoCover src={ctx.imageSrc} /></div>
+      <div style={{ position: 'absolute', top: pad, left: pad + photoW + gap, width: photoW, height: photoH, overflow: 'hidden', zIndex: 1, backgroundColor: '#000' }}><PhotoCover src={ctx.imageSrc} /></div>
+      <div style={{ position: 'absolute', left: pad, right: pad, bottom: containerHeight * 0.02, textAlign: 'center', zIndex: 5, fontFamily: "'JetBrains Mono', monospace", fontSize: `${scale(0.011, ctx)}px`, color: '#666' }}>
+        {ctx.modelText} · {ctx.shootingText || '—'}
+      </div>
+    </div>
   )
 }

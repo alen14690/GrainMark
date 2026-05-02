@@ -138,8 +138,7 @@ const generateGlassChip: FrameSvgGenerator = (ctx: FrameGeneratorContext) => {
   const fontParam = me * 0.012
   const chipH = me * 0.055
   const chipMargin = me * 0.04
-  const dotSize = me * 0.03
-  const padL = chipMargin + dotSize + 10 // 10px 是 dot 和文字之间的 gap
+  const padL = chipMargin + 8 // 文字左侧 padding
   const maxChipW = canvasW * 0.6
   const modelTrunc = truncateByWidth(modelLine, maxChipW - padL - chipMargin, fontModel)
   const paramTrunc = truncateByWidth(paramLine, maxChipW - padL - chipMargin, fontParam)
@@ -153,13 +152,6 @@ const generateGlassChip: FrameSvgGenerator = (ctx: FrameGeneratorContext) => {
   <!-- style=${ESC(style.id)} -->
   <rect x="0" y="0" width="${canvasW}" height="${canvasH}" fill="${ESC(layout.backgroundColor)}"/>
   <rect x="${chipX}" y="${chipY}" width="${chipW}" height="${chipH}" rx="${chipH / 2}" ry="${chipH / 2}" fill="rgba(20,20,20,0.7)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
-  <defs>
-    <linearGradient id="dot-grad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ff8c42"/>
-      <stop offset="1" stop-color="#ff3a3a"/>
-    </linearGradient>
-  </defs>
-  <circle cx="${chipX + chipMargin / 2 + dotSize / 2}" cy="${chipY + chipH / 2}" r="${dotSize / 2}" fill="url(#dot-grad)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
   ${drawText({
     x: chipX + padL,
     y: chipY + chipH * 0.15,
@@ -498,81 +490,6 @@ const generateSwissGrid: FrameSvgGenerator = (ctx: FrameGeneratorContext) => {
     align: 'right',
     letterSpacing: fontParam * 0.06,
   })}
-</svg>`
-}
-
-const generateContactSheet: FrameSvgGenerator = (ctx: FrameGeneratorContext) => {
-  const { geometry, modelLine, exif, style } = ctx
-  const { canvasW, canvasH, layout, orientation } = geometry
-  const me = minEdge(geometry)
-  const kodakBandH = canvasH * 0.03
-  const captionBottom = canvasH * 0.03
-  const fontKodak = Math.max(me * 0.01, 10)
-  const fontGrid = me * 0.013
-  const fontGridLabel = me * 0.01
-  const pad = canvasW * 0.04
-  const cols = orientation === 'portrait' ? 2 : 3
-
-  // 短镜头
-  const shortLens = (lens?: string) => {
-    if (!lens) return '—'
-    const m = lens.match(/(\d+(?:-\d+)?mm(?:\s*F[\d.]+)?)/i)
-    return m?.[1] ?? lens.slice(0, 20)
-  }
-  const items: Array<{ label: string; value: string }> = [
-    { label: 'CAMERA', value: exif.model || '—' },
-    { label: 'LENS', value: shortLens(exif.lensModel) },
-    { label: 'FOCAL', value: exif.focalLength ? `${exif.focalLength}mm` : '—' },
-    { label: 'APERTURE', value: exif.fNumber ? `f/${exif.fNumber}` : '—' },
-    { label: 'SHUTTER', value: exif.exposureTime || '—' },
-    { label: 'ISO', value: exif.iso ? `${exif.iso}` : '—' },
-  ]
-  const cellW = (canvasW - pad * 2) / cols
-  const rowH = fontGridLabel + fontGrid + 8 // 小字 + 大字 + gap
-  const gridItems = items
-    .map((item, i) => {
-      const col = i % cols
-      const row = Math.floor(i / cols)
-      const x = pad + col * cellW
-      const y = canvasH - captionBottom - (Math.ceil(items.length / cols) - row) * (rowH + 6)
-      return `${drawText({
-        x,
-        y,
-        text: item.label,
-        fontSizePx: fontGridLabel,
-        fontFamily: 'courier',
-        color: 'rgba(42,42,42,0.55)',
-        weight: 700,
-        letterSpacing: fontGridLabel * 0.15,
-      })}
-  ${drawText({
-    x,
-    y: y + fontGridLabel + 2,
-    text: truncateByWidth(item.value, cellW - 8, fontGrid),
-    fontSizePx: fontGrid,
-    fontFamily: 'courier',
-    color: '#2A2A2A',
-  })}`
-    })
-    .join('\n  ')
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}" height="${canvasH}" viewBox="0 0 ${canvasW} ${canvasH}">
-  <!-- style=${ESC(style.id)} bg=${ESC(layout.backgroundColor)} -->
-  <rect x="0" y="0" width="${canvasW}" height="${canvasH}" fill="#EDE8D9"/>
-  ${/* KODAK 橙带 */ ''}
-  <rect x="0" y="0" width="${canvasW}" height="${kodakBandH}" fill="#D4A017"/>
-  ${drawText({
-    x: canvasW / 2,
-    y: kodakBandH * 0.5 - fontKodak * 0.5,
-    text: truncateByWidth(`KODAK GOLD 200 · ${modelLine}`, canvasW * 0.85, fontKodak, fontKodak * 0.3),
-    fontSizePx: fontKodak,
-    fontFamily: 'courier',
-    color: '#3A2A00',
-    weight: 700,
-    align: 'center',
-    letterSpacing: fontKodak * 0.3,
-  })}
-  ${gridItems}
 </svg>`
 }
 
@@ -1056,7 +973,6 @@ export const STAGE5_GENERATORS = {
   'cinema-letterbox': generateCinemaLetterbox,
   'cinema-timestamp': generateCinemaTimestamp,
   'swiss-grid': generateSwissGrid,
-  'contact-sheet': generateContactSheet,
   'editorial-minimal': generateEditorialMinimal,
   'floating-caption': generateFloatingCaption,
   'stamp-corner': generateStampCorner,
@@ -1090,7 +1006,6 @@ export {
   generateCinemaLetterbox,
   generateCinemaTimestamp,
   generateSwissGrid,
-  generateContactSheet,
   generateEditorialMinimal,
   generateFloatingCaption,
   generateStampCorner,

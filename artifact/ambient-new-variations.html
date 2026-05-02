@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>氛围模糊新增效果样例 — GrainMark</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, 'SF Pro Text', 'Inter', sans-serif;
+  background: #0A0B0F;
+  color: #E0E0E0;
+  padding: 40px 24px;
+}
+h1 { font-size: 24px; color: #fff; margin-bottom: 8px; }
+.subtitle { font-size: 14px; color: #888; margin-bottom: 40px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 28px; }
+.card { background: #14151A; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.06); }
+.card-preview { aspect-ratio: 3/4; position: relative; overflow: hidden; }
+.card-info { padding: 16px; }
+.card-name { font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+.card-desc { font-size: 12px; color: #888; line-height: 1.5; }
+.card-tags { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+.tag { padding: 2px 8px; border-radius: 4px; font-size: 10px; background: rgba(232,184,109,0.1); color: #E8B86D; }
+
+/* 照片 URL */
+:root {
+  --photo: url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&q=80');
+}
+
+/* 共用 */
+.abs-full { position: absolute; inset: 0; }
+.caption { position: absolute; left: 10%; right: 10%; bottom: 5%; text-align: center; color: rgba(255,255,255,0.92); z-index: 10; }
+.cap-model { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
+.cap-lens { font-size: 10px; opacity: 0.7; font-family: 'JetBrains Mono', monospace; }
+.cap-params { font-size: 10px; opacity: 0.55; font-family: 'JetBrains Mono', monospace; margin-top: 2px; }
+
+/* 1. 圆角氛围 */
+.s1 { position: relative; background: #0D0D12; }
+.s1 .bg { position: absolute; inset: -40px; background: var(--photo) center/cover; filter: blur(50px) saturate(140%) brightness(0.7); }
+.s1 .ov { position: absolute; inset: 0; background: rgba(0,0,0,0.3); }
+.s1 .photo { position: absolute; top: 5%; left: 8%; right: 8%; bottom: 24%; border-radius: 20px; overflow: hidden; box-shadow: 0 24px 80px rgba(0,0,0,0.6); z-index: 2; }
+.s1 .photo img { width: 100%; height: 100%; object-fit: cover; }
+
+/* 2. 浮岛阴影 */
+.s2 { position: relative; background: #080810; }
+.s2 .bg { position: absolute; inset: -40px; background: var(--photo) center/cover; filter: blur(60px) saturate(120%) brightness(0.4); }
+.s2 .ov { position: absolute; inset: 0; background: rgba(0,0,0,0.2); }
+.s2 .photo { position: absolute; top: 5%; left: 6%; right: 6%; bottom: 22%; border-radius: 12px; overflow: hidden; box-shadow: 0 30px 100px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.05); z-index: 2; }
+.s2 .photo img { width: 100%; height: 100%; object-fit: cover; }
+
+/* 3. 玻璃氛围 */
+.s3 { position: relative; background: #0A0A14; }
+.s3 .bg { position: absolute; inset: -40px; background: var(--photo) center/cover; filter: blur(40px) saturate(160%) brightness(0.6); }
+.s3 .ov { position: absolute; inset: 0; background: rgba(0,0,0,0.2); }
+.s3 .photo { position: absolute; top: 4%; left: 5%; right: 5%; bottom: 28%; border-radius: 8px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.5); z-index: 2; }
+.s3 .photo img { width: 100%; height: 100%; object-fit: cover; }
+.s3 .glass { position: absolute; left: 4%; right: 4%; bottom: 3%; height: 20%; background: rgba(255,255,255,0.06); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border-radius: 16px; border: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; align-items: center; justify-content: center; color: rgba(255,255,255,0.9); z-index: 10; padding: 12px; }
+
+/* 4. 极光边缘 */
+.s4 { position: relative; background: #050510; }
+.s4 .bg { position: absolute; inset: -40px; background: var(--photo) center/cover; filter: blur(50px) saturate(150%) brightness(0.5); }
+.s4 .aurora { position: absolute; inset: -30px; background: conic-gradient(from 45deg, rgba(120,80,220,0.25), rgba(80,200,220,0.2), rgba(255,120,80,0.2), rgba(120,80,220,0.25)); filter: blur(40px); animation: spin 15s linear infinite; z-index: 1; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.s4 .ov { position: absolute; inset: 0; background: rgba(0,0,0,0.35); z-index: 2; }
+.s4 .photo { position: absolute; top: 6%; left: 7%; right: 7%; bottom: 22%; border-radius: 6px; overflow: hidden; box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 20px 60px rgba(0,0,0,0.5), 0 0 50px rgba(120,80,220,0.2); z-index: 3; }
+.s4 .photo img { width: 100%; height: 100%; object-fit: cover; }
+.s4 .caption { z-index: 5; }
+
+/* 5. 霜雾层叠 */
+.s5 { position: relative; background: #0C0C14; }
+.s5 .bg { position: absolute; inset: -40px; background: var(--photo) center/cover; filter: blur(70px) saturate(80%) brightness(0.5); }
+.s5 .frost { position: absolute; inset: 0; background: rgba(180,200,230,0.03); backdrop-filter: blur(1px); }
+.s5 .photo { position: absolute; top: 5%; left: 6%; right: 6%; bottom: 24%; border-radius: 18px; overflow: hidden; box-shadow: 0 16px 48px rgba(0,0,0,0.5); border: 2px solid rgba(255,255,255,0.08); z-index: 2; }
+.s5 .photo img { width: 100%; height: 100%; object-fit: cover; }
+
+/* 6. 呼吸光圈 */
+.s6 { position: relative; background: #080810; }
+.s6 .bg { position: absolute; inset: -40px; background: var(--photo) center/cover; filter: blur(50px) saturate(140%) brightness(0.5); }
+.s6 .ring { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -52%); width: 80%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, transparent 42%, rgba(100,160,240,0.08) 48%, rgba(100,160,240,0.12) 50%, rgba(100,160,240,0.08) 52%, transparent 58%); box-shadow: 0 0 80px rgba(100,160,240,0.08); z-index: 1; }
+.s6 .ov { position: absolute; inset: 0; background: rgba(0,0,0,0.25); }
+.s6 .photo { position: absolute; top: 6%; left: 7%; right: 7%; bottom: 24%; border-radius: 4px; overflow: hidden; box-shadow: 0 24px 70px rgba(0,0,0,0.5); z-index: 2; }
+.s6 .photo img { width: 100%; height: 100%; object-fit: cover; }
+
+/* 7. 镜面反射 */
+.s7 { position: relative; background: #0A0A10; overflow: hidden; }
+.s7 .bg { position: absolute; inset: -40px; background: var(--photo) center/cover; filter: blur(50px) saturate(140%) brightness(0.4); }
+.s7 .ov { position: absolute; inset: 0; background: rgba(0,0,0,0.3); }
+.s7 .photo { position: absolute; top: 4%; left: 6%; right: 6%; bottom: 38%; border-radius: 4px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.5); z-index: 2; }
+.s7 .photo img { width: 100%; height: 100%; object-fit: cover; }
+.s7 .reflect { position: absolute; left: 6%; right: 6%; bottom: 18%; height: 14%; border-radius: 4px; overflow: hidden; transform: scaleY(-1); opacity: 0.2; filter: blur(4px); z-index: 2; mask-image: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent); -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent); }
+.s7 .reflect img { width: 100%; height: 100%; object-fit: cover; }
+
+/* 8. 暗角聚焦 */
+.s8 { position: relative; background: #080808; }
+.s8 .bg { position: absolute; inset: -40px; background: var(--photo) center/cover; filter: blur(60px) saturate(100%) brightness(0.35); }
+.s8 .vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 25%, rgba(0,0,0,0.7) 100%); z-index: 1; }
+.s8 .photo { position: absolute; top: 5%; left: 6%; right: 6%; bottom: 22%; border-radius: 3px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.6); z-index: 2; }
+.s8 .photo img { width: 100%; height: 100%; object-fit: cover; }
+</style>
+</head>
+<body>
+
+<h1>氛围模糊 · 新增效果样例</h1>
+<p class="subtitle">使用真实风景照片展示 8 个新变体效果 · 组合了圆角、阴影、模糊、玻璃、极光、霜雾、反射、暗角</p>
+
+<div class="grid">
+
+  <div class="card">
+    <div class="card-preview s1">
+      <div class="bg"></div><div class="ov"></div>
+      <div class="photo"><img src="https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&q=80" alt=""></div>
+      <div class="caption"><div class="cap-model">SONY ILCE-7SM3</div><div class="cap-lens">FE 70-200mm F2.8 GM OSS II</div><div class="cap-params">200mm · f/5.6 · 1/125s · ISO 200</div></div>
+    </div>
+    <div class="card-info">
+      <div class="card-name">圆角氛围</div>
+      <div class="card-desc">大圆角 (20px) + 深阴影浮起 · 柔和现代</div>
+      <div class="card-tags"><span class="tag">圆角</span><span class="tag">阴影</span><span class="tag">模糊</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-preview s2">
+      <div class="bg"></div><div class="ov"></div>
+      <div class="photo"><img src="https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800&q=80" alt=""></div>
+      <div class="caption"><div class="cap-model">SONY ILCE-7SM3</div><div class="cap-lens">FE 70-200mm F2.8 GM OSS II</div><div class="cap-params">200mm · f/5.6 · 1/125s · ISO 200</div></div>
+    </div>
+    <div class="card-info">
+      <div class="card-name">浮岛阴影</div>
+      <div class="card-desc">中圆角 + 超深阴影 · 照片如浮岛悬空 · 沉稳暗调</div>
+      <div class="card-tags"><span class="tag">圆角</span><span class="tag">超深阴影</span><span class="tag">暗调</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-preview s3">
+      <div class="bg"></div><div class="ov"></div>
+      <div class="photo"><img src="https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800&q=80" alt=""></div>
+      <div class="glass">
+        <div class="cap-model">SONY ILCE-7SM3</div><div class="cap-lens">FE 70-200mm F2.8 GM OSS II</div><div class="cap-params">200mm · f/5.6 · 1/125s · ISO 200</div>
+      </div>
+    </div>
+    <div class="card-info">
+      <div class="card-name">玻璃氛围</div>
+      <div class="card-desc">氛围模糊底 + 底部圆角毛玻璃信息卡 · 融合 glass + ambient</div>
+      <div class="card-tags"><span class="tag">毛玻璃卡</span><span class="tag">圆角</span><span class="tag">模糊</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-preview s4">
+      <div class="bg"></div><div class="aurora"></div><div class="ov"></div>
+      <div class="photo"><img src="https://images.unsplash.com/photo-1519681393784-d120267933ba?w=800&q=80" alt=""></div>
+      <div class="caption"><div class="cap-model">SONY ILCE-7SM3</div><div class="cap-lens">FE 70-200mm F2.8 GM OSS II</div><div class="cap-params">200mm · f/5.6 · 1/125s · ISO 200</div></div>
+    </div>
+    <div class="card-info">
+      <div class="card-name">极光边缘</div>
+      <div class="card-desc">旋转极光光晕 + 边缘彩色辉光 · 科幻梦境感</div>
+      <div class="card-tags"><span class="tag">极光</span><span class="tag">辉光</span><span class="tag">动效</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-preview s5">
+      <div class="bg"></div><div class="frost"></div>
+      <div class="photo"><img src="https://images.unsplash.com/photo-1477346611705-65d1883cee1e?w=800&q=80" alt=""></div>
+      <div class="caption"><div class="cap-model">SONY ILCE-7SM3</div><div class="cap-lens">FE 70-200mm F2.8 GM OSS II</div><div class="cap-params">200mm · f/5.6 · 1/125s · ISO 200</div></div>
+    </div>
+    <div class="card-info">
+      <div class="card-name">霜雾层叠</div>
+      <div class="card-desc">大圆角 + 白描边 + 多层霜雾 · 冷调通透清晨感</div>
+      <div class="card-tags"><span class="tag">大圆角</span><span class="tag">描边</span><span class="tag">霜雾</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-preview s6">
+      <div class="bg"></div><div class="ring"></div><div class="ov"></div>
+      <div class="photo"><img src="https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=800&q=80" alt=""></div>
+      <div class="caption"><div class="cap-model">SONY ILCE-7SM3</div><div class="cap-lens">FE 70-200mm F2.8 GM OSS II</div><div class="cap-params">200mm · f/5.6 · 1/125s · ISO 200</div></div>
+    </div>
+    <div class="card-info">
+      <div class="card-name">呼吸光圈</div>
+      <div class="card-desc">背景大圆形光环 · 照片被柔光环绕 · 静谧灵性</div>
+      <div class="card-tags"><span class="tag">光环</span><span class="tag">柔光</span><span class="tag">呼吸</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-preview s7">
+      <div class="bg"></div><div class="ov"></div>
+      <div class="photo"><img src="https://images.unsplash.com/photo-1505765050516-f72dcac9c60e?w=800&q=80" alt=""></div>
+      <div class="reflect"><img src="https://images.unsplash.com/photo-1505765050516-f72dcac9c60e?w=800&q=80" alt=""></div>
+      <div class="caption"><div class="cap-model">SONY ILCE-7SM3</div><div class="cap-lens">FE 70-200mm F2.8 GM OSS II</div><div class="cap-params">200mm · f/5.6 · 1/125s · ISO 200</div></div>
+    </div>
+    <div class="card-info">
+      <div class="card-name">镜面反射</div>
+      <div class="card-desc">照片下方倒影渐隐 · 玻璃桌面感 · 高级展示</div>
+      <div class="card-tags"><span class="tag">反射</span><span class="tag">倒影</span><span class="tag">渐隐</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-preview s8">
+      <div class="bg"></div><div class="vignette"></div>
+      <div class="photo"><img src="https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800&q=80" alt=""></div>
+      <div class="caption"><div class="cap-model">SONY ILCE-7SM3</div><div class="cap-lens">FE 70-200mm F2.8 GM OSS II</div><div class="cap-params">200mm · f/5.6 · 1/125s · ISO 200</div></div>
+    </div>
+    <div class="card-info">
+      <div class="card-name">暗角聚焦</div>
+      <div class="card-desc">径向暗角 · 视觉聚焦中心 · 沉稳胶片暗房感</div>
+      <div class="card-tags"><span class="tag">暗角</span><span class="tag">聚焦</span><span class="tag">胶片</span></div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
