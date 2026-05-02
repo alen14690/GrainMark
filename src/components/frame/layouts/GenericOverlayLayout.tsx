@@ -70,6 +70,9 @@ export function GenericOverlayLayout({
     exif: photo.exif,
   }
 
+  // Logo 路径(从 overrides 传入 · Watermark.tsx 自动按 EXIF make 匹配)
+  const logoPath = overrides.logoPath
+
   return (
     <div
       className="relative w-full h-full"
@@ -82,6 +85,25 @@ export function GenericOverlayLayout({
       }}
     >
       {renderByStyleId(ctx)}
+      {/* 品牌 Logo overlay · 左下角 · 所有风格通用 */}
+      {logoPath && (
+        <img
+          src={`grain://logo/${encodeURIComponent(logoPath.split('/').pop()!)}?v=1`}
+          alt="brand logo"
+          draggable={false}
+          style={{
+            position: 'absolute',
+            left: containerWidth * 0.03,
+            bottom: containerHeight * 0.03,
+            height: Math.max(containerHeight * 0.06, 16),
+            width: 'auto',
+            objectFit: 'contain',
+            opacity: 0.85,
+            zIndex: 20,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
     </div>
   )
 }
