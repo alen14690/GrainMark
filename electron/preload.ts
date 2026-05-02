@@ -20,7 +20,7 @@ import { contextBridge, ipcRenderer } from 'electron'
  *    - 子空间：prefix:sub:actionName  （子系统，如 batch:gpu:ready / batch:gpu:task）
  */
 const CHANNEL_PATTERN =
-  /^(filter|photo|preview|batch|extract|watermark|frame|ai|llm|trending|sync|settings|dialog|app|perf):([a-zA-Z]+|[a-zA-Z]+:[a-zA-Z-]+)$/
+  /^(filter|photo|preview|batch|extract|watermark|frame|ai|llm|trending|sync|settings|dialog|app|perf):([a-zA-Z][a-zA-Z0-9-]*|[a-zA-Z]+:[a-zA-Z][a-zA-Z0-9-]*)$/
 
 /**
  * testMode 标志:仅当主进程启动时设置了 `GRAINMARK_TEST=1` 才为 true。

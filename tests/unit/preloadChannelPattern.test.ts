@@ -20,7 +20,7 @@ import { describe, expect, it } from 'vitest'
 // 契约副本 —— 必须与 electron/preload.ts 中的 CHANNEL_PATTERN 保持一致
 // 2026-05-01:修复副本漂移(原副本缺 frame|perf、多 taste|score|evolve)并新增 frame 前缀
 const CHANNEL_PATTERN =
-  /^(filter|photo|preview|batch|extract|watermark|frame|ai|llm|trending|sync|settings|dialog|app|perf):([a-zA-Z]+|[a-zA-Z]+:[a-zA-Z-]+)$/
+  /^(filter|photo|preview|batch|extract|watermark|frame|ai|llm|trending|sync|settings|dialog|app|perf):([a-zA-Z][a-zA-Z0-9-]*|[a-zA-Z]+:[a-zA-Z][a-zA-Z0-9-]*)$/
 
 describe('preload CHANNEL_PATTERN · 放行所有现役 IPC 通道', () => {
   const valid = [
