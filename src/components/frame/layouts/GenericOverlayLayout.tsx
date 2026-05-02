@@ -210,26 +210,6 @@ function scale(ratio: number, ctx: StageFiveContext): number {
   return Math.max(Math.round(ratio * Math.min(ctx.containerWidth, ctx.containerHeight)), 8)
 }
 
-/** 品牌 Logo · 与参数文字配合显示 */
-function BrandLogo({ ctx, height }: { ctx: StageFiveContext; height?: number }) {
-  if (!ctx.logoSrc) return null
-  const h = height ?? scale(0.035, ctx)
-  return (
-    <img
-      src={ctx.logoSrc}
-      alt=""
-      draggable={false}
-      style={{
-        height: h,
-        width: 'auto',
-        objectFit: 'contain',
-        opacity: 0.9,
-        flexShrink: 0,
-      }}
-    />
-  )
-}
-
 // ============================================================================
 // GLASS · 玻璃拟态
 // ============================================================================
@@ -275,9 +255,8 @@ function renderFrostedGlass(ctx: StageFiveContext) {
           zIndex: 5,
         }}
       >
-        <BrandLogo ctx={ctx} height={Math.round(glassH * 0.45)} />
         <div style={{ flex: 1, minWidth: 0, color: '#fff', fontFamily: "'Inter', system-ui, sans-serif" }}>
-          <GlassLine size={scale(0.02, ctx)} weight={600}>{ctx.modelText || '—'}</GlassLine>
+          <GlassLine size={scale(0.02, ctx)} weight={600}>{ctx.logoSrc && <img src={ctx.logoSrc} alt="" style={{ height: '1.2em', width: 'auto', verticalAlign: 'middle', marginRight: '0.4em', opacity: 0.9 }} draggable={false} />}{ctx.modelText || '—'}</GlassLine>
           <GlassLine size={scale(0.014, ctx)} color="rgba(255,255,255,0.75)" mono mt={2}>{ctx.paramText || '—'}</GlassLine>
         </div>
       </div>
@@ -348,12 +327,10 @@ function renderGlassChip(ctx: StageFiveContext) {
           zIndex: 5,
         }}
       >
-        <BrandLogo ctx={ctx} height={Math.round(glassH * 0.4)} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.06)', borderRadius: 999, padding: `${scale(0.008, ctx)}px ${scale(0.014, ctx)}px`, border: '1px solid rgba(255,255,255,0.1)' }}>
           <span style={{ width: scale(0.022, ctx), height: scale(0.022, ctx), borderRadius: '50%', background: 'linear-gradient(135deg, #ff8c42, #ff3a3a)', flexShrink: 0 }} />
           <div style={{ fontFamily: "'JetBrains Mono', monospace", minWidth: 0 }}>
-            <BrandLogo ctx={ctx} />
-            <GlassLine size={scale(0.013, ctx)} weight={600}>{ctx.modelText || '—'}</GlassLine>
+            <GlassLine size={scale(0.013, ctx)} weight={600}>{ctx.logoSrc && <img src={ctx.logoSrc} alt="" style={{ height: '1.2em', width: 'auto', verticalAlign: 'middle', marginRight: '0.4em', opacity: 0.9 }} draggable={false} />}{ctx.modelText || '—'}</GlassLine>
             <GlassLine size={scale(0.01, ctx)} color="rgba(255,255,255,0.7)" mt={1}>{ctx.paramText || '—'}</GlassLine>
           </div>
         </div>
@@ -420,8 +397,7 @@ function renderOilTexture(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
-          <BrandLogo ctx={ctx} />
-          {ctx.modelText || '—'}
+          {ctx.logoSrc && <img src={ctx.logoSrc} alt="" style={{ height: '1.2em', width: 'auto', verticalAlign: 'middle', marginRight: '0.4em', opacity: 0.9 }} draggable={false} />}{ctx.modelText || '—'}
         </div>
         <div
           style={{
@@ -508,8 +484,7 @@ function renderWatercolorCaption(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
-          <BrandLogo ctx={ctx} />
-          {ctx.modelText || '—'}
+          {ctx.logoSrc && <img src={ctx.logoSrc} alt="" style={{ height: '1.2em', width: 'auto', verticalAlign: 'middle', marginRight: '0.4em', opacity: 0.9 }} draggable={false} />}{ctx.modelText || '—'}
         </div>
         <div
           style={{
@@ -591,7 +566,6 @@ function renderAmbientGlow(ctx: StageFiveContext) {
           gap: 4,
         }}
       >
-        <BrandLogo ctx={ctx} height={scale(0.03, ctx)} />
         <div
           style={{
             fontFamily: "'Inter', system-ui, sans-serif",
@@ -604,8 +578,7 @@ function renderAmbientGlow(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
-          <BrandLogo ctx={ctx} />
-          {ctx.modelText || '—'}
+          {ctx.logoSrc && <img src={ctx.logoSrc} alt="" style={{ height: '1.2em', width: 'auto', verticalAlign: 'middle', marginRight: '0.4em', opacity: 0.9 }} draggable={false} />}{ctx.modelText || '—'}
         </div>
         <div
           style={{
@@ -682,8 +655,7 @@ function renderBokehPillar(ctx: StageFiveContext) {
           textOverflow: 'ellipsis',
         }}
       >
-        <BrandLogo ctx={ctx} />
-        {ctx.modelText || '—'}
+        {ctx.logoSrc && <img src={ctx.logoSrc} alt="" style={{ height: '1.2em', width: 'auto', verticalAlign: 'middle', marginRight: '0.4em', opacity: 0.9 }} draggable={false} />}{ctx.modelText || '—'}
       </div>
       <div
         style={{
@@ -763,8 +735,7 @@ function renderCinemaScope(ctx: StageFiveContext) {
           }}
         >
           <span style={{ color: '#FF6B00', marginRight: 6 }}>●</span>
-          <BrandLogo ctx={ctx} />
-          REC · {ctx.modelText || '—'}
+          REC · {ctx.logoSrc && <img src={ctx.logoSrc} alt="" style={{ height: '1.2em', width: 'auto', verticalAlign: 'middle', marginRight: '0.4em', opacity: 0.9 }} draggable={false} />}{ctx.modelText || '—'}
         </span>
       </div>
       {/* 底部黑条:参数大字 */}
@@ -846,8 +817,7 @@ function renderNeonEdge(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
-          <BrandLogo ctx={ctx} />
-          {ctx.modelText || '—'}
+          {ctx.logoSrc && <img src={ctx.logoSrc} alt="" style={{ height: '1.2em', width: 'auto', verticalAlign: 'middle', marginRight: '0.4em', opacity: 0.9 }} draggable={false} />}{ctx.modelText || '—'}
         </div>
         <div
           style={{
@@ -941,8 +911,7 @@ function renderSwissGrid(ctx: StageFiveContext) {
               maxWidth: '100%',
             }}
           >
-            <BrandLogo ctx={ctx} />
-            {ctx.modelText || '—'}
+            {ctx.logoSrc && <img src={ctx.logoSrc} alt="" style={{ height: '1.2em', width: 'auto', verticalAlign: 'middle', marginRight: '0.4em', opacity: 0.9 }} draggable={false} />}{ctx.modelText || '—'}
           </div>
           <div
             style={{
@@ -1018,8 +987,7 @@ function renderContactSheet(ctx: StageFiveContext) {
           overflow: 'hidden',
         }}
       >
-        <BrandLogo ctx={ctx} />
-        KODAK GOLD 200 · {ctx.modelText || '—'}
+        KODAK GOLD 200 · {ctx.logoSrc && <img src={ctx.logoSrc} alt="" style={{ height: '1.2em', width: 'auto', verticalAlign: 'middle', marginRight: '0.4em', opacity: 0.9 }} draggable={false} />}{ctx.modelText || '—'}
       </div>
       {/* 照片 */}
       <div
@@ -1122,9 +1090,8 @@ function renderGlassGradient(ctx: StageFiveContext) {
           zIndex: 5,
         }}
       >
-        <BrandLogo ctx={ctx} height={Math.round(glassH * 0.45)} />
         <div style={{ flex: 1, minWidth: 0, color: '#fff', fontFamily: "'Inter', system-ui, sans-serif" }}>
-          <GlassLine size={scale(0.02, ctx)} weight={600}>{ctx.modelText || '—'}</GlassLine>
+          <GlassLine size={scale(0.02, ctx)} weight={600}>{ctx.logoSrc && <img src={ctx.logoSrc} alt="" style={{ height: '1.2em', width: 'auto', verticalAlign: 'middle', marginRight: '0.4em', opacity: 0.9 }} draggable={false} />}{ctx.modelText || '—'}</GlassLine>
           <GlassLine size={scale(0.014, ctx)} color="rgba(255,255,255,0.75)" mono mt={2}>{ctx.paramText || '—'}</GlassLine>
         </div>
       </div>
@@ -1160,9 +1127,8 @@ function renderGlassMinimal(ctx: StageFiveContext) {
           fontFamily: "'JetBrains Mono', monospace",
         }}
       >
-        <BrandLogo ctx={ctx} height={Math.round(glassH * 0.4)} />
         <div style={{ flex: 1, minWidth: 0, color: '#fff' }}>
-          <GlassLine size={scale(0.012, ctx)} color="rgba(255,255,255,0.85)">{ctx.modelText || '—'}</GlassLine>
+          <GlassLine size={scale(0.012, ctx)} color="rgba(255,255,255,0.85)">{ctx.logoSrc && <img src={ctx.logoSrc} alt="" style={{ height: '1.2em', width: 'auto', verticalAlign: 'middle', marginRight: '0.4em', opacity: 0.9 }} draggable={false} />}{ctx.modelText || '—'}</GlassLine>
           <GlassLine size={scale(0.01, ctx)} color="rgba(255,255,255,0.55)" mt={1}>{ctx.paramText || '—'}</GlassLine>
         </div>
       </div>
@@ -1220,8 +1186,7 @@ function renderOilClassic(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
-          <BrandLogo ctx={ctx} />
-          {ctx.modelText || '—'}
+          {ctx.logoSrc && <img src={ctx.logoSrc} alt="" style={{ height: '1.2em', width: 'auto', verticalAlign: 'middle', marginRight: '0.4em', opacity: 0.9 }} draggable={false} />}{ctx.modelText || '—'}
         </div>
         <div
           style={{
@@ -1303,8 +1268,7 @@ function renderAmbientVinyl(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
-          <BrandLogo ctx={ctx} />
-          {ctx.modelText || '—'}
+          {ctx.logoSrc && <img src={ctx.logoSrc} alt="" style={{ height: '1.2em', width: 'auto', verticalAlign: 'middle', marginRight: '0.4em', opacity: 0.9 }} draggable={false} />}{ctx.modelText || '—'}
         </div>
         <div
           style={{
@@ -1382,8 +1346,7 @@ function renderAmbientAura(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
-          <BrandLogo ctx={ctx} />
-          {ctx.modelText || '—'}
+          {ctx.logoSrc && <img src={ctx.logoSrc} alt="" style={{ height: '1.2em', width: 'auto', verticalAlign: 'middle', marginRight: '0.4em', opacity: 0.9 }} draggable={false} />}{ctx.modelText || '—'}
         </div>
         <div
           style={{
@@ -1463,8 +1426,7 @@ function renderAmbientSoft(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
-          <BrandLogo ctx={ctx} />
-          {ctx.modelText || '—'}
+          {ctx.logoSrc && <img src={ctx.logoSrc} alt="" style={{ height: '1.2em', width: 'auto', verticalAlign: 'middle', marginRight: '0.4em', opacity: 0.9 }} draggable={false} />}{ctx.modelText || '—'}
         </div>
         <div
           style={{
@@ -1542,8 +1504,7 @@ function renderAmbientDark(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
-          <BrandLogo ctx={ctx} />
-          {ctx.modelText || '—'}
+          {ctx.logoSrc && <img src={ctx.logoSrc} alt="" style={{ height: '1.2em', width: 'auto', verticalAlign: 'middle', marginRight: '0.4em', opacity: 0.9 }} draggable={false} />}{ctx.modelText || '—'}
         </div>
         <div
           style={{
@@ -1639,8 +1600,7 @@ function renderAmbientGradient(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
-          <BrandLogo ctx={ctx} />
-          {ctx.modelText || '—'}
+          {ctx.logoSrc && <img src={ctx.logoSrc} alt="" style={{ height: '1.2em', width: 'auto', verticalAlign: 'middle', marginRight: '0.4em', opacity: 0.9 }} draggable={false} />}{ctx.modelText || '—'}
         </div>
         <div
           style={{
@@ -1776,7 +1736,6 @@ function renderAmbientColored(ctx: StageFiveContext) {
           gap: 4,
         }}
       >
-        <BrandLogo ctx={ctx} height={scale(0.03, ctx)} />
         <div
           style={{
             color: colors.modelColor,
@@ -1788,8 +1747,7 @@ function renderAmbientColored(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
-          <BrandLogo ctx={ctx} />
-          {ctx.modelText || '—'}
+          {ctx.logoSrc && <img src={ctx.logoSrc} alt="" style={{ height: '1.2em', width: 'auto', verticalAlign: 'middle', marginRight: '0.4em', opacity: 0.9 }} draggable={false} />}{ctx.modelText || '—'}
         </div>
         <div
           style={{
@@ -1859,8 +1817,7 @@ function renderCinemaLetterbox(ctx: StageFiveContext) {
             maxWidth: '80%',
           }}
         >
-          <BrandLogo ctx={ctx} />
-          {ctx.modelText || '—'}
+          {ctx.logoSrc && <img src={ctx.logoSrc} alt="" style={{ height: '1.2em', width: 'auto', verticalAlign: 'middle', marginRight: '0.4em', opacity: 0.9 }} draggable={false} />}{ctx.modelText || '—'}
         </div>
         <div
           style={{
@@ -1907,8 +1864,7 @@ function renderCinemaTimestamp(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
-          <BrandLogo ctx={ctx} />
-          {ctx.modelText || '—'}
+          {ctx.logoSrc && <img src={ctx.logoSrc} alt="" style={{ height: '1.2em', width: 'auto', verticalAlign: 'middle', marginRight: '0.4em', opacity: 0.9 }} draggable={false} />}{ctx.modelText || '—'}
         </div>
         <div
           style={{
@@ -1974,8 +1930,7 @@ function renderEditorialMinimal(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
-          <BrandLogo ctx={ctx} />
-          {ctx.modelText || '—'}
+          {ctx.logoSrc && <img src={ctx.logoSrc} alt="" style={{ height: '1.2em', width: 'auto', verticalAlign: 'middle', marginRight: '0.4em', opacity: 0.9 }} draggable={false} />}{ctx.modelText || '—'}
         </div>
         <div
           style={{
@@ -2044,8 +1999,7 @@ function renderFloatingCaption(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
-          <BrandLogo ctx={ctx} />
-          {ctx.modelText || '—'}
+          {ctx.logoSrc && <img src={ctx.logoSrc} alt="" style={{ height: '1.2em', width: 'auto', verticalAlign: 'middle', marginRight: '0.4em', opacity: 0.9 }} draggable={false} />}{ctx.modelText || '—'}
         </div>
         <div
           style={{
@@ -2095,8 +2049,7 @@ function renderStampCorner(ctx: StageFiveContext) {
             maxWidth: '100%',
           }}
         >
-          <BrandLogo ctx={ctx} />
-          {ctx.modelText || '—'}
+          {ctx.logoSrc && <img src={ctx.logoSrc} alt="" style={{ height: '1.2em', width: 'auto', verticalAlign: 'middle', marginRight: '0.4em', opacity: 0.9 }} draggable={false} />}{ctx.modelText || '—'}
         </div>
         <div
           style={{
