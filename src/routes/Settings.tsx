@@ -279,60 +279,90 @@ export default function Settings() {
                 <div className="text-[10.5px] text-fg-3">在下方按品牌管理</div>
               </Row>
               {/* 多品牌 Logo 管理(持久化到 settings.watermark.brandLogos) */}
-              <div className="space-y-1 mt-2 pt-2 border-t border-bg-1">
+              <div className="space-y-1.5 mt-2 pt-2 border-t border-bg-1">
                 <div className="text-[10.5px] text-fg-2 font-medium mb-1">品牌 Logo · 按 EXIF 自动匹配</div>
                 {CAMERA_BRANDS.map((brand) => {
-                  const hasLogo = !!settings.watermark.brandLogos[brand.id]
+                  const logoPath = settings.watermark.brandLogos[brand.id]
+                  const hasLogo = !!logoPath
+
+                  const handleUpload = () => {
+                    const input = document.createElement('input')
+                    input.type = 'file'
+                    input.accept = 'image/png,image/jpeg,image/webp,image/svg+xml'
+                    input.onchange = async () => {
+                      const file = input.files?.[0]
+                      if (!file) return
+                      const filePath = (file as File & { path?: string }).path
+                      if (!filePath) return
+                      try {
+                        const dest = await ipc('frame:upload-logo', brand.id, filePath)
+                        update({
+                          watermark: {
+                            ...settings.watermark,
+                            brandLogos: { ...settings.watermark.brandLogos, [brand.id]: dest },
+                          },
+                        })
+                      } catch (err) {
+                        window.alert(`Logo 上传失败: ${(err as Error).message}`)
+                      }
+                    }
+                    input.click()
+                  }
+
+                  const handleDelete = async () => {
+                    await ipc('frame:delete-logo', brand.id)
+                    const next = { ...settings.watermark.brandLogos }
+                    delete next[brand.id]
+                    update({ watermark: { ...settings.watermark, brandLogos: next } })
+                  }
+
                   return (
                     <div
                       key={brand.id}
-                      className="flex items-center justify-between gap-2 px-2 py-1.5 rounded text-[11px] border border-transparent hover:bg-bg-1"
+                      className="flex items-center gap-3 px-2 py-2 rounded text-[11px] border border-bg-1 hover:border-brand-amber/20"
                     >
-                      <span className="text-fg-2 font-medium">{brand.name}</span>
-                      <div className="flex items-center gap-2">
-                        {hasLogo && <span className="text-[9px] text-green-500">✓</span>}
-                        <button
-                          type="button"
-                          className="btn-secondary text-[10.5px] px-2 py-0.5"
-                          onClick={() => {
-                            const input = document.createElement('input')
-                            input.type = 'file'
-                            input.accept = 'image/png,image/jpeg,image/webp,image/svg+xml'
-                            input.onchange = async () => {
-                              const file = input.files?.[0]
-                              if (!file) return
-                              const filePath = (file as File & { path?: string }).path
-                              if (!filePath) return
-                              try {
-                                const dest = await ipc('frame:upload-logo', brand.id, filePath)
-                                update({
-                                  watermark: {
-                                    ...settings.watermark,
-                                    brandLogos: { ...settings.watermark.brandLogos, [brand.id]: dest },
-                                  },
-                                })
-                              } catch (err) {
-                                window.alert(`Logo 上传失败: ${(err as Error).message}`)
-                              }
-                            }
-                            input.click()
-                          }}
-                        >
-                          <ImgIcon className="w-3 h-3" />
-                          {hasLogo ? '更换' : '上传'}
-                        </button>
-                        {hasLogo && (
+                      {/* Logo 预览缩略图 */}
+                      <div className="w-8 h-8 rounded bg-bg-0 border border-bg-1 flex items-center justify-center overflow-hidden flex-shrink-0">
+                        {hasLogo ? (
+                          <img
+                            src={`file://${logoPath}`}
+                            alt={brand.name}
+                            className="w-full h-full object-contain"
+                            draggable={false}
+                          />
+                        ) : (
+                          <ImgIcon className="w-3.5 h-3.5 text-fg-3 opacity-40" />
+                        )}
+                      </div>
+                      {/* 品牌名 */}
+                      <span className="text-fg-2 font-medium flex-1 min-w-0 truncate">{brand.name}</span>
+                      {/* 操作按钮 */}
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {hasLogo ? (
+                          <>
+                            <button
+                              type="button"
+                              className="btn-secondary text-[10px] px-2 py-0.5"
+                              onClick={handleUpload}
+                            >
+                              修改
+                            </button>
+                            <button
+                              type="button"
+                              className="text-[10px] text-fg-3 hover:text-red-400 px-1.5 py-0.5"
+                              onClick={handleDelete}
+                            >
+                              删除
+                            </button>
+                          </>
+                        ) : (
                           <button
                             type="button"
-                            className="text-fg-3 hover:text-red-400 text-[10.5px]"
-                            onClick={async () => {
-                              await ipc('frame:delete-logo', brand.id)
-                              const next = { ...settings.watermark.brandLogos }
-                              delete next[brand.id]
-                              update({ watermark: { ...settings.watermark, brandLogos: next } })
-                            }}
+                            className="btn-secondary text-[10px] px-2 py-0.5"
+                            onClick={handleUpload}
                           >
-                            删除
+                            <ImgIcon className="w-3 h-3" />
+                            上传
                           </button>
                         )}
                       </div>
