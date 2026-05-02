@@ -17,77 +17,33 @@ const CATEGORIES: { id: FilterCategory | 'all'; label: string }[] = [
 ]
 
 /**
- * 按滤镜类别选配 Unsplash 示例照片 + CSS 色调模拟
- * 照片来源：Unsplash (免费商用授权)
- * CSS filter 模拟滤镜色调效果（非精确还原，仅用于预览区氛围展示）
+ * 按滤镜类别/名称生成 CSS 渐变背景，模拟滤镜色调效果
+ * 不使用外部图片（Electron CSP 阻止外部网络请求）
  */
-const CATEGORY_PREVIEW: Record<string, { photo: string; css: string }> = {
-  // 彩色负片：暖色调 · 柔和对比
-  'negative-color': {
-    photo: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&q=75',
-    css: 'saturate(0.85) contrast(0.9) sepia(0.15) brightness(1.05)',
-  },
-  // 黑白：去饱和 · 高对比
-  'negative-bw': {
-    photo: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=400&q=75',
-    css: 'grayscale(1) contrast(1.15) brightness(1.05)',
-  },
-  // 反转片：高饱和 · 强对比
-  slide: {
-    photo: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=400&q=75',
-    css: 'saturate(1.3) contrast(1.15) brightness(0.95)',
-  },
-  // 电影胶片：偏暖 · 低饱和 · 偏青暗部
-  cinema: {
-    photo: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=400&q=75',
-    css: 'saturate(0.8) contrast(1.1) sepia(0.2) brightness(0.9)',
-  },
-  // 拍立得：褪色 · 暖调 · 低对比
-  instant: {
-    photo: 'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=400&q=75',
-    css: 'saturate(0.7) contrast(0.85) sepia(0.25) brightness(1.1)',
-  },
-  // 数码风格：清晰 · 干净
-  digital: {
-    photo: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=400&q=75',
-    css: 'saturate(1.1) contrast(1.05) brightness(1.02)',
-  },
-  // 已提取 / 自定义 / 油画：通用照片
-  extracted: {
-    photo: 'https://images.unsplash.com/photo-1477346611705-65d1883cee1e?w=400&q=75',
-    css: 'saturate(0.9) contrast(1.05)',
-  },
-  custom: {
-    photo: 'https://images.unsplash.com/photo-1505765050516-f72dcac9c60e?w=400&q=75',
-    css: 'saturate(1.0) contrast(1.0)',
-  },
-  'oil-painting': {
-    photo: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=400&q=75',
-    css: 'saturate(0.75) contrast(0.9) sepia(0.1) brightness(1.08)',
-  },
+const CATEGORY_GRADIENT: Record<string, string> = {
+  'negative-color': 'linear-gradient(135deg, #8B6B3A 0%, #C4A060 30%, #4A7080 70%, #2A3040 100%)',
+  'negative-bw': 'linear-gradient(135deg, #1A1A1A 0%, #4A4A4A 30%, #8A8A8A 70%, #3A3A3A 100%)',
+  slide: 'linear-gradient(135deg, #1A4060 0%, #3A8050 30%, #80A040 70%, #C06030 100%)',
+  cinema: 'linear-gradient(135deg, #0A1520 0%, #1A3040 30%, #4A3020 70%, #0A0A10 100%)',
+  instant: 'linear-gradient(135deg, #E8D8C0 0%, #C0A880 30%, #8A7050 70%, #F0E8D8 100%)',
+  digital: 'linear-gradient(135deg, #2A4060 0%, #4080A0 30%, #60A0C0 70%, #204060 100%)',
+  'oil-painting': 'linear-gradient(135deg, #6A5030 0%, #A08040 30%, #C0A060 70%, #5A4020 100%)',
+  extracted: 'linear-gradient(135deg, #3A2050 0%, #604080 30%, #8060A0 70%, #2A1040 100%)',
+  custom: 'linear-gradient(135deg, #2A2A3A 0%, #4A4A5A 30%, #6A6A7A 70%, #2A2A3A 100%)',
 }
 
-/** 根据滤镜名称微调 CSS 效果 */
-function getFilterPreviewStyle(name: string, category: string): string {
-  const base = CATEGORY_PREVIEW[category]?.css ?? 'saturate(1) contrast(1)'
+function getFilterGradient(name: string, category: string): string {
   const lower = name.toLowerCase()
-  // 黑白类滤镜强制灰度
-  if (lower.includes('b&w') || lower.includes('黑白') || lower.includes('mono') || category === 'negative-bw') {
-    return 'grayscale(1) contrast(1.15) brightness(1.05)'
-  }
-  // Portra 系列：柔和暖色
-  if (lower.includes('portra')) return 'saturate(0.82) contrast(0.88) sepia(0.12) brightness(1.08)'
-  // Cinestill / 夜景：暖黄偏红
-  if (lower.includes('cinestill') || lower.includes('800t')) return 'saturate(0.9) contrast(1.1) sepia(0.2) hue-rotate(-10deg) brightness(0.92)'
-  // Fuji 系列：偏绿微冷
-  if (lower.includes('fuji') || lower.includes('fujifilm')) return 'saturate(0.88) contrast(1.05) hue-rotate(5deg) brightness(1.02)'
-  // Kodak Gold / Ektar：暖黄高饱和
-  if (lower.includes('gold') || lower.includes('ektar')) return 'saturate(1.15) contrast(1.05) sepia(0.15) brightness(1.02)'
-  // Teal & Orange
-  if (lower.includes('teal') || lower.includes('orange')) return 'saturate(1.1) contrast(1.1) hue-rotate(-5deg)'
-  // 日系
-  if (lower.includes('日系') || lower.includes('japanese')) return 'saturate(0.75) contrast(0.85) brightness(1.15) sepia(0.05)'
-  return base
+  if (lower.includes('portra')) return 'linear-gradient(135deg, #A08060 0%, #D0B080 40%, #80A0B0 80%, #604030 100%)'
+  if (lower.includes('cinestill') || lower.includes('800t')) return 'linear-gradient(135deg, #1A0A08 0%, #4A2010 30%, #803010 60%, #C06020 100%)'
+  if (lower.includes('fuji') && lower.includes('pro')) return 'linear-gradient(135deg, #E0D8C8 0%, #A0C8A0 40%, #80B8A0 70%, #D0E0D0 100%)'
+  if (lower.includes('fuji')) return 'linear-gradient(135deg, #304838 0%, #508060 30%, #70A080 60%, #405840 100%)'
+  if (lower.includes('gold')) return 'linear-gradient(135deg, #C09030 0%, #E0B040 30%, #D0A030 60%, #A07020 100%)'
+  if (lower.includes('teal') || lower.includes('orange')) return 'linear-gradient(135deg, #104040 0%, #206060 30%, #C07030 70%, #804020 100%)'
+  if (lower.includes('日系') || lower.includes('japanese')) return 'linear-gradient(135deg, #E8E0D8 0%, #D0C8C0 30%, #B8D0D8 70%, #F0E8E0 100%)'
+  if (lower.includes('b&w') || lower.includes('mono') || category === 'negative-bw') return 'linear-gradient(135deg, #1A1A1A 0%, #4A4A4A 30%, #8A8A8A 60%, #2A2A2A 100%)'
+  if (lower.includes('chrome')) return 'linear-gradient(135deg, #2A3A30 0%, #4A6A50 30%, #6A8A60 60%, #3A4A38 100%)'
+  return CATEGORY_GRADIENT[category] ?? CATEGORY_GRADIENT.custom
 }
 
 export default function Filters() {
@@ -155,13 +111,10 @@ export default function Filters() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {filtered.map((f) => (
           <div key={f.id} className="card p-4 hover:border-bg-3 transition-colors group">
-            <div className="aspect-video rounded-lg mb-3 relative overflow-hidden bg-bg-1">
-              <img
-                src={CATEGORY_PREVIEW[f.category]?.photo ?? CATEGORY_PREVIEW.custom.photo}
-                alt={f.name}
-                loading="lazy"
-                className="absolute inset-0 w-full h-full object-cover"
-                style={{ filter: getFilterPreviewStyle(f.name, f.category) }}
+            <div className="aspect-video rounded-lg mb-3 relative overflow-hidden">
+              <div
+                className="absolute inset-0"
+                style={{ background: getFilterGradient(f.name, f.category) }}
               />
               <span className="absolute inset-0 film-grain" />
               {f.source === 'extracted' && (

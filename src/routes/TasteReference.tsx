@@ -9,13 +9,8 @@
  */
 import { Palette, Plus, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import type { ColorPalette, ColorScheme, TasteCategory, TasteReference as TasteRef } from '../../shared/types'
-
-// IPC 类型安全调用
-declare function ipc(channel: 'taste:presets', category?: string): Promise<TasteRef[]>
-declare function ipc(channel: 'taste:categories'): Promise<Array<{ id: TasteCategory; label: string }>>
-declare function ipc(channel: 'taste:extract', path: string): Promise<{ palette: ColorPalette; scheme: ColorScheme }>
-declare function ipc(channel: 'taste:get-scheme', refId: string): Promise<ColorScheme>
+import type { TasteCategory, TasteReference as TasteRef } from '../../shared/types'
+import { ipc } from '../lib/ipc'
 
 export default function TasteReferencePage() {
   const [categories, setCategories] = useState<Array<{ id: TasteCategory; label: string }>>([])
@@ -26,13 +21,13 @@ export default function TasteReferencePage() {
 
   useEffect(() => {
     Promise.all([
-      (window as any).ipc('taste:categories'),
-      (window as any).ipc('taste:presets'),
+      ipc('taste:categories'),
+      ipc('taste:presets'),
     ]).then(([cats, refs]) => {
-      setCategories(cats)
-      setPresets(refs)
+      setCategories(cats as any)
+      setPresets(refs as any)
       setLoading(false)
-    })
+    }).catch(() => setLoading(false))
   }, [])
 
   const filteredPresets =
@@ -89,14 +84,14 @@ export default function TasteReferencePage() {
                       : 'border-transparent hover:border-fg-3/20'
                   }`}
                 >
-                  <img
-                    src={ref.thumbUrl}
-                    alt={ref.photographer}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
+                  {/* 基于色板的渐变背景（不依赖外部图片，避免 CSP 阻止） */}
+                  <div
+                    className="absolute inset-0"
+                    style={{ background: `linear-gradient(135deg, ${ref.palette.dominant} 0%, ${ref.palette.secondary[0] ?? ref.palette.dominant} 40%, ${ref.palette.secondary[1] ?? ref.palette.accent} 70%, ${ref.palette.accent} 100%)` }}
                   />
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-2 pt-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-2 pt-6">
                     <div className="text-[10px] text-white/80 truncate">{ref.photographer}</div>
+                    <div className="text-[9px] text-white/50 font-mono">{ref.scheme.name}</div>
                   </div>
                   {/* 色板预览小条 */}
                   <div className="absolute top-2 right-2 flex gap-0.5">
@@ -157,9 +152,8 @@ function SchemeDetail({ ref }: { ref: TasteRef }) {
 
   return (
     <div className="space-y-5">
-      {/* 预览图 */}
-      <div className="aspect-[4/3] rounded-lg overflow-hidden">
-        <img src={ref.regularUrl} alt="" className="w-full h-full object-cover" />
+      {/* 预览色板 */}
+      <div className="aspect-[4/3] rounded-lg overflow-hidden" style={{ background: `linear-gradient(135deg, ${ref.palette.dominant} 0%, ${ref.palette.secondary[0] ?? ref.palette.dominant} 35%, ${ref.palette.secondary[1] ?? ref.palette.accent} 65%, ${ref.palette.accent} 100%)` }}>
       </div>
 
       {/* 方案名称 */}

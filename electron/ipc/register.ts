@@ -9,6 +9,7 @@ import { registerPhotoIpc } from './photo.js'
 import { registerPreviewIpc } from './preview.js'
 import { registerSettingsIpc } from './settings.js'
 import { registerSyncIpc } from './sync.js'
+import { registerTasteIpc } from './taste.js'
 import { registerTrendingIpc } from './trending.js'
 import { registerWatermarkIpc } from './watermark.js'
 
@@ -26,4 +27,5 @@ export function registerAllIpcHandlers() {
   registerSyncIpc()
   registerSettingsIpc()
   registerPerfIpc()
+  registerTasteIpc()
 }
