@@ -27,19 +27,35 @@ import type {
   CurvesParams,
   FilterPipeline,
   FilterPreset,
+  FrameStyleId,
+  FrameStyleOverrides,
   GrainParams,
   HSLParams,
   HalationParams,
   ToneParams,
   TransformParams,
   VignetteParams,
+  WatermarkStyle,
   WhiteBalanceParams,
 } from '../../shared/types'
 
-/** 历史栈条目 */
+/** 边框工作流配置 */
+export interface FrameConfig {
+  styleId: FrameStyleId
+  overrides: FrameStyleOverrides
+}
+
+/** 水印工作流配置 */
+export type WatermarkConfig = WatermarkStyle
+
+/** 历史栈条目 — 包含完整工作流快照 */
 export interface HistoryEntry {
   /** pipeline 的深拷贝快照（独立对象，不会被后续修改污染） */
   pipeline: FilterPipeline | null
+  /** 边框配置快照 */
+  frameConfig: FrameConfig | null
+  /** 水印配置快照 */
+  watermarkConfig: WatermarkConfig | null
   /** commit 时间戳（ms） */
   timestamp: number
   /** 可选：用于 UI 显示（如 "曝光调整"） */
@@ -56,6 +72,11 @@ interface EditState {
   baselinePipeline: FilterPipeline | null
   /** 基准 preset id；切换时同步更新 */
   baselineFilterId: string | null
+
+  /** 边框配置（工作流一等公民，纳入历史栈） */
+  frameConfig: FrameConfig | null
+  /** 水印配置（工作流一等公民，纳入历史栈） */
+  watermarkConfig: WatermarkConfig | null
 
   /**
    * P2 优化：脏标记。set* action 触发时标为 true，loadFromPreset / resetToBaseline 重置为 false。
@@ -92,6 +113,10 @@ interface EditState {
   setSaturation: (v: number) => void
   setVibrance: (v: number) => void
   setLut: (lut: string | null, intensity?: number) => void
+
+  // 工作流级 setter（watermark / frame）
+  setFrameConfig: (config: FrameConfig | null) => void
+  setWatermarkConfig: (config: WatermarkConfig | null) => void
 
   // ---- 历史栈 actions（M4.2）----
   /**
@@ -169,11 +194,19 @@ function ensurePipe(s: EditState): FilterPipeline {
   return s.currentPipeline
 }
 
+/** 通用深拷贝（JSON round-trip，适用于纯数据结构） */
+function deepClone<T>(v: T | null | undefined): T | null {
+  if (v == null) return null
+  return JSON.parse(JSON.stringify(v)) as T
+}
+
 export const useEditStore = create<EditState>()(
   immer((set) => ({
     currentPipeline: null,
     baselinePipeline: null,
     baselineFilterId: null,
+    frameConfig: null,
+    watermarkConfig: null,
     _dirty: false,
     history: [],
     future: [],
@@ -202,6 +235,8 @@ export const useEditStore = create<EditState>()(
         s.currentPipeline = null
         s.baselinePipeline = null
         s.baselineFilterId = null
+        s.frameConfig = null
+        s.watermarkConfig = null
         s._dirty = false
         s.history = []
         s.future = []
@@ -211,7 +246,10 @@ export const useEditStore = create<EditState>()(
     setTone(patch) {
       set((s) => {
         if (patch === null) {
-          if (s.currentPipeline?.tone) { s.currentPipeline.tone = undefined; s._dirty = true }
+          if (s.currentPipeline?.tone) {
+            s.currentPipeline.tone = undefined
+            s._dirty = true
+          }
           return
         }
         const pipe = ensurePipe(s)
@@ -230,7 +268,10 @@ export const useEditStore = create<EditState>()(
     setWhiteBalance(patch) {
       set((s) => {
         if (patch === null) {
-          if (s.currentPipeline?.whiteBalance) { s.currentPipeline.whiteBalance = undefined; s._dirty = true }
+          if (s.currentPipeline?.whiteBalance) {
+            s.currentPipeline.whiteBalance = undefined
+            s._dirty = true
+          }
           return
         }
         const pipe = ensurePipe(s)
@@ -245,7 +286,10 @@ export const useEditStore = create<EditState>()(
     setVignette(patch) {
       set((s) => {
         if (patch === null) {
-          if (s.currentPipeline?.vignette) { s.currentPipeline.vignette = undefined; s._dirty = true }
+          if (s.currentPipeline?.vignette) {
+            s.currentPipeline.vignette = undefined
+            s._dirty = true
+          }
           return
         }
         const pipe = ensurePipe(s)
@@ -284,7 +328,10 @@ export const useEditStore = create<EditState>()(
     setColorGrading(patch) {
       set((s) => {
         if (patch === null) {
-          if (s.currentPipeline?.colorGrading) { s.currentPipeline.colorGrading = undefined; s._dirty = true }
+          if (s.currentPipeline?.colorGrading) {
+            s.currentPipeline.colorGrading = undefined
+            s._dirty = true
+          }
           return
         }
         const pipe = ensurePipe(s)
@@ -302,7 +349,10 @@ export const useEditStore = create<EditState>()(
     setGrain(patch) {
       set((s) => {
         if (patch === null) {
-          if (s.currentPipeline?.grain) { s.currentPipeline.grain = undefined; s._dirty = true }
+          if (s.currentPipeline?.grain) {
+            s.currentPipeline.grain = undefined
+            s._dirty = true
+          }
           return
         }
         const pipe = ensurePipe(s)
@@ -318,7 +368,10 @@ export const useEditStore = create<EditState>()(
     setHalation(patch) {
       set((s) => {
         if (patch === null) {
-          if (s.currentPipeline?.halation) { s.currentPipeline.halation = undefined; s._dirty = true }
+          if (s.currentPipeline?.halation) {
+            s.currentPipeline.halation = undefined
+            s._dirty = true
+          }
           return
         }
         const pipe = ensurePipe(s)
@@ -334,7 +387,10 @@ export const useEditStore = create<EditState>()(
     setCrop(patch) {
       set((s) => {
         if (patch === null) {
-          if (s.currentPipeline?.crop) { s.currentPipeline.crop = undefined; s._dirty = true }
+          if (s.currentPipeline?.crop) {
+            s.currentPipeline.crop = undefined
+            s._dirty = true
+          }
           return
         }
         const pipe = ensurePipe(s)
@@ -346,7 +402,10 @@ export const useEditStore = create<EditState>()(
     setTransform(patch) {
       set((s) => {
         if (patch === null) {
-          if (s.currentPipeline?.transform) { s.currentPipeline.transform = undefined; s._dirty = true }
+          if (s.currentPipeline?.transform) {
+            s.currentPipeline.transform = undefined
+            s._dirty = true
+          }
           return
         }
         const pipe = ensurePipe(s)
@@ -382,6 +441,20 @@ export const useEditStore = create<EditState>()(
       })
     },
 
+    // 工作流级 setter
+    setFrameConfig(config) {
+      set((s) => {
+        s.frameConfig = config ? deepClone(config) : null
+        s._dirty = true
+      })
+    },
+    setWatermarkConfig(config) {
+      set((s) => {
+        s.watermarkConfig = config ? deepClone(config) : null
+        s._dirty = true
+      })
+    },
+
     // ---- 历史栈 ----
 
     commitHistory(label) {
@@ -392,6 +465,8 @@ export const useEditStore = create<EditState>()(
         if (top && pipelineEquals(top.pipeline, snap)) return
         s.history.push({
           pipeline: snap,
+          frameConfig: deepClone(s.frameConfig),
+          watermarkConfig: deepClone(s.watermarkConfig),
           timestamp: Date.now(),
           label,
         })
@@ -408,28 +483,31 @@ export const useEditStore = create<EditState>()(
       set((s) => {
         if (s.history.length === 0) return
         const top = s.history[s.history.length - 1]!
-        // 场景 A：current 与栈顶已对齐（常规情况，刚 commit 完）
-        //   → pop 栈顶入 future，current 回到新栈顶（没有时回到 null）
-        // 场景 B：current 领先栈顶（用户 commit 后又 setTone 未 commit）
-        //   → 不 pop，只把 current 回退到栈顶（丢弃未 commit 的变化）
-        //     同时把 "current 的那份未 commit 变化" 推入 future 以便 redo 恢复
         if (pipelineEquals(s.currentPipeline, top.pipeline)) {
           // 场景 A
           const popped = s.history.pop()!
           s.future.push({
             pipeline: deepClonePipeline(popped.pipeline),
+            frameConfig: deepClone(s.frameConfig),
+            watermarkConfig: deepClone(s.watermarkConfig),
             timestamp: Date.now(),
             label: popped.label,
           })
           const newTop = s.history[s.history.length - 1]
           s.currentPipeline = newTop ? deepClonePipeline(newTop.pipeline) : null
+          s.frameConfig = newTop ? deepClone(newTop.frameConfig) : null
+          s.watermarkConfig = newTop ? deepClone(newTop.watermarkConfig) : null
         } else {
-          // 场景 B：把未 commit 的变化推入 future，current 回到 top
+          // 场景 B
           s.future.push({
             pipeline: deepClonePipeline(s.currentPipeline),
+            frameConfig: deepClone(s.frameConfig),
+            watermarkConfig: deepClone(s.watermarkConfig),
             timestamp: Date.now(),
           })
           s.currentPipeline = deepClonePipeline(top.pipeline)
+          s.frameConfig = deepClone(top.frameConfig)
+          s.watermarkConfig = deepClone(top.watermarkConfig)
         }
       })
     },
@@ -438,15 +516,16 @@ export const useEditStore = create<EditState>()(
       set((s) => {
         if (s.future.length === 0) return
         const next = s.future.pop()!
-        // redo：future 顶推入 history（恢复为最新 commit）+ current 设为它
-        // 注意：这会让 "刚才推入 future 的未 commit 变化" 变成新的栈顶 commit。
-        // 这是刻意的：一旦 redo，相当于用户明确接受那次变化作为 commit
         s.history.push({
           pipeline: deepClonePipeline(next.pipeline),
+          frameConfig: deepClone(s.frameConfig),
+          watermarkConfig: deepClone(s.watermarkConfig),
           timestamp: Date.now(),
           label: next.label,
         })
         s.currentPipeline = deepClonePipeline(next.pipeline)
+        s.frameConfig = deepClone(next.frameConfig)
+        s.watermarkConfig = deepClone(next.watermarkConfig)
         // 守住上限
         if (s.history.length > HISTORY_LIMIT) {
           s.history = s.history.slice(s.history.length - HISTORY_LIMIT)

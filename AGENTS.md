@@ -222,6 +222,17 @@ Commit body 模板（中文）：
 - CI 单平台总耗时 > 15min
 - 发布包（dmg/exe）> 300MB
 
+### 渲染路径性能防劣化准则（M5 引入）
+
+以下规则**强制执行**，违反即视为性能回归：
+
+1. **禁止在高频渲染路径中执行 `canvas.toDataURL`**：toDataURL 需要 GPU→CPU 回读 + 图像编码，单次 10-50ms。只能在"用户交互结束"或"显式需要快照"时执行，且必须用条件守卫（如 `captureSnapshot` 标志）
+2. **禁止在 Slider onChange（拖动中）路径做深拷贝**：`JSON.stringify`/`JSON.parse`/`structuredClone` 只能在 `onChangeEnd`（松手）时执行。高频路径只允许 immer draft 浅修改
+3. **Editor 组件的 zustand selector 必须精准**：禁止 `useEditStore((s) => s.currentPipeline)` 这种整对象订阅出现在会导致大范围 re-render 的位置。用 `useRef` + `useEffect` 传递给 WebGL，避免组件级重渲
+4. **`preserveDrawingBuffer: false` 不可更改**：这是 GPU swap chain 快路径的前提（省 2-5ms/帧）。所有"需要从 canvas 读取像素"的场景必须在 draw 的**同一 tick** 内完成，且必须有条件守卫
+5. **新增任何"每帧执行"的操作前，必须 benchmark 其 ms 开销**：在 commit body 中附上"新增操作单次耗时 Xms，对帧预算占比 Y%"，超过 2ms 必须做条件化或跳帧
+6. **React re-render 预算**：Editor 主组件 re-render 不超过 3ms（用 React DevTools Profiler 或 `performance.now()` 验证）。超过需拆分为 memo 子组件或改用 ref 模式
+
 ---
 
 ## 📂 目录约定

@@ -83,6 +83,12 @@ export interface WebGLPreviewResult {
   canvasRef: React.RefObject<HTMLCanvasElement>
   status: WebGLPreviewStatus
   error?: string
+  /**
+   * 最新一帧渲染结果的 dataURL（JPEG）。
+   * 在 renderNow 的同一 tick 内捕获（preserveDrawingBuffer=false 安全）。
+   * 用于边框预览等需要引用编辑后图像的场景。
+   */
+  snapshotRef: React.RefObject<string | null>
 }
 
 /** 构造 pipeline step 时需要的 GPU 资源（LUT 纹理等） */
@@ -243,10 +249,16 @@ const HISTOGRAM_SAMPLE_EVERY = 3
 export function useWebGLPreview(
   sourceUrl: string | null,
   pipeline: FilterPipeline | null,
+  /** 是否在每帧渲染后捕获快照（昂贵操作，仅边框预览时开启） */
+  captureSnapshot = false,
 ): WebGLPreviewResult {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [status, setStatus] = useState<WebGLPreviewStatus>('idle')
   const [error, setError] = useState<string | undefined>(undefined)
+  /** 最新一帧渲染结果（draw 同 tick 捕获，preserveDrawingBuffer=false 安全） */
+  const snapshotRef = useRef<string | null>(null)
+  const captureSnapshotRef = useRef(captureSnapshot)
+  captureSnapshotRef.current = captureSnapshot
   const [gl, setGl] = useState<GLContext | null>(null)
   /**
    * 上下文重建版本号。每次 webglcontextrestored 触发时 +1，让 sourceUrl useEffect
@@ -303,6 +315,19 @@ export function useWebGLPreview(
       const tAfterRun = performance.now()
 
       setStatus('ready')
+
+      // 2.5) 帧快照：仅在 captureSnapshot=true 时执行（toDataURL 极其昂贵：10-50ms）
+      //      边框预览需要时才开启，拖滑块调参时不执行
+      if (captureSnapshotRef.current) {
+        try {
+          const canvas = canvasRef.current
+          if (canvas) {
+            snapshotRef.current = canvas.toDataURL('image/jpeg', 0.8)
+          }
+        } catch {
+          // 静默失败
+        }
+      }
 
       // 3) 直方图：同 tick readPixels + 复用 buffer + 跳帧
       //    P0-1：preserveDrawingBuffer=false，但 draw 和 readPixels 都在同一个
@@ -468,7 +493,11 @@ export function useWebGLPreview(
       } catch (e) {
         if (cancelled) return
         // 释放 tmpCanvas 防止 96MB 内存泄漏
-        if (tmpCanvas) { tmpCanvas.width = 0; tmpCanvas.height = 0; tmpCanvas = null }
+        if (tmpCanvas) {
+          tmpCanvas.width = 0
+          tmpCanvas.height = 0
+          tmpCanvas = null
+        }
         // 关键错误记录到 console（诊断 "GL: Failed to fetch" 类问题）：
         //   - sourceUrl 前缀（判断是 data:/grain:/file:/...）
         //   - URL 长度（data URL 过大 Chromium 会拒）
@@ -519,5 +548,5 @@ export function useWebGLPreview(
     })
   }, [pipeline, lut.texture, renderNow])
 
-  return { canvasRef, status, error }
+  return { canvasRef, status, error, snapshotRef }
 }

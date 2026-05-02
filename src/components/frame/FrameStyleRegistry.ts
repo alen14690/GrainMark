@@ -42,6 +42,12 @@ export interface FrameLayoutProps {
   containerWidth: number
   /** 容器高度 */
   containerHeight: number
+  /**
+   * 覆盖照片 src —— 来自 WebGL canvas 的当前渲染帧 dataURL。
+   * 提供时替代 thumbSrc(photo)，使边框预览反映 AI 优化 / 滤镜 / 调参后的状态。
+   * 未提供时回退到原始缩略图（水印独立页等场景）。
+   */
+  photoSrcOverride?: string
 }
 
 const LAYOUT_REGISTRY: Partial<Record<FrameStyleId, ComponentType<FrameLayoutProps>>> = {
@@ -110,7 +116,7 @@ const LAYOUT_REGISTRY: Partial<Record<FrameStyleId, ComponentType<FrameLayoutPro
   'transparent-overlay': GenericOverlayLayout,
   // collage(2)
   'half-frame': GenericOverlayLayout,
-  'diptych': GenericOverlayLayout,
+  diptych: GenericOverlayLayout,
 }
 
 /** 占位布局导出:给未注册的风格调用方手动 fallback 用(可选) */

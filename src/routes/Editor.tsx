@@ -7,13 +7,32 @@
  *   - WebGL 渲染 : useWebGLPreview，完整 10-shader GPU pipeline + 实时直方图
  *   - 右栏 Tab   : 滤镜列表 | 参数调整（滑块）
  */
-import { Crop, Download, Eye, FlipHorizontal2, FlipVertical2, Frame, Maximize, Redo2, RotateCcw, RotateCw, Save, Sliders, Sparkles, SplitSquareHorizontal, Undo2, Wand2, ZoomIn } from 'lucide-react'
+import {
+  Crop,
+  Download,
+  Eye,
+  FlipHorizontal2,
+  FlipVertical2,
+  Frame,
+  Maximize,
+  Redo2,
+  RotateCcw,
+  RotateCw,
+  Save,
+  Sliders,
+  Sparkles,
+  SplitSquareHorizontal,
+  Undo2,
+  Wand2,
+  ZoomIn,
+} from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { AdjustmentsPanel } from '../components/AdjustmentsPanel'
 import AIAdvisorDialog from '../components/AIAdvisorDialog'
+import { AdjustmentsPanel } from '../components/AdjustmentsPanel'
 import CropOverlay from '../components/CropOverlay'
 import { EditorFramePanel } from '../components/frame/EditorFramePanel'
+import { FramePreviewHost } from '../components/frame/FramePreviewHost'
 import { Histogram, ScoreBar, ValueBadge, cn } from '../design'
 import { type FilterGroup, groupAndSortFilters } from '../lib/filterOrder'
 import { ipc } from '../lib/ipc'
@@ -49,6 +68,20 @@ export default function Editor() {
   /** 裁切模式 */
   const [cropMode, setCropMode] = useState(false)
   const canvasContainerRef = useRef<HTMLDivElement>(null)
+
+  // 边框/水印从 editStore 统一读取（Single Source of Truth）
+  const frameConfig = useEditStore((s) => s.frameConfig)
+  const watermarkConfig = useEditStore((s) => s.watermarkConfig)
+  const [frameStyles, setFrameStyles] = useState<import('../../shared/types').FrameStyle[]>([])
+
+  // 加载边框风格列表（纯 UI 数据缓存）
+  useEffect(() => {
+    ipc('frame:templates')
+      .then((list) => setFrameStyles(list))
+      .catch(() => {})
+  }, [])
+
+  const selectedFrameStyle = frameStyles.find((s) => s.id === frameConfig?.styleId) ?? null
 
   const activeFilter = filters.find((f) => f.id === activeFilterId)
 
@@ -126,10 +159,14 @@ export default function Editor() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable))
+        return
 
       const grainPlatform = typeof window !== 'undefined' ? window.grain?.platform : undefined
-      const isMac = grainPlatform !== undefined ? grainPlatform === 'darwin' : /Mac|iPod|iPhone|iPad/.test(navigator.platform)
+      const isMac =
+        grainPlatform !== undefined
+          ? grainPlatform === 'darwin'
+          : /Mac|iPod|iPhone|iPad/.test(navigator.platform)
       const isCmdOrCtrl = isMac ? e.metaKey : e.ctrlKey
 
       // \ = Before/After toggle
@@ -237,7 +274,6 @@ export default function Editor() {
 
   /** 导出当前编辑结果为全分辨率图片 */
   const [exportSize, setExportSize] = useState<'original' | '4000' | '2400' | '1600'>('original')
-  const [exportWatermark, setExportWatermark] = useState(false)
   const [exportToast, setExportToast] = useState<string | null>(null)
   const handleExport = async () => {
     if (!photo?.path) return
@@ -249,18 +285,8 @@ export default function Editor() {
         rotation,
         flipH,
         flipV,
-        watermark: exportWatermark ? {
-          templateId: 'minimal-bar',
-          position: 'bottom-center',
-          opacity: 0.92,
-          scale: 1,
-          color: '#ffffff',
-          bgColor: '#000000',
-          fontFamily: 'Inter',
-          showLogo: false,
-          fields: { make: true, model: true, lens: true, aperture: true, shutter: true, iso: true, focalLength: true, dateTime: true, artist: false, location: false },
-          padding: 24,
-        } : null,
+        watermark: watermarkConfig ?? null,
+        frame: frameConfig ? { styleId: frameConfig.styleId, overrides: frameConfig.overrides } : null,
       })
       if (result) {
         setExportToast(result)
@@ -273,8 +299,8 @@ export default function Editor() {
   }
 
   // ---- WebGL 预览：按 showOriginal / compareMode 短路 pipeline ----
-  const renderPipeline = (showOriginal || compareMode) ? null : currentPipeline
-  const webgl = useWebGLPreview(previewUrl, renderPipeline)
+  const renderPipeline = showOriginal || compareMode ? null : currentPipeline
+  const webgl = useWebGLPreview(previewUrl, renderPipeline, !!frameConfig)
 
   // GPU-only 策略（2026-04-26 起）：
   //   架构决策：不再做 CPU 兜底。编辑路径只走 WebGL 实时渲染
@@ -329,12 +355,15 @@ export default function Editor() {
   }, [])
 
   // ---- Viewport: 拖拽平移 ----
-  const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
-    if (viewport.zoom <= 1) return // fit 模式下不可 pan
-    isPanning.current = true
-    panStart.current = { x: e.clientX, y: e.clientY, panX: viewport.panX, panY: viewport.panY }
-    e.preventDefault()
-  }, [viewport.zoom, viewport.panX, viewport.panY])
+  const handleCanvasMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (viewport.zoom <= 1) return // fit 模式下不可 pan
+      isPanning.current = true
+      panStart.current = { x: e.clientX, y: e.clientY, panX: viewport.panX, panY: viewport.panY }
+      e.preventDefault()
+    },
+    [viewport.zoom, viewport.panX, viewport.panY],
+  )
 
   const handleCanvasMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isPanning.current) return
@@ -349,7 +378,7 @@ export default function Editor() {
 
   // 双击画布切换 Fit ↔ 放大
   const handleCanvasDoubleClick = useCallback(() => {
-    setViewport((v) => v.zoom > 1 ? { zoom: 1, panX: 0, panY: 0 } : { zoom: 3, panX: 0, panY: 0 })
+    setViewport((v) => (v.zoom > 1 ? { zoom: 1, panX: 0, panY: 0 } : { zoom: 3, panX: 0, panY: 0 }))
   }, [])
 
   if (!photo) {
@@ -360,177 +389,221 @@ export default function Editor() {
 
   const useWebglCanvas = !webglFatal && (webgl.status === 'ready' || webgl.status === 'loading')
   const showImgFallback = !useWebglCanvas && previewUrl
-  const canvasStyle = { maxWidth: '100%', maxHeight: 'calc(100vh - 240px)' } as const
+  const canvasStyle = { maxWidth: '100%', maxHeight: 'calc(100vh - 260px)' } as const
+  /** 是否显示边框覆盖层 — 选中了边框且风格数据已加载 */
+  const showFrameOverlay = !!frameConfig?.styleId && !!selectedFrameStyle
 
   return (
     <div className="h-full flex animate-fade-in bg-bg-0" data-testid="editor-root">
       {/* Canvas Column */}
       <section className="flex-1 flex flex-col min-w-0 bg-bg-0">
-        {/* 顶部工具条 */}
-        <div className="h-12 border-b border-fg-4/50 flex items-center px-4 gap-2">
-          <div className="text-sm font-medium truncate flex-1 text-fg-1">{photo.name}</div>
-          {dirty && <ValueBadge value="EDITED" variant="amber" size="sm" className="!ml-0 shrink-0" />}
-          <button
-            type="button"
-            onClick={undo}
-            disabled={!canUndoNow}
-            data-testid="editor-undo-btn"
-            className={cn('btn-ghost btn-xs', !canUndoNow && 'opacity-30 cursor-not-allowed')}
-            title="撤销 (⌘Z)"
-          >
-            <Undo2 className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={redo}
-            disabled={!canRedoNow}
-            data-testid="editor-redo-btn"
-            className={cn('btn-ghost btn-xs', !canRedoNow && 'opacity-30 cursor-not-allowed')}
-            title="重做 (⌘⇧Z)"
-          >
-            <Redo2 className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onMouseDown={() => setShowOriginal(true)}
-            onMouseUp={() => setShowOriginal(false)}
-            onMouseLeave={() => setShowOriginal(false)}
-            className="btn-ghost btn-xs"
-            title="按住查看原图"
-          >
-            <SplitSquareHorizontal className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setCompareMode((m) => !m)}
-            className={cn('btn-ghost btn-xs', compareMode && 'bg-brand-amber/20 text-brand-amber')}
-            title="Before/After 切换 (\)"
-          >
-            <Eye className="w-3.5 h-3.5" />
-          </button>
-          <div className="divider-metal-v mx-1" />
-          {/* 旋转 & 翻转 */}
-          <button
-            type="button"
-            onClick={() => {
-              const newRot = ((rotation + 90) % 360) as 0 | 90 | 180 | 270
-              setTransform({ rotation: newRot, flipH, flipV })
-              commitHistory('旋转')
-            }}
-            className="btn-ghost btn-xs"
-            title="旋转 90° (R)"
-          >
-            <RotateCw className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setTransform({ rotation, flipH: !flipH, flipV })
-              commitHistory('水平翻转')
-            }}
-            className={cn('btn-ghost btn-xs', flipH && 'bg-fg-4/20')}
-            title="水平翻转 (H)"
-          >
-            <FlipHorizontal2 className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setTransform({ rotation, flipH, flipV: !flipV })
-              commitHistory('垂直翻转')
-            }}
-            className={cn('btn-ghost btn-xs', flipV && 'bg-fg-4/20')}
-            title="垂直翻转"
-          >
-            <FlipVertical2 className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setCropMode((m) => !m)}
-            className={cn('btn-ghost btn-xs', cropMode && 'bg-brand-amber/20 text-brand-amber')}
-            title="裁切 (C)"
-          >
-            <Crop className="w-3.5 h-3.5" />
-          </button>
-          <div className="divider-metal-v mx-1" />
-          {/* 缩放控制 */}
-          <button
-            type="button"
-            onClick={() => setViewport({ zoom: 1, panX: 0, panY: 0 })}
-            className={cn('btn-ghost btn-xs', viewport.zoom === 1 && 'text-brand-amber')}
-            title="适应窗口 (⌘0)"
-          >
-            <Maximize className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewport({ zoom: 3, panX: 0, panY: 0 })}
-            className={cn('btn-ghost btn-xs', viewport.zoom === 3 && 'text-brand-amber')}
-            title="放大 100% (⌘1)"
-          >
-            <ZoomIn className="w-3.5 h-3.5" />
-          </button>
-          <span className="text-xxs font-numeric text-fg-3 w-10 text-center">{Math.round(viewport.zoom * 100)}%</span>
-          {dirty && (
+        {/* 顶部工具条 — 双行布局 */}
+        <div className="border-b border-fg-4/50 flex flex-col">
+          {/* 第一行：文件名 + 编辑工具 */}
+          <div className="h-10 flex items-center px-4 gap-1.5">
+            <div className="text-xs font-medium truncate text-fg-1 max-w-[120px]">{photo.name}</div>
+            {dirty && <ValueBadge value="EDITED" variant="amber" size="sm" className="!ml-0 shrink-0" />}
+            <div className="flex-1" />
             <button
               type="button"
-              onClick={handleResetToBaseline}
-              className="btn-ghost btn-xs"
-              title="重置到滤镜预设"
+              onClick={undo}
+              disabled={!canUndoNow}
+              data-testid="editor-undo-btn"
+              className={cn('btn-ghost btn-xs', !canUndoNow && 'opacity-30 cursor-not-allowed')}
+              title="撤销 (⌘Z)"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
+              <Undo2 className="w-3.5 h-3.5" />
             </button>
-          )}
-          <div className="divider-metal-v mx-1" />
-          <button
-            type="button"
-            onClick={() => setShowAIAdvisor(true)}
-            className="btn-ghost btn-xs gap-1"
-            title="AI 摄影顾问：光影/色彩/质感/主体 5 维分析"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-brand-amber" />
-            <span className="text-xxs">AI 顾问</span>
-          </button>
-          <div className="divider-metal-v mx-1" />
-          <button
-            type="button"
-            onClick={handleSavePreset}
-            disabled={!dirty}
-            className={cn('btn-secondary btn-xs', !dirty && 'opacity-40 cursor-not-allowed')}
-            title={dirty ? '把当前调整保存为"我的滤镜"' : '当前参数与起点一致，无需保存'}
-          >
-            <Save className="w-3.5 h-3.5" />
-            保存预设
-          </button>
-          <select
-            value={exportSize}
-            onChange={(e) => setExportSize(e.target.value as typeof exportSize)}
-            className="text-xxs bg-bg-1 border border-fg-4/40 rounded px-1.5 py-1 text-fg-2"
-            title="导出尺寸（长边像素）"
-          >
-            <option value="original">原图尺寸</option>
-            <option value="4000">长边 4000px</option>
-            <option value="2400">长边 2400px</option>
-            <option value="1600">长边 1600px</option>
-          </select>
-          <label className="flex items-center gap-1 text-xxs text-fg-3 cursor-pointer" title="导出时添加 EXIF 水印底栏">
-            <input
-              type="checkbox"
-              checked={exportWatermark}
-              onChange={(e) => setExportWatermark(e.target.checked)}
-              className="accent-brand-amber"
-            />
-            水印
-          </label>
-          <button
-            type="button"
-            onClick={handleExport}
-            className="btn-primary btn-xs"
-            data-testid="editor-export-btn"
-          >
-            <Download className="w-3.5 h-3.5" />
-            导出
-          </button>
+            <button
+              type="button"
+              onClick={redo}
+              disabled={!canRedoNow}
+              data-testid="editor-redo-btn"
+              className={cn('btn-ghost btn-xs', !canRedoNow && 'opacity-30 cursor-not-allowed')}
+              title="重做 (⌘⇧Z)"
+            >
+              <Redo2 className="w-3.5 h-3.5" />
+            </button>
+            <div className="divider-metal-v mx-0.5 h-4" />
+            <button
+              type="button"
+              onMouseDown={() => setShowOriginal(true)}
+              onMouseUp={() => setShowOriginal(false)}
+              onMouseLeave={() => setShowOriginal(false)}
+              className="btn-ghost btn-xs"
+              title="按住查看原图"
+            >
+              <SplitSquareHorizontal className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setCompareMode((m) => !m)}
+              className={cn('btn-ghost btn-xs', compareMode && 'bg-brand-amber/20 text-brand-amber')}
+              title="Before/After 切换 (\)"
+            >
+              <Eye className="w-3.5 h-3.5" />
+            </button>
+            <div className="divider-metal-v mx-0.5 h-4" />
+            <button
+              type="button"
+              onClick={() => {
+                const newRot = ((rotation + 90) % 360) as 0 | 90 | 180 | 270
+                setTransform({ rotation: newRot, flipH, flipV })
+                commitHistory('旋转')
+              }}
+              className="btn-ghost btn-xs"
+              title="旋转 90° (R)"
+            >
+              <RotateCw className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTransform({ rotation, flipH: !flipH, flipV })
+                commitHistory('水平翻转')
+              }}
+              className={cn('btn-ghost btn-xs', flipH && 'bg-fg-4/20')}
+              title="水平翻转 (H)"
+            >
+              <FlipHorizontal2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTransform({ rotation, flipH, flipV: !flipV })
+                commitHistory('垂直翻转')
+              }}
+              className={cn('btn-ghost btn-xs', flipV && 'bg-fg-4/20')}
+              title="垂直翻转"
+            >
+              <FlipVertical2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setCropMode((m) => !m)}
+              className={cn('btn-ghost btn-xs', cropMode && 'bg-brand-amber/20 text-brand-amber')}
+              title="裁切 (C)"
+            >
+              <Crop className="w-3.5 h-3.5" />
+            </button>
+            <div className="divider-metal-v mx-0.5 h-4" />
+            <button
+              type="button"
+              onClick={() => setViewport({ zoom: 1, panX: 0, panY: 0 })}
+              className={cn('btn-ghost btn-xs', viewport.zoom === 1 && 'text-brand-amber')}
+              title="适应窗口 (⌘0)"
+            >
+              <Maximize className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewport({ zoom: 3, panX: 0, panY: 0 })}
+              className={cn('btn-ghost btn-xs', viewport.zoom === 3 && 'text-brand-amber')}
+              title="放大 100% (⌘1)"
+            >
+              <ZoomIn className="w-3.5 h-3.5" />
+            </button>
+            <span className="text-xxs font-numeric text-fg-3 w-8 text-center">
+              {Math.round(viewport.zoom * 100)}%
+            </span>
+            {dirty && (
+              <button
+                type="button"
+                onClick={handleResetToBaseline}
+                className="btn-ghost btn-xs"
+                title="重置到滤镜预设"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+            )}
+            <div className="divider-metal-v mx-0.5 h-4" />
+            <button
+              type="button"
+              onClick={() => setShowAIAdvisor(true)}
+              className="btn-ghost btn-xs gap-1"
+              title="AI 摄影顾问"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-brand-amber" />
+              <span className="text-xxs">AI 顾问</span>
+            </button>
+          </div>
+          {/* 第二行：保存预设 + 导出选项 */}
+          <div className="h-9 flex items-center px-4 gap-2 border-t border-fg-4/20">
+            <button
+              type="button"
+              onClick={handleSavePreset}
+              disabled={!dirty}
+              className={cn('btn-secondary btn-xs', !dirty && 'opacity-40 cursor-not-allowed')}
+              title={dirty ? '把当前调整保存为"我的滤镜"' : '当前参数与起点一致，无需保存'}
+            >
+              <Save className="w-3.5 h-3.5" />
+              保存预设
+            </button>
+            <div className="divider-metal-v mx-0.5 h-4" />
+            <select
+              value={exportSize}
+              onChange={(e) => setExportSize(e.target.value as typeof exportSize)}
+              className="text-xxs bg-bg-1 border border-fg-4/40 rounded px-1.5 py-1 text-fg-2"
+              title="导出尺寸（长边像素）"
+            >
+              <option value="original">原图尺寸</option>
+              <option value="4000">长边 4000px</option>
+              <option value="2400">长边 2400px</option>
+              <option value="1600">长边 1600px</option>
+            </select>
+            <label
+              className="flex items-center gap-1 text-xxs text-fg-3 cursor-pointer"
+              title="导出时添加 EXIF 水印底栏"
+            >
+              <input
+                type="checkbox"
+                checked={!!watermarkConfig}
+                onChange={(e) => {
+                  const setWm = useEditStore.getState().setWatermarkConfig
+                  if (e.target.checked) {
+                    setWm({
+                      templateId: 'minimal-bar',
+                      position: 'bottom-center',
+                      opacity: 0.92,
+                      scale: 1,
+                      color: '#ffffff',
+                      bgColor: '#000000',
+                      fontFamily: 'Inter',
+                      showLogo: false,
+                      fields: {
+                        make: true,
+                        model: true,
+                        lens: true,
+                        aperture: true,
+                        shutter: true,
+                        iso: true,
+                        focalLength: true,
+                        dateTime: false,
+                        artist: false,
+                        location: false,
+                      },
+                      padding: 24,
+                    })
+                    commitHistory('添加水印')
+                  } else {
+                    setWm(null)
+                    commitHistory('移除水印')
+                  }
+                }}
+                className="accent-brand-amber"
+              />
+              水印
+            </label>
+            <button
+              type="button"
+              onClick={handleExport}
+              className="btn-primary btn-xs"
+              data-testid="editor-export-btn"
+            >
+              <Download className="w-3.5 h-3.5" />
+              导出
+            </button>
+          </div>
         </div>
 
         {/* ScoreBar 占位 */}
@@ -542,14 +615,18 @@ export default function Editor() {
         <div
           ref={canvasContainerRef}
           className="flex-1 flex items-center justify-center p-6 overflow-hidden relative"
-          style={{ cursor: viewport.zoom > 1 ? (isPanning.current ? 'grabbing' : 'grab') : 'default' }}
-          onWheel={handleWheel}
-          onMouseDown={handleCanvasMouseDown}
-          onMouseMove={handleCanvasMouseMove}
-          onMouseUp={handleCanvasMouseUp}
-          onMouseLeave={handleCanvasMouseUp}
-          onDoubleClick={handleCanvasDoubleClick}
+          style={{
+            cursor:
+              !showFrameOverlay && viewport.zoom > 1 ? (isPanning.current ? 'grabbing' : 'grab') : 'default',
+          }}
+          onWheel={showFrameOverlay ? undefined : handleWheel}
+          onMouseDown={showFrameOverlay ? undefined : handleCanvasMouseDown}
+          onMouseMove={showFrameOverlay ? undefined : handleCanvasMouseMove}
+          onMouseUp={showFrameOverlay ? undefined : handleCanvasMouseUp}
+          onMouseLeave={showFrameOverlay ? undefined : handleCanvasMouseUp}
+          onDoubleClick={showFrameOverlay ? undefined : handleCanvasDoubleClick}
         >
+          {/* WebGL 画布层 — 始终挂载，避免切换时重建 GL context 导致闪烁 */}
           <div
             className="relative max-w-full max-h-full transition-transform duration-75"
             style={{
@@ -561,22 +638,22 @@ export default function Editor() {
                 `scaleY(${flipV ? -1 : 1})`,
               ].join(' '),
               transformOrigin: 'center center',
+              // 选中边框时隐藏 WebGL 画布（不卸载），用 visibility 保持 GL context 存活
+              visibility: showFrameOverlay ? 'hidden' : 'visible',
             }}
           >
-            {/* WebGL 画布（主路径） */}
             <canvas
               ref={webgl.canvasRef}
               data-testid="preview-canvas"
               className={cn('rounded-md shadow-soft-lg object-contain', useWebglCanvas ? 'block' : 'hidden')}
               style={canvasStyle}
             />
-            {/* WebGL 不可用时显示原图占位（未调色），必须叠加醒目提示避免用户误以为"调色生效了" */}
             {showImgFallback && (
               <div className="relative">
                 <img
                   src={previewUrl!}
                   alt="preview"
-                  className="max-w-full max-h-[calc(100vh-240px)] object-contain rounded-md shadow-soft-lg"
+                  className="max-w-full max-h-[calc(100vh-260px)] object-contain rounded-md shadow-soft-lg"
                 />
                 <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-sem-error/90 text-white text-xs font-medium px-3 py-1.5 rounded shadow-soft-md backdrop-blur-sm">
                   ⚠ WebGL 不可用 · 当前显示原图，调色暂不生效
@@ -623,13 +700,35 @@ export default function Editor() {
                 GL: {webgl.error}
               </div>
             )}
-            {/* Dev 诊断条：webgl 状态 + pipeline 通道数 + Frame budget；仅 import.meta.env.DEV 显示 */}
             {import.meta.env.DEV && (
               <DevDiagnosticOverlay
                 status={webgl.status}
                 error={webgl.error}
                 channelCount={currentPipeline ? countPipelineChannels(currentPipeline) : 0}
               />
+            )}
+          </div>
+
+          {/* 边框预览覆盖层 — 选中边框时淡入叠加，不触发 WebGL 重建 */}
+          <div
+            className="absolute inset-6 transition-opacity duration-200 ease-out"
+            style={{
+              opacity: showFrameOverlay ? 1 : 0,
+              pointerEvents: showFrameOverlay ? 'auto' : 'none',
+            }}
+          >
+            {selectedFrameStyle && photo && frameConfig?.overrides && (
+              <>
+                <FramePreviewHost
+                  photo={photo}
+                  style={selectedFrameStyle}
+                  overrides={frameConfig.overrides}
+                  photoSrcOverride={webgl.snapshotRef.current ?? undefined}
+                />
+                <div className="absolute top-3 left-3 z-10">
+                  <ValueBadge value={`边框 · ${selectedFrameStyle.name}`} variant="amber" size="sm" />
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -693,6 +792,7 @@ export default function Editor() {
             onClick={() => setRightTab('frame')}
             icon={<Frame className="w-3.5 h-3.5" strokeWidth={2} />}
             label="边框"
+            sub={selectedFrameStyle?.name}
             testId="editor-tab-frame"
           />
         </div>

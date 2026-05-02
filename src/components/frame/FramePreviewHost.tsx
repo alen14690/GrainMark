@@ -28,9 +28,11 @@ export interface FramePreviewHostProps {
   photo: Photo | null
   style: FrameStyle | null
   overrides: FrameStyleOverrides | null
+  /** 来自 WebGL canvas 的当前渲染帧 dataURL，覆盖原始缩略图 */
+  photoSrcOverride?: string
 }
 
-export function FramePreviewHost({ photo, style, overrides }: FramePreviewHostProps) {
+export function FramePreviewHost({ photo, style, overrides, photoSrcOverride }: FramePreviewHostProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 })
 
@@ -96,6 +98,7 @@ export function FramePreviewHost({ photo, style, overrides }: FramePreviewHostPr
             overrides={overrides}
             containerWidth={fit.boxW}
             containerHeight={fit.boxH}
+            photoSrcOverride={photoSrcOverride}
           />
         </div>
       )}

@@ -650,6 +650,8 @@ export interface IpcApi {
       flipH?: boolean
       flipV?: boolean
       watermark?: WatermarkStyle | null
+      /** 边框：在所有变换/水印之后叠加 */
+      frame?: { styleId: FrameStyleId; overrides: FrameStyleOverrides } | null
     },
   ) => Promise<string | null>
 

@@ -396,7 +396,21 @@ export const IPC_SCHEMAS = {
   'photo:exportSingle': z.tuple([
     PathSchema,
     z.any(), // FilterPipeline | null
-    z.object({ longEdge: z.number().nullable(), quality: z.number().min(1).max(100) }),
+    z.object({
+      longEdge: z.number().nullable(),
+      quality: z.number().min(1).max(100),
+      rotation: z.number().optional(),
+      flipH: z.boolean().optional(),
+      flipV: z.boolean().optional(),
+      watermark: WatermarkStyleSchema.nullable().optional(),
+      frame: z
+        .object({
+          styleId: FrameStyleIdSchema,
+          overrides: FrameStyleOverridesSchema,
+        })
+        .nullable()
+        .optional(),
+    }),
   ]),
 
   'preview:render': z.tuple([PathSchema, FilterIdSchema.nullable(), FilterPipelineSchema.optional()]),
