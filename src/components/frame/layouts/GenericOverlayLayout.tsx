@@ -56,6 +56,11 @@ export function GenericOverlayLayout({
 
   const imageSrc = photo.thumbPath ? thumbSrc(photo) : undefined
 
+  // Logo 路径(从 overrides 传入 · Watermark.tsx 自动按 EXIF make 匹配)
+  const logoSrc = overrides.logoPath
+    ? `grain://logo/${encodeURIComponent(overrides.logoPath.split('/').pop()!)}?v=1`
+    : undefined
+
   const ctx: StageFiveContext = {
     styleId: style.id,
     group: style.group,
@@ -68,10 +73,8 @@ export function GenericOverlayLayout({
     paramText,
     artistText,
     exif: photo.exif,
+    logoSrc,
   }
-
-  // Logo 路径(从 overrides 传入 · Watermark.tsx 自动按 EXIF make 匹配)
-  const logoPath = overrides.logoPath
 
   return (
     <div
@@ -85,25 +88,6 @@ export function GenericOverlayLayout({
       }}
     >
       {renderByStyleId(ctx)}
-      {/* 品牌 Logo overlay · 左下角 · 所有风格通用 */}
-      {logoPath && (
-        <img
-          src={`grain://logo/${encodeURIComponent(logoPath.split('/').pop()!)}?v=1`}
-          alt="brand logo"
-          draggable={false}
-          style={{
-            position: 'absolute',
-            left: containerWidth * 0.03,
-            bottom: containerHeight * 0.03,
-            height: Math.max(containerHeight * 0.06, 16),
-            width: 'auto',
-            objectFit: 'contain',
-            opacity: 0.85,
-            zIndex: 20,
-            pointerEvents: 'none',
-          }}
-        />
-      )}
     </div>
   )
 }
@@ -124,6 +108,7 @@ interface StageFiveContext {
   paramText: string
   artistText: string
   exif: PhotoExif
+  logoSrc?: string
 }
 
 function renderByStyleId(ctx: StageFiveContext): React.ReactNode {
@@ -225,43 +210,78 @@ function scale(ratio: number, ctx: StageFiveContext): number {
   return Math.max(Math.round(ratio * Math.min(ctx.containerWidth, ctx.containerHeight)), 8)
 }
 
+/** 品牌 Logo · 与参数文字配合显示(放在文字行左侧或上方) */
+function BrandLogo({ ctx, height }: { ctx: StageFiveContext; height?: number }) {
+  if (!ctx.logoSrc) return null
+  const h = height ?? scale(0.035, ctx)
+  return (
+    <img
+      src={ctx.logoSrc}
+      alt=""
+      draggable={false}
+      style={{
+        height: h,
+        width: 'auto',
+        objectFit: 'contain',
+        opacity: 0.9,
+        flexShrink: 0,
+      }}
+    />
+  )
+}
+
 // ============================================================================
 // GLASS · 玻璃拟态
 // ============================================================================
 
 function renderFrostedGlass(ctx: StageFiveContext) {
-  const { containerWidth, containerHeight } = ctx
-  const padX = containerWidth * 0.05
+  const { containerWidth, containerHeight, orientation } = ctx
+  const glassH = containerHeight * (orientation === 'portrait' ? 0.14 : 0.12)
   return (
-    <>
-      <PhotoCover src={ctx.imageSrc} />
-      {/* 磨砂玻璃底条 · 居中浮起在照片底部 5% 位置 */}
+    <div style={{ position: 'absolute', inset: 0, background: '#000' }}>
+      {/* 照片占上方 · 留底部给玻璃区 */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: glassH, overflow: 'hidden' }}>
+        <PhotoCover src={ctx.imageSrc} />
+      </div>
+      {/* 照片底部向玻璃区半透明过渡 */}
       <div
         style={{
           position: 'absolute',
-          left: `${padX}px`,
-          right: `${padX}px`,
-          bottom: `${containerHeight * 0.05}px`,
-          padding: `${scale(0.018, ctx)}px ${scale(0.022, ctx)}px`,
-          borderRadius: 14,
-          background: 'rgba(255, 255, 255, 0.08)',
-          backdropFilter: 'blur(20px) saturate(140%)',
-          WebkitBackdropFilter: 'blur(20px) saturate(140%)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3)',
-          color: '#ffffff',
-          zIndex: 10,
-          fontFamily: "'Inter', system-ui, sans-serif",
+          left: 0,
+          right: 0,
+          bottom: glassH,
+          height: glassH * 0.6,
+          background: 'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.6) 100%)',
+          zIndex: 2,
+          pointerEvents: 'none',
+        }}
+      />
+      {/* 底部玻璃区 · 在照片外 */}
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: glassH,
+          backdropFilter: 'blur(30px) saturate(150%)',
+          WebkitBackdropFilter: 'blur(30px) saturate(150%)',
+          background: 'rgba(20, 20, 30, 0.75)',
+          borderTop: '1px solid rgba(255,255,255,0.1)',
+          display: 'flex',
+          alignItems: 'center',
+          padding: `0 ${containerWidth * 0.05}px`,
+          gap: scale(0.015, ctx),
+          zIndex: 5,
         }}
       >
-        <GlassLine size={scale(0.022, ctx)} weight={600}>
-          {ctx.modelText || '—'}
-        </GlassLine>
-        <GlassLine size={scale(0.016, ctx)} color="rgba(255,255,255,0.88)" mono mt={3}>
-          {ctx.paramText || '—'}
-        </GlassLine>
+        <BrandLogo ctx={ctx} height={Math.round(glassH * 0.45)} />
+        <div style={{ flex: 1, minWidth: 0, color: '#fff', fontFamily: "'Inter', system-ui, sans-serif" }}>
+          <GlassLine size={scale(0.02, ctx)} weight={600}>{ctx.modelText || '—'}</GlassLine>
+          <GlassLine size={scale(0.014, ctx)} color="rgba(255,255,255,0.75)" mono mt={2}>{ctx.paramText || '—'}</GlassLine>
+        </div>
       </div>
-    </>
+    </div>
   )
 }
 
@@ -300,52 +320,43 @@ function GlassLine({
 }
 
 function renderGlassChip(ctx: StageFiveContext) {
-  const { containerWidth, containerHeight } = ctx
+  const { containerWidth, containerHeight, orientation } = ctx
+  const glassH = containerHeight * (orientation === 'portrait' ? 0.12 : 0.1)
   return (
-    <>
-      <PhotoCover src={ctx.imageSrc} />
+    <div style={{ position: 'absolute', inset: 0, background: '#000' }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: glassH, overflow: 'hidden' }}>
+        <PhotoCover src={ctx.imageSrc} />
+      </div>
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: glassH, height: glassH * 0.5, background: 'linear-gradient(180deg, transparent, rgba(0,0,0,0.5))', zIndex: 2, pointerEvents: 'none' }} />
       <div
         style={{
           position: 'absolute',
-          right: `${containerWidth * 0.04}px`,
-          bottom: `${containerHeight * 0.04}px`,
-          maxWidth: `${containerWidth * 0.6}px`,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: glassH,
+          backdropFilter: 'blur(24px) saturate(150%)',
+          WebkitBackdropFilter: 'blur(24px) saturate(150%)',
+          background: 'rgba(15, 15, 20, 0.8)',
+          borderTop: '1px solid rgba(255,255,255,0.08)',
           display: 'flex',
           alignItems: 'center',
-          gap: 10,
-          padding: `${scale(0.012, ctx)}px ${scale(0.018, ctx)}px ${scale(0.012, ctx)}px ${scale(0.01, ctx)}px`,
-          backdropFilter: 'blur(16px) saturate(140%)',
-          WebkitBackdropFilter: 'blur(16px) saturate(140%)',
-          background: 'rgba(20, 20, 20, 0.35)',
-          border: '1px solid rgba(255,255,255,0.15)',
-          borderRadius: 999,
-          boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
-          color: '#fff',
-          zIndex: 10,
-          overflow: 'hidden',
+          justifyContent: 'center',
+          padding: `0 ${containerWidth * 0.05}px`,
+          gap: scale(0.012, ctx),
+          zIndex: 5,
         }}
       >
-        {/* 品牌色点(非 Logo · 仅视觉识别) */}
-        <span
-          style={{
-            width: scale(0.03, ctx),
-            height: scale(0.03, ctx),
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #ff8c42, #ff3a3a)',
-            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.25)',
-            flexShrink: 0,
-          }}
-        />
-        <div style={{ minWidth: 0, flex: 1, fontFamily: "'JetBrains Mono', monospace" }}>
-          <GlassLine size={scale(0.015, ctx)} weight={600}>
-            {ctx.modelText || '—'}
-          </GlassLine>
-          <GlassLine size={scale(0.012, ctx)} color="rgba(255,255,255,0.8)" mt={1}>
-            {ctx.paramText || '—'}
-          </GlassLine>
+        <BrandLogo ctx={ctx} height={Math.round(glassH * 0.4)} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.06)', borderRadius: 999, padding: `${scale(0.008, ctx)}px ${scale(0.014, ctx)}px`, border: '1px solid rgba(255,255,255,0.1)' }}>
+          <span style={{ width: scale(0.022, ctx), height: scale(0.022, ctx), borderRadius: '50%', background: 'linear-gradient(135deg, #ff8c42, #ff3a3a)', flexShrink: 0 }} />
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", minWidth: 0 }}>
+            <GlassLine size={scale(0.013, ctx)} weight={600}>{ctx.modelText || '—'}</GlassLine>
+            <GlassLine size={scale(0.01, ctx)} color="rgba(255,255,255,0.7)" mt={1}>{ctx.paramText || '—'}</GlassLine>
+          </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }
 
@@ -566,8 +577,13 @@ function renderAmbientGlow(ctx: StageFiveContext) {
           color: 'rgba(255,255,255,0.95)',
           textShadow: '0 2px 8px rgba(0,0,0,0.5)',
           zIndex: 5,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 4,
         }}
       >
+        <BrandLogo ctx={ctx} height={scale(0.03, ctx)} />
         <div
           style={{
             fontFamily: "'Inter', system-ui, sans-serif",
@@ -577,6 +593,7 @@ function renderAmbientGlow(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.modelText || '—'}
@@ -1057,70 +1074,77 @@ function shortLens(lens?: string): string {
 // ============================================================================
 
 function renderGlassGradient(ctx: StageFiveContext) {
-  const { containerWidth, containerHeight } = ctx
-  const padX = containerWidth * 0.05
+  const { containerWidth, containerHeight, orientation } = ctx
+  const glassH = containerHeight * (orientation === 'portrait' ? 0.14 : 0.12)
   return (
-    <>
-      <PhotoCover src={ctx.imageSrc} />
+    <div style={{ position: 'absolute', inset: 0, background: '#000' }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: glassH, overflow: 'hidden' }}>
+        <PhotoCover src={ctx.imageSrc} />
+      </div>
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: glassH, height: glassH * 0.6, background: 'linear-gradient(180deg, transparent, rgba(0,0,0,0.5))', zIndex: 2, pointerEvents: 'none' }} />
       <div
         style={{
           position: 'absolute',
-          left: `${padX}px`,
-          right: `${padX}px`,
-          bottom: `${containerHeight * 0.05}px`,
-          padding: `${scale(0.018, ctx)}px ${scale(0.022, ctx)}px`,
-          borderRadius: 14,
-          background:
-            'linear-gradient(90deg, rgba(120,80,220,0.12), rgba(80,180,220,0.1), rgba(220,120,80,0.12))',
-          backdropFilter: 'blur(20px) saturate(140%)',
-          WebkitBackdropFilter: 'blur(20px) saturate(140%)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
-          color: '#ffffff',
-          zIndex: 10,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: glassH,
+          background: 'linear-gradient(90deg, rgba(120,80,220,0.2), rgba(80,180,220,0.15), rgba(220,120,80,0.2))',
+          backdropFilter: 'blur(24px) saturate(150%)',
+          WebkitBackdropFilter: 'blur(24px) saturate(150%)',
+          borderTop: '1px solid rgba(255,255,255,0.1)',
+          display: 'flex',
+          alignItems: 'center',
+          padding: `0 ${containerWidth * 0.05}px`,
+          gap: scale(0.015, ctx),
+          zIndex: 5,
         }}
       >
-        <GlassLine size={scale(0.022, ctx)} weight={600}>
-          {ctx.modelText || '—'}
-        </GlassLine>
-        <GlassLine size={scale(0.016, ctx)} color="rgba(255,255,255,0.88)" mono mt={3}>
-          {ctx.paramText || '—'}
-        </GlassLine>
+        <BrandLogo ctx={ctx} height={Math.round(glassH * 0.45)} />
+        <div style={{ flex: 1, minWidth: 0, color: '#fff', fontFamily: "'Inter', system-ui, sans-serif" }}>
+          <GlassLine size={scale(0.02, ctx)} weight={600}>{ctx.modelText || '—'}</GlassLine>
+          <GlassLine size={scale(0.014, ctx)} color="rgba(255,255,255,0.75)" mono mt={2}>{ctx.paramText || '—'}</GlassLine>
+        </div>
       </div>
-    </>
+    </div>
   )
 }
 
 function renderGlassMinimal(ctx: StageFiveContext) {
-  const { containerWidth, containerHeight } = ctx
+  const { containerWidth, containerHeight, orientation } = ctx
+  const glassH = containerHeight * (orientation === 'portrait' ? 0.1 : 0.08)
   return (
-    <>
-      <PhotoCover src={ctx.imageSrc} />
+    <div style={{ position: 'absolute', inset: 0, background: '#000' }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: glassH, overflow: 'hidden' }}>
+        <PhotoCover src={ctx.imageSrc} />
+      </div>
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: glassH, height: glassH * 0.4, background: 'linear-gradient(180deg, transparent, rgba(0,0,0,0.4))', zIndex: 2, pointerEvents: 'none' }} />
       <div
         style={{
           position: 'absolute',
-          left: `${containerWidth * 0.04}px`,
-          bottom: `${containerHeight * 0.04}px`,
-          maxWidth: `${containerWidth * 0.4}px`,
-          padding: `${scale(0.008, ctx)}px ${scale(0.012, ctx)}px`,
-          borderRadius: 6,
-          background: 'rgba(255,255,255,0.12)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          border: '0.5px solid rgba(255,255,255,0.2)',
-          color: '#ffffff',
-          zIndex: 10,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: glassH,
+          background: 'rgba(10, 10, 15, 0.85)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderTop: '1px solid rgba(255,255,255,0.06)',
+          display: 'flex',
+          alignItems: 'center',
+          padding: `0 ${containerWidth * 0.05}px`,
+          gap: scale(0.012, ctx),
+          zIndex: 5,
           fontFamily: "'JetBrains Mono', monospace",
         }}
       >
-        <GlassLine size={scale(0.013, ctx)} color="rgba(255,255,255,0.9)">
-          {ctx.modelText || '—'}
-        </GlassLine>
-        <GlassLine size={scale(0.011, ctx)} color="rgba(255,255,255,0.7)" mt={1}>
-          {ctx.paramText || '—'}
-        </GlassLine>
+        <BrandLogo ctx={ctx} height={Math.round(glassH * 0.4)} />
+        <div style={{ flex: 1, minWidth: 0, color: '#fff' }}>
+          <GlassLine size={scale(0.012, ctx)} color="rgba(255,255,255,0.85)">{ctx.modelText || '—'}</GlassLine>
+          <GlassLine size={scale(0.01, ctx)} color="rgba(255,255,255,0.55)" mt={1}>{ctx.paramText || '—'}</GlassLine>
+        </div>
       </div>
-    </>
+    </div>
   )
 }
 
@@ -1706,8 +1730,13 @@ function renderAmbientColored(ctx: StageFiveContext) {
           bottom: `${containerHeight * 0.05}px`,
           textAlign: 'center',
           zIndex: 5,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 4,
         }}
       >
+        <BrandLogo ctx={ctx} height={scale(0.03, ctx)} />
         <div
           style={{
             color: colors.modelColor,
@@ -1716,6 +1745,7 @@ function renderAmbientColored(ctx: StageFiveContext) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            maxWidth: '100%',
           }}
         >
           {ctx.modelText || '—'}
