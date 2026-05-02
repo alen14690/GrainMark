@@ -7,12 +7,13 @@
  *   - WebGL 渲染 : useWebGLPreview，完整 10-shader GPU pipeline + 实时直方图
  *   - 右栏 Tab   : 滤镜列表 | 参数调整（滑块）
  */
-import { Crop, Download, Eye, FlipHorizontal2, FlipVertical2, Maximize, Redo2, RotateCcw, RotateCw, Save, Sliders, Sparkles, SplitSquareHorizontal, Undo2, Wand2, ZoomIn } from 'lucide-react'
+import { Crop, Download, Eye, FlipHorizontal2, FlipVertical2, Frame, Maximize, Redo2, RotateCcw, RotateCw, Save, Sliders, Sparkles, SplitSquareHorizontal, Undo2, Wand2, ZoomIn } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AdjustmentsPanel } from '../components/AdjustmentsPanel'
 import AIAdvisorDialog from '../components/AIAdvisorDialog'
 import CropOverlay from '../components/CropOverlay'
+import { EditorFramePanel } from '../components/frame/EditorFramePanel'
 import { Histogram, ScoreBar, ValueBadge, cn } from '../design'
 import { type FilterGroup, groupAndSortFilters } from '../lib/filterOrder'
 import { ipc } from '../lib/ipc'
@@ -21,7 +22,7 @@ import { useAppStore } from '../stores/appStore'
 import { hasDirtyEdits, useEditStore } from '../stores/editStore'
 import { usePerfStore } from '../stores/perfStore'
 
-type RightPanelTab = 'filters' | 'adjust'
+type RightPanelTab = 'filters' | 'adjust' | 'frame'
 
 export default function Editor() {
   const { photoId } = useParams()
@@ -687,6 +688,13 @@ export default function Editor() {
             sub={dirty ? '已修改' : undefined}
             testId="editor-tab-adjust"
           />
+          <TabButton
+            active={rightTab === 'frame'}
+            onClick={() => setRightTab('frame')}
+            icon={<Frame className="w-3.5 h-3.5" strokeWidth={2} />}
+            label="边框"
+            testId="editor-tab-frame"
+          />
         </div>
 
         {/* 内容 */}
@@ -738,8 +746,10 @@ export default function Editor() {
                   </section>
                 ))}
             </div>
-          ) : (
+          ) : rightTab === 'adjust' ? (
             <AdjustmentsPanel />
+          ) : (
+            <EditorFramePanel photo={photo} />
           )}
         </div>
 
