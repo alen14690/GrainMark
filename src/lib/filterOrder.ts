@@ -54,12 +54,14 @@ export const FILTER_GROUP_META: Record<FilterGroupKey, FilterGroupMeta> = {
 
 /** FilterCategory → 中文短标签（用作组内二级分组的 chip） */
 export const CATEGORY_LABEL: Record<FilterCategory, string> = {
+  'oil-painting': '油画质感',
+  'muted-art': '低饱和艺术',
   'negative-color': '彩色负片',
   'negative-bw': '黑白',
   slide: '反转片',
   cinema: '电影胶片',
+  'cinematic-mood': '电影氛围',
   instant: '拍立得',
-  'oil-painting': '油画质感',
   digital: '数码',
   custom: '自定义',
   extracted: '已提取',
@@ -68,14 +70,16 @@ export const CATEGORY_LABEL: Record<FilterCategory, string> = {
 /** Category 在组内的展示顺序（数字越小越靠前） */
 const CATEGORY_PRIORITY: Record<FilterCategory, number> = {
   'oil-painting': 1,
-  'negative-color': 2,
-  'negative-bw': 3,
-  slide: 4,
-  cinema: 5,
-  instant: 6,
-  digital: 7,
-  custom: 8,
-  extracted: 9,
+  'muted-art': 2,
+  'negative-color': 3,
+  'negative-bw': 4,
+  slide: 5,
+  cinema: 6,
+  'cinematic-mood': 7,
+  instant: 8,
+  digital: 9,
+  custom: 10,
+  extracted: 11,
 }
 
 /** 分组内二级子分组（同 category 紧挨） */

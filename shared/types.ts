@@ -12,6 +12,8 @@ export type FilterCategory =
   | 'cinema' // 电影胶片
   | 'instant' // 拍立得
   | 'oil-painting' // 油画质感
+  | 'muted-art' // 低饱和艺术
+  | 'cinematic-mood' // 电影氛围
   | 'digital' // 数码模拟
   | 'custom' // 用户自定义
   | 'extracted' // 从参考图提取

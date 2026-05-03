@@ -623,4 +623,289 @@ export const BUILTIN_PRESETS: FilterPreset[] = [
     },
     ['oil-painting', 'bright', 'pastel', 'landscape'],
   ),
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  油画质感 · 扩充 4 款
+  // ═══════════════════════════════════════════════════════════════════
+
+  p('oil-vermeer', '弗美尔柔光', 'oil-painting', 86,
+    {
+      tone: { exposure: 0, contrast: -8, highlights: -25, shadows: 15, whites: -12, blacks: 8 },
+      colorGrading: {
+        shadows: { h: 35, s: 15, l: -4 },
+        midtones: { h: 38, s: 8, l: 0 },
+        highlights: { h: 42, s: 6, l: 2 },
+        blending: 50, balance: -5,
+      },
+      clarity: -18,
+      saturation: -25,
+      vibrance: 10,
+      grain: { amount: 8, size: 2.5, roughness: 0.2 },
+      vignette: { amount: -30, midpoint: 40, roundness: -5, feather: 60 },
+    },
+    ['oil-painting', 'portrait', 'warm', 'soft'],
+  ),
+
+  p('oil-watercolor', '水彩薄纱', 'oil-painting', 84,
+    {
+      tone: { exposure: 0.3, contrast: -15, highlights: -12, shadows: 20, whites: -5, blacks: 5 },
+      colorGrading: {
+        shadows: { h: 200, s: 6, l: 3 },
+        midtones: { h: 45, s: 5, l: 2 },
+        highlights: { h: 55, s: 12, l: 5 },
+        blending: 40, balance: 10,
+      },
+      clarity: -20,
+      saturation: -30,
+      vibrance: 15,
+      grain: { amount: 5, size: 2.0, roughness: 0.15 },
+      halation: { amount: 15, threshold: 190, radius: 15 },
+    },
+    ['oil-painting', 'bright', 'ethereal', 'landscape'],
+  ),
+
+  p('oil-impasto', '厚涂肖像', 'oil-painting', 80,
+    {
+      tone: { exposure: 0, contrast: 12, highlights: -10, shadows: 5, whites: -5, blacks: 5 },
+      curves: {
+        rgb: [
+          { x: 0, y: 30 }, { x: 64, y: 70 }, { x: 128, y: 130 }, { x: 192, y: 190 }, { x: 255, y: 220 },
+        ],
+      },
+      colorGrading: {
+        shadows: { h: 30, s: 12, l: -3 },
+        midtones: { h: 25, s: 18, l: 0 },
+        highlights: { h: 40, s: 8, l: 2 },
+        blending: 55, balance: 0,
+      },
+      clarity: -8,
+      saturation: -15,
+      vibrance: -5,
+      grain: { amount: 35, size: 3.0, roughness: 0.4 },
+    },
+    ['oil-painting', 'portrait', 'gritty', 'textured'],
+  ),
+
+  p('oil-cyber', '赛博油彩', 'oil-painting', 82,
+    {
+      tone: { exposure: 0, contrast: 8, highlights: -12, shadows: 8, whites: -3, blacks: 3 },
+      colorGrading: {
+        shadows: { h: 260, s: 25, l: -2 },
+        midtones: { h: 220, s: 10, l: 0 },
+        highlights: { h: 180, s: 20, l: 3 },
+        blending: 60, balance: 0,
+      },
+      clarity: -12,
+      saturation: -10,
+      grain: { amount: 20, size: 2.2, roughness: 0.35 },
+      halation: { amount: 25, threshold: 200, radius: 10 },
+    },
+    ['oil-painting', 'creative', 'neon', 'urban'],
+  ),
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  低饱和艺术 · 6 款
+  // ═══════════════════════════════════════════════════════════════════
+
+  p('muted-morandi', '莫兰迪灰调', 'muted-art', 92,
+    {
+      tone: { exposure: 0, contrast: -10, highlights: -15, shadows: 10, whites: -5, blacks: 5 },
+      hsl: {
+        orange: { h: 0, s: -20, l: 3 },
+        yellow: { h: 0, s: -18, l: 2 },
+        green: { h: 5, s: -30, l: -3 },
+        blue: { h: 0, s: -25, l: 0 },
+        purple: { h: 0, s: -15, l: 2 },
+      },
+      colorGrading: {
+        shadows: { h: 35, s: 6, l: 2 },
+        midtones: { h: 30, s: 8, l: 3 },
+        highlights: { h: 40, s: 5, l: 2 },
+        blending: 45, balance: 5,
+      },
+      clarity: -5,
+      saturation: -35,
+      vibrance: -10,
+      grain: { amount: 8, size: 1.2, roughness: 0.3 },
+    },
+    ['muted', 'morandi', 'still-life', 'fashion'],
+  ),
+
+  p('muted-silver-fog', '雾灰银盐', 'muted-art', 88,
+    {
+      whiteBalance: { temp: -8, tint: 3 },
+      tone: { exposure: 0, contrast: -12, highlights: -20, shadows: 15, whites: -8, blacks: 8 },
+      curves: {
+        rgb: [
+          { x: 0, y: 25 }, { x: 64, y: 75 }, { x: 128, y: 130 }, { x: 192, y: 195 }, { x: 255, y: 230 },
+        ],
+      },
+      colorGrading: {
+        shadows: { h: 160, s: 12, l: 0 },
+        midtones: { h: 150, s: 5, l: 2 },
+        highlights: { h: 140, s: 4, l: 3 },
+        blending: 50, balance: 0,
+      },
+      saturation: -28,
+      grain: { amount: 25, size: 1.3, roughness: 0.55 },
+    },
+    ['muted', 'fog', 'film', 'vintage'],
+  ),
+
+  p('muted-wabi-sabi', '侘寂素白', 'muted-art', 85,
+    {
+      whiteBalance: { temp: -3, tint: 0 },
+      tone: { exposure: 0.2, contrast: -15, highlights: -10, shadows: 20, whites: -3, blacks: 8 },
+      colorGrading: {
+        shadows: { h: 200, s: 4, l: 3 },
+        midtones: { h: 0, s: 0, l: 2 },
+        highlights: { h: 50, s: 3, l: 3 },
+        blending: 30, balance: 10,
+      },
+      clarity: -8,
+      saturation: -40,
+      vibrance: -15,
+      grain: { amount: 5, size: 0.8, roughness: 0.2 },
+    },
+    ['muted', 'minimal', 'japanese', 'quiet'],
+  ),
+
+  p('muted-linen', '亚麻暖灰', 'muted-art', 90,
+    {
+      whiteBalance: { temp: 10, tint: 3 },
+      tone: { exposure: 0, contrast: -5, highlights: -10, shadows: 8, whites: -3, blacks: 3 },
+      hsl: {
+        green: { h: 5, s: -25, l: -5 },
+        blue: { h: 0, s: -30, l: -3 },
+        aqua: { h: 5, s: -20, l: -3 },
+      },
+      colorGrading: {
+        shadows: { h: 35, s: 8, l: 0 },
+        midtones: { h: 40, s: 10, l: 2 },
+        highlights: { h: 45, s: 6, l: 3 },
+        blending: 50, balance: 5,
+      },
+      saturation: -30,
+      vibrance: 5,
+      grain: { amount: 12, size: 1.5, roughness: 0.4 },
+    },
+    ['muted', 'warm', 'lifestyle', 'cozy'],
+  ),
+
+  p('muted-graphite', '石墨冷灰', 'muted-art', 83,
+    {
+      whiteBalance: { temp: -12, tint: -3 },
+      tone: { exposure: 0, contrast: 10, highlights: -5, shadows: -5, whites: 2, blacks: -3 },
+      colorGrading: {
+        shadows: { h: 210, s: 10, l: -2 },
+        midtones: { h: 215, s: 5, l: 0 },
+        highlights: { h: 200, s: 5, l: 2 },
+        blending: 45, balance: -5,
+      },
+      saturation: -38,
+      grain: { amount: 15, size: 1.0, roughness: 0.5 },
+    },
+    ['muted', 'cold', 'architecture', 'urban'],
+  ),
+
+  p('muted-dusty-rose', '烟粉玫瑰', 'muted-art', 87,
+    {
+      whiteBalance: { temp: 5, tint: 8 },
+      tone: { exposure: 0, contrast: -5, highlights: -12, shadows: 8, whites: -3, blacks: 3 },
+      hsl: {
+        orange: { h: 0, s: -15, l: 2 },
+        green: { h: 5, s: -30, l: -5 },
+        blue: { h: 0, s: -20, l: -3 },
+      },
+      colorGrading: {
+        shadows: { h: 330, s: 10, l: 0 },
+        midtones: { h: 340, s: 12, l: 2 },
+        highlights: { h: 350, s: 8, l: 3 },
+        blending: 55, balance: 5,
+      },
+      saturation: -25,
+      vibrance: 8,
+      grain: { amount: 8, size: 1.1, roughness: 0.35 },
+    },
+    ['muted', 'fashion', 'pink', 'portrait'],
+  ),
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  电影氛围 · 4 款
+  // ═══════════════════════════════════════════════════════════════════
+
+  p('mood-black-gold', '黑金奢华', 'cinematic-mood', 91,
+    {
+      tone: { exposure: -0.2, contrast: 15, highlights: -20, shadows: -10, whites: -5, blacks: -8 },
+      colorGrading: {
+        shadows: { h: 35, s: 12, l: -5 },
+        midtones: { h: 40, s: 8, l: -2 },
+        highlights: { h: 45, s: 25, l: 3 },
+        blending: 60, balance: -10,
+      },
+      saturation: -12,
+      grain: { amount: 10, size: 1.0, roughness: 0.4 },
+      vignette: { amount: -25, midpoint: 35, roundness: 0, feather: 50 },
+    },
+    ['cinematic', 'luxury', 'dark', 'commercial'],
+  ),
+
+  p('mood-dark-emerald', '暗翡翠', 'cinematic-mood', 86,
+    {
+      tone: { exposure: -0.3, contrast: 8, highlights: -25, shadows: 5, whites: -8, blacks: 5 },
+      hsl: {
+        green: { h: 5, s: 10, l: -8 },
+        blue: { h: 0, s: -20, l: -5 },
+        yellow: { h: 5, s: -10, l: -3 },
+      },
+      colorGrading: {
+        shadows: { h: 150, s: 15, l: -3 },
+        midtones: { h: 140, s: 10, l: -2 },
+        highlights: { h: 130, s: 8, l: 2 },
+        blending: 55, balance: -5,
+      },
+      saturation: -15,
+      vignette: { amount: -20, midpoint: 40, roundness: 0, feather: 55 },
+    },
+    ['cinematic', 'dark', 'nature', 'moody'],
+  ),
+
+  p('mood-midnight-blue', '午夜蓝调', 'cinematic-mood', 89,
+    {
+      whiteBalance: { temp: -20, tint: 0 },
+      tone: { exposure: -0.1, contrast: 10, highlights: -15, shadows: 8, whites: -5, blacks: 0 },
+      colorGrading: {
+        shadows: { h: 220, s: 20, l: -3 },
+        midtones: { h: 215, s: 10, l: 0 },
+        highlights: { h: 200, s: 10, l: 3 },
+        blending: 55, balance: 0,
+      },
+      saturation: -18,
+      grain: { amount: 20, size: 1.2, roughness: 0.55 },
+      halation: { amount: 12, threshold: 220, radius: 8 },
+    },
+    ['cinematic', 'night', 'cold', 'urban'],
+  ),
+
+  p('mood-burnt-caramel', '焦糖暮色', 'cinematic-mood', 88,
+    {
+      whiteBalance: { temp: 15, tint: 5 },
+      tone: { exposure: -0.2, contrast: 8, highlights: -20, shadows: 5, whites: -5, blacks: 3 },
+      hsl: {
+        blue: { h: 0, s: -30, l: -10 },
+        green: { h: 10, s: -20, l: -5 },
+        aqua: { h: 10, s: -25, l: -5 },
+      },
+      colorGrading: {
+        shadows: { h: 25, s: 18, l: -4 },
+        midtones: { h: 30, s: 12, l: 0 },
+        highlights: { h: 40, s: 15, l: 2 },
+        blending: 60, balance: -5,
+      },
+      saturation: -15,
+      grain: { amount: 15, size: 1.2, roughness: 0.5 },
+      vignette: { amount: -18, midpoint: 45, roundness: 0, feather: 55 },
+    },
+    ['cinematic', 'warm', 'autumn', 'golden-hour'],
+  ),
 ]
