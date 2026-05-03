@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "npm run build && test -f dist-electron/main.js && test -f dist/index.html && electron dist-electron/main.js",
+    "preview": "pkill -f 'electron.*dist-electron' 2>/dev/null; pkill -f 'exiftool.*stay_open' 2>/dev/null; sleep 0.5 && npm run build && test -f dist-electron/main.js && test -f dist/index.html && electron dist-electron/main.js",
     "pack:dir": "npm run build && electron-builder --dir",
     "pack": "npm run build && electron-builder",
     "pack:mac": "npm run build && electron-builder --mac",
