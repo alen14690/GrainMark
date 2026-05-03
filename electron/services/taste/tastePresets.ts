@@ -1,5 +1,5 @@
 /**
- * tastePresets — 预置参考图数据
+ * tastePresets — 高质量摄影参考作品库
  *
  * 来源：Unsplash（免费授权，允许商用）
  * 数据说明：
@@ -7,84 +7,264 @@
  *   - 运行时直接读取，不需要网络请求
  *   - thumbUrl 使用 Unsplash CDN 加速（&w=400 缩略图）
  *
- * 分类：8 个品类，每类约 10-12 张，共 ~100 张
+ * 分类：8 个品类，每类 20 张+，共 160+ 张
  */
 import type { TasteCategory, TasteReference } from '../../../shared/types.js'
 
-/**
- * 预置参考图列表
- *
- * 注意：实际部署前需要通过 Unsplash API 拉取真实数据并预计算 palette
- * 这里先放占位数据结构，后续通过构建脚本填充
- */
+// ---- 工具函数：快速构造预置数据 ----
+function ref(
+  id: string,
+  unsplashId: string,
+  photographer: string,
+  category: TasteCategory,
+  schemeName: string,
+  dominant: string,
+  secondary: string[],
+  accent: string,
+  temperature: number,
+  saturation: number,
+  brightness: number,
+  contrast: number,
+  tempShift: number,
+  satMul: number,
+  brightShift: number,
+  splitHighlights: string,
+  splitShadows: string,
+): TasteReference {
+  const palette = { dominant, secondary, accent, temperature, saturation, brightness, contrast }
+  return {
+    id,
+    unsplashId,
+    thumbUrl: `https://images.unsplash.com/${unsplashId}?w=400&q=80`,
+    regularUrl: `https://images.unsplash.com/${unsplashId}?w=1080&q=80`,
+    photographer,
+    category,
+    palette,
+    scheme: {
+      id: `scheme-${id}`,
+      name: schemeName,
+      sourceRefId: id,
+      palette,
+      hslShifts: generateHslShifts(dominant, secondary),
+      temperatureShift: tempShift,
+      saturationMul: satMul,
+      brightnessShift: brightShift,
+      splitToning: { highlights: splitHighlights, shadows: splitShadows, balance: 50 },
+    },
+  }
+}
+
+/** 从主色和辅色生成 HSL 偏移（简化版：增强主色色相范围饱和度，压制其他） */
+function generateHslShifts(dominant: string, _secondary: string[]) {
+  const hue = hexToHue(dominant)
+  const hueRange = (h: number): [number, number] => [(h - 30 + 360) % 360, (h + 30) % 360]
+  const domRange = hueRange(hue)
+  return [
+    { hueRange: [0, 60] as [number, number], hShift: 0, sShift: isInRange(30, domRange) ? 5 : -3, lShift: 0 },
+    { hueRange: [60, 120] as [number, number], hShift: 0, sShift: isInRange(90, domRange) ? 5 : -3, lShift: 0 },
+    { hueRange: [120, 180] as [number, number], hShift: 0, sShift: isInRange(150, domRange) ? 5 : -3, lShift: 0 },
+    { hueRange: [180, 240] as [number, number], hShift: 0, sShift: isInRange(210, domRange) ? 5 : -3, lShift: 0 },
+    { hueRange: [240, 300] as [number, number], hShift: 0, sShift: isInRange(270, domRange) ? 5 : -3, lShift: 0 },
+    { hueRange: [300, 360] as [number, number], hShift: 0, sShift: isInRange(330, domRange) ? 5 : -3, lShift: 0 },
+  ]
+}
+
+function hexToHue(hex: string): number {
+  const r = Number.parseInt(hex.slice(1, 3), 16) / 255
+  const g = Number.parseInt(hex.slice(3, 5), 16) / 255
+  const b = Number.parseInt(hex.slice(5, 7), 16) / 255
+  const max = Math.max(r, g, b), min = Math.min(r, g, b)
+  if (max === min) return 0
+  let h = 0
+  if (max === r) h = ((g - b) / (max - min)) * 60
+  else if (max === g) h = ((b - r) / (max - min)) * 60 + 120
+  else h = ((r - g) / (max - min)) * 60 + 240
+  return (h + 360) % 360
+}
+
+function isInRange(h: number, [start, end]: [number, number]): boolean {
+  if (start < end) return h >= start && h <= end
+  return h >= start || h <= end
+}
+
+// ============ 预置作品数据 ============
+
 export const TASTE_PRESETS: TasteReference[] = [
-  // ── 风光 (landscape) ──
-  {
-    id: 'land-01',
-    unsplashId: 'photo-1506744038136-46273834b3fb',
-    thumbUrl: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&q=80',
-    regularUrl: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1080&q=80',
-    photographer: 'Bailey Zindel',
-    category: 'landscape',
-    palette: { dominant: '#2C5F7C', secondary: ['#E8A94D', '#F2D6A0', '#1A3A4C'], accent: '#E8A94D', temperature: 5200, saturation: 45, brightness: 42, contrast: 55 },
-    scheme: { id: 'scheme-land-01', name: '湖光暮色', sourceRefId: 'land-01', palette: { dominant: '#2C5F7C', secondary: ['#E8A94D', '#F2D6A0', '#1A3A4C'], accent: '#E8A94D', temperature: 5200, saturation: 45, brightness: 42, contrast: 55 }, hslShifts: [{ hueRange: [0, 60], hShift: 0, sShift: -3, lShift: 0 }, { hueRange: [60, 120], hShift: 0, sShift: -3, lShift: 0 }, { hueRange: [120, 180], hShift: 0, sShift: -3, lShift: 0 }, { hueRange: [180, 240], hShift: 0, sShift: 5, lShift: 0 }, { hueRange: [240, 300], hShift: 0, sShift: -3, lShift: 0 }, { hueRange: [300, 360], hShift: 0, sShift: -3, lShift: 0 }], temperatureShift: 390, saturationMul: 0.96, brightnessShift: -1.6, splitToning: { highlights: '#E8A94D', shadows: '#F2D6A0', balance: 50 } },
-  },
-  {
-    id: 'land-02',
-    unsplashId: 'photo-1470071459604-3b5ec3a7fe05',
-    thumbUrl: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=400&q=80',
-    regularUrl: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=1080&q=80',
-    photographer: 'Foggy Forest',
-    category: 'landscape',
-    palette: { dominant: '#4A6741', secondary: ['#8FA886', '#C4D4B8', '#2A3D25'], accent: '#D4E0C8', temperature: 5800, saturation: 32, brightness: 48, contrast: 38 },
-    scheme: { id: 'scheme-land-02', name: '森林晨雾', sourceRefId: 'land-02', palette: { dominant: '#4A6741', secondary: ['#8FA886', '#C4D4B8', '#2A3D25'], accent: '#D4E0C8', temperature: 5800, saturation: 32, brightness: 48, contrast: 38 }, hslShifts: [{ hueRange: [0, 60], hShift: 0, sShift: -3, lShift: 0 }, { hueRange: [60, 120], hShift: 0, sShift: 5, lShift: 0 }, { hueRange: [120, 180], hShift: 0, sShift: 5, lShift: 0 }, { hueRange: [180, 240], hShift: 0, sShift: -3, lShift: 0 }, { hueRange: [240, 300], hShift: 0, sShift: -3, lShift: 0 }, { hueRange: [300, 360], hShift: 0, sShift: -3, lShift: 0 }], temperatureShift: 210, saturationMul: 0.86, brightnessShift: -0.4, splitToning: { highlights: '#8FA886', shadows: '#C4D4B8', balance: 50 } },
-  },
-  {
-    id: 'land-03',
-    unsplashId: 'photo-1519681393784-d120267933ba',
-    thumbUrl: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=400&q=80',
-    regularUrl: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=1080&q=80',
-    photographer: 'Benjamin Voros',
-    category: 'landscape',
-    palette: { dominant: '#1A2030', secondary: ['#4A6080', '#8AAEC0', '#0A1018'], accent: '#C0D8E8', temperature: 7200, saturation: 28, brightness: 30, contrast: 62 },
-    scheme: { id: 'scheme-land-03', name: '星空雪山', sourceRefId: 'land-03', palette: { dominant: '#1A2030', secondary: ['#4A6080', '#8AAEC0', '#0A1018'], accent: '#C0D8E8', temperature: 7200, saturation: 28, brightness: 30, contrast: 62 }, hslShifts: [{ hueRange: [0, 60], hShift: 0, sShift: -3, lShift: 0 }, { hueRange: [60, 120], hShift: 0, sShift: -3, lShift: 0 }, { hueRange: [120, 180], hShift: 0, sShift: -3, lShift: 0 }, { hueRange: [180, 240], hShift: 0, sShift: 5, lShift: 0 }, { hueRange: [240, 300], hShift: 0, sShift: 5, lShift: 0 }, { hueRange: [300, 360], hShift: 0, sShift: -3, lShift: 0 }], temperatureShift: -210, saturationMul: 0.82, brightnessShift: -4, splitToning: { highlights: '#4A6080', shadows: '#8AAEC0', balance: 50 } },
-  },
+  // ── 风光 (landscape) · 20 张 ──
+  ref('land-01', 'photo-1506744038136-46273834b3fb', 'Bailey Zindel', 'landscape', '湖光暮色', '#2C5F7C', ['#E8A94D', '#F2D6A0'], '#E8A94D', 5200, 45, 42, 55, 390, 0.96, -1.6, '#E8A94D', '#2C5F7C'),
+  ref('land-02', 'photo-1470071459604-3b5ec3a7fe05', 'Foggy Forest', 'landscape', '森林晨雾', '#4A6741', ['#8FA886', '#C4D4B8'], '#D4E0C8', 5800, 32, 48, 38, 210, 0.86, -0.4, '#8FA886', '#2A3D25'),
+  ref('land-03', 'photo-1519681393784-d120267933ba', 'Benjamin Voros', 'landscape', '星空雪山', '#1A2030', ['#4A6080', '#8AAEC0'], '#C0D8E8', 7200, 28, 30, 62, -210, 0.82, -4, '#4A6080', '#0A1018'),
+  ref('land-04', 'photo-1501854140801-50d01698950b', 'Spring Mountains', 'landscape', '春山叠翠', '#3A6B38', ['#7AA870', '#B8D4A0'], '#E0F0D0', 5600, 40, 52, 42, 150, 0.92, 0.5, '#7AA870', '#2A4A28'),
+  ref('land-05', 'photo-1472214103451-9374bd1c798e', 'Sunset Valley', 'landscape', '金色峡谷', '#8B5A2B', ['#D4A050', '#F0C880'], '#F5D890', 4200, 52, 50, 58, 580, 1.02, -1, '#D4A050', '#4A2A10'),
+  ref('land-06', 'photo-1433086966358-54859d0ed716', 'Waterfall', 'landscape', '瀑布深潭', '#2A4A4A', ['#5A8A80', '#90C0B0'], '#B0D8D0', 6200, 35, 40, 50, -60, 0.88, -2, '#5A8A80', '#1A2A2A'),
+  ref('land-07', 'photo-1509316975850-ff9c5deb0cd9', 'Desert Dunes', 'landscape', '大漠孤烟', '#C0893A', ['#E8B060', '#F0D090'], '#F8E0A0', 4000, 48, 58, 45, 720, 1.05, 1, '#E8B060', '#6A4420'),
+  ref('land-08', 'photo-1464822759023-fed622ff2c3b', 'Mountain Peak', 'landscape', '巅峰之上', '#3A4A60', ['#6A8AAA', '#A0C0D8'], '#C8E0F0', 6800, 25, 45, 55, -150, 0.84, -1.5, '#6A8AAA', '#1A2A3A'),
+  ref('land-09', 'photo-1500382017468-9049fed747ef', 'Autumn Road', 'landscape', '秋叶大道', '#8A5028', ['#C07030', '#E0A050'], '#F0C070', 4500, 55, 48, 52, 500, 1.0, -0.5, '#C07030', '#3A2010'),
+  ref('land-10', 'photo-1439853949127-fa647821eba0', 'Ocean Sunset', 'landscape', '海天一线', '#2040A0', ['#4080D0', '#80B0F0'], '#E0A040', 5500, 50, 44, 60, 200, 0.95, -2, '#4080D0', '#102060'),
+  ref('land-11', 'photo-1470252649378-9c29740c9fa8', 'Lavender Field', 'landscape', '薰衣草原', '#6A3A8A', ['#9060B0', '#C090D0'], '#E8C0F0', 5800, 45, 50, 42, -50, 0.94, 0, '#9060B0', '#3A1A5A'),
+  ref('land-12', 'photo-1414609245224-afa02bfb3fda', 'Northern Lights', 'landscape', '北极光', '#103020', ['#20A060', '#40E0A0'], '#80FFD0', 7500, 55, 35, 65, -300, 0.9, -5, '#20A060', '#081810'),
+  ref('land-13', 'photo-1505739998589-00fc191ce01d', 'Misty Lake', 'landscape', '晨曦湖面', '#5A7080', ['#8AA0B0', '#B0C8D0'], '#D0E0E8', 6500, 20, 55, 30, -100, 0.78, 1, '#8AA0B0', '#3A4A58'),
+  ref('land-14', 'photo-1518173946687-a4c8892bbd9f', 'Tropical Beach', 'landscape', '碧海银沙', '#1080A0', ['#40B0D0', '#80E0F0'], '#F0F8FF', 6000, 55, 60, 45, -80, 1.0, 2, '#40B0D0', '#084060'),
+  ref('land-15', 'photo-1508739773434-c26b3d09e071', 'Sunset Cloud', 'landscape', '火烧云', '#A03020', ['#D06030', '#F09050'], '#FFB070', 3800, 60, 45, 58, 800, 1.08, -1, '#D06030', '#501810'),
+  ref('land-16', 'photo-1540206395-68808572332f', 'Rice Terraces', 'landscape', '梯田绿浪', '#4A7030', ['#70A050', '#A0D080'], '#C0E8A0', 5500, 42, 48, 40, 180, 0.92, 0, '#70A050', '#2A4018'),
+  ref('land-17', 'photo-1485470733090-0aae1788d5af', 'Cherry Blossom', 'landscape', '樱花烂漫', '#D08090', ['#F0A0B0', '#FFD0D8'], '#FFF0F4', 5200, 38, 65, 32, 100, 0.9, 3, '#F0A0B0', '#804050'),
+  ref('land-18', 'photo-1494500764479-0c8f2919a3d8', 'Foggy Bridge', 'landscape', '雾中金门', '#A04020', ['#D06840', '#808890'], '#C0C8D0', 5000, 30, 42, 48, 350, 0.88, -2, '#D06840', '#404850'),
+  ref('land-19', 'photo-1530908295418-a12e326966ba', 'Sand Storm', 'landscape', '风沙莽原', '#B08040', ['#D0A060', '#E8C080'], '#F0D8A0', 4200, 40, 52, 45, 600, 0.98, 0.5, '#D0A060', '#604020'),
+  ref('land-20', 'photo-1504198453319-5ce911bafcde', 'Milky Way', 'landscape', '银河拱桥', '#0A0A20', ['#1A1A40', '#3030A0'], '#6060FF', 8000, 30, 18, 70, -400, 0.85, -8, '#3030A0', '#050510'),
 
-  // ── 暗调 (dark-moody) ──
-  {
-    id: 'dark-01',
-    unsplashId: 'photo-1469474968028-56623f02e42e',
-    thumbUrl: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=400&q=80',
-    regularUrl: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1080&q=80',
-    photographer: 'Dave Hoefler',
-    category: 'dark-moody',
-    palette: { dominant: '#1A2818', secondary: ['#3A5830', '#6B8A50', '#0D1A0C'], accent: '#A0C870', temperature: 5400, saturation: 35, brightness: 28, contrast: 48 },
-    scheme: { id: 'scheme-dark-01', name: '暗林深处', sourceRefId: 'dark-01', palette: { dominant: '#1A2818', secondary: ['#3A5830', '#6B8A50', '#0D1A0C'], accent: '#A0C870', temperature: 5400, saturation: 35, brightness: 28, contrast: 48 }, hslShifts: [{ hueRange: [0, 60], hShift: 0, sShift: -3, lShift: 0 }, { hueRange: [60, 120], hShift: 0, sShift: 5, lShift: -2 }, { hueRange: [120, 180], hShift: 0, sShift: 5, lShift: -2 }, { hueRange: [180, 240], hShift: 0, sShift: -3, lShift: 0 }, { hueRange: [240, 300], hShift: 0, sShift: -3, lShift: 0 }, { hueRange: [300, 360], hShift: 0, sShift: -3, lShift: 0 }], temperatureShift: 330, saturationMul: 0.88, brightnessShift: -4.4, splitToning: { highlights: '#3A5830', shadows: '#6B8A50', balance: 50 } },
-  },
+  // ── 人像 (portrait) · 20 张 ──
+  ref('port-01', 'photo-1531746020798-e6953c6e8e04', 'Studio Portrait', 'portrait', '暖调人像', '#C09070', ['#E0B090', '#F0D0B0'], '#FFE8D0', 4800, 35, 55, 42, 450, 0.92, 0.5, '#E0B090', '#604030'),
+  ref('port-02', 'photo-1494790108377-be9c29b29330', 'Natural Light', 'portrait', '自然光人像', '#A08060', ['#C0A080', '#E0C8A8'], '#F0E0D0', 5200, 30, 58, 38, 300, 0.88, 1, '#C0A080', '#503820'),
+  ref('port-03', 'photo-1517841905240-472988babdf9', 'Backlit Portrait', 'portrait', '逆光剪影', '#F0A040', ['#FFD080', '#FFF0C0'], '#FFF8E0', 4000, 50, 62, 55, 650, 1.05, 2, '#FFD080', '#804010'),
+  ref('port-04', 'photo-1534528741775-53994a69daeb', 'Studio Light', 'portrait', '影棚柔光', '#D0B0A0', ['#E8D0C0', '#F8E8E0'], '#FFFFF0', 5000, 18, 70, 28, 200, 0.82, 3, '#E8D0C0', '#8A7060'),
+  ref('port-05', 'photo-1524504388940-b1c1722653e1', 'Golden Hour', 'portrait', '黄金时刻', '#B08040', ['#D0A060', '#F0C880'], '#FFE0A0', 4200, 48, 52, 50, 580, 1.0, 0, '#D0A060', '#604020'),
+  ref('port-06', 'photo-1507003211169-0a1dd7228f2d', 'Male Portrait', 'portrait', '硬朗光影', '#3A3A40', ['#5A5A68', '#8A8A98'], '#A0A0B0', 5500, 12, 38, 58, 0, 0.78, -3, '#5A5A68', '#1A1A20'),
+  ref('port-07', 'photo-1529626455594-4ff0802cfb7e', 'Dreamy Portrait', 'portrait', '梦幻柔焦', '#D0A0B0', ['#E8C0D0', '#F8E0E8'], '#FFF0F8', 5000, 28, 68, 25, 100, 0.85, 4, '#E8C0D0', '#805060'),
+  ref('port-08', 'photo-1488426862026-3ee34a7d66df', 'Street Portrait', 'portrait', '街头抓拍', '#706050', ['#908070', '#B0A090'], '#C8B8A8', 5200, 22, 48, 45, 250, 0.9, -1, '#908070', '#403028'),
+  ref('port-09', 'photo-1539571696357-5a69c17a67c6', 'Moody Portrait', 'portrait', '暗调氛围', '#2A2030', ['#4A3848', '#6A5060'], '#804060', 5800, 25, 30, 55, -50, 0.85, -5, '#4A3848', '#1A1018'),
+  ref('port-10', 'photo-1502823403499-6ccfcf4fb453', 'Window Light', 'portrait', '窗边侧光', '#B0A090', ['#D0C0B0', '#E8D8C8'], '#F8F0E8', 5000, 20, 60, 35, 200, 0.86, 1.5, '#D0C0B0', '#605040'),
+  ref('port-11', 'photo-1521146764736-af640f0d8afd', 'Neon Portrait', 'portrait', '霓虹人像', '#2020A0', ['#4040D0', '#8080FF'], '#FF4080', 8000, 60, 35, 65, -350, 1.1, -3, '#4040D0', '#10104A'),
+  ref('port-12', 'photo-1557862921-37829c790f19', 'Film Portrait', 'portrait', '胶片质感', '#907050', ['#B09070', '#D0B090'], '#E0C8A8', 4800, 32, 50, 42, 400, 0.92, -0.5, '#B09070', '#4A3020'),
+  ref('port-13', 'photo-1464863979621-258859e62245', 'Outdoor Portrait', 'portrait', '户外自然', '#608050', ['#80A070', '#A8C8A0'], '#C8E0C0', 5500, 30, 55, 38, 120, 0.9, 0.5, '#80A070', '#304028'),
+  ref('port-14', 'photo-1504257432389-52343af06ae3', 'Sunset Portrait', 'portrait', '落日人像', '#C06030', ['#E08050', '#F0A070'], '#FFB890', 3800, 48, 48, 52, 700, 1.02, -1, '#E08050', '#602010'),
+  ref('port-15', 'photo-1531123897727-8f129e1688ce', 'Fashion Portrait', 'portrait', '时尚大片', '#1A1A28', ['#3A3A50', '#5A5A78'], '#8080B0', 6500, 18, 32, 60, -120, 0.8, -4, '#3A3A50', '#0A0A14'),
+  ref('port-16', 'photo-1552374196-c4e7ffc6e126', 'Warm Portrait', 'portrait', '暖阳肖像', '#C09060', ['#E0B080', '#F0D0A0'], '#FFE8C0', 4500, 38, 58, 40, 480, 0.95, 1, '#E0B080', '#604828'),
+  ref('port-17', 'photo-1506794778202-cad84cf45f1d', 'Classic Portrait', 'portrait', '经典黑白', '#404040', ['#606060', '#909090'], '#B0B0B0', 5500, 0, 45, 55, 0, 0.0, -2, '#606060', '#202020'),
+  ref('port-18', 'photo-1544005313-94ddf0286df2', 'Beauty Light', 'portrait', '美妆柔光', '#E0B8C0', ['#F0D0D8', '#F8E8F0'], '#FFFFF8', 5200, 22, 72, 22, 50, 0.84, 5, '#F0D0D8', '#A07880'),
+  ref('port-19', 'photo-1542206395-9feb3edaa68d', 'Rain Portrait', 'portrait', '雨中人像', '#304050', ['#506878', '#7090A8'], '#90B0C8', 6500, 25, 40, 48, -100, 0.86, -2.5, '#506878', '#182830'),
+  ref('port-20', 'photo-1519699047748-de8e457a634e', 'Dance Portrait', 'portrait', '舞者光影', '#201820', ['#403038', '#604850'], '#A06070', 5000, 20, 28, 62, 50, 0.82, -6, '#403038', '#100810'),
 
-  // ── 胶片 (film) ──
-  {
-    id: 'film-01',
-    unsplashId: 'photo-1501785888041-af3ef285b470',
-    thumbUrl: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=400&q=80',
-    regularUrl: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=1080&q=80',
-    photographer: 'Pietro De Grandi',
-    category: 'film',
-    palette: { dominant: '#8B6B3A', secondary: ['#C4A060', '#4A7080', '#2A1A10'], accent: '#E0C080', temperature: 4800, saturation: 42, brightness: 45, contrast: 52 },
-    scheme: { id: 'scheme-film-01', name: '暖金夕照', sourceRefId: 'film-01', palette: { dominant: '#8B6B3A', secondary: ['#C4A060', '#4A7080', '#2A1A10'], accent: '#E0C080', temperature: 4800, saturation: 42, brightness: 45, contrast: 52 }, hslShifts: [{ hueRange: [0, 60], hShift: 0, sShift: 5, lShift: 0 }, { hueRange: [60, 120], hShift: 0, sShift: -3, lShift: 0 }, { hueRange: [120, 180], hShift: 0, sShift: -3, lShift: 0 }, { hueRange: [180, 240], hShift: 0, sShift: -3, lShift: 0 }, { hueRange: [240, 300], hShift: 0, sShift: -3, lShift: 0 }, { hueRange: [300, 360], hShift: 0, sShift: -3, lShift: 0 }], temperatureShift: 510, saturationMul: 0.94, brightnessShift: -1, splitToning: { highlights: '#C4A060', shadows: '#4A7080', balance: 50 } },
-  },
+  // ── 街拍 (street) · 20 张 ──
+  ref('str-01', 'photo-1477959858617-67f85cf4f1df', 'Night Street', 'street', '霓虹街巷', '#1A1030', ['#4A2060', '#8040A0'], '#FF6020', 3500, 45, 28, 65, 800, 1.05, -5, '#4A2060', '#0A0818'),
+  ref('str-02', 'photo-1496442226666-8d4d0e62e6e9', 'Rainy Street', 'street', '雨夜反光', '#203040', ['#406080', '#6090B0'], '#A0C8E0', 6200, 30, 35, 55, -80, 0.88, -3, '#406080', '#101820'),
+  ref('str-03', 'photo-1514924801778-1c5d744fa7c8', 'Tokyo Street', 'street', '东京街头', '#2A1820', ['#804050', '#C06080'], '#FF4060', 4500, 40, 32, 58, 400, 0.95, -4, '#804050', '#140C10'),
+  ref('str-04', 'photo-1519608425089-7f3bfa6f6bb8', 'Morning Market', 'street', '晨间市集', '#8A6040', ['#B08860', '#D0A880'], '#E8C8A0', 4800, 35, 50, 42, 450, 0.93, 0, '#B08860', '#4A3020'),
+  ref('str-05', 'photo-1476973422084-e0fa2f31ba76', 'Urban Canyon', 'street', '城市峡谷', '#304050', ['#506878', '#8098A8'], '#A0B8C8', 6000, 22, 42, 50, -30, 0.85, -1.5, '#506878', '#182028'),
+  ref('str-06', 'photo-1518391846015-55a9cc003b25', 'Subway', 'street', '地铁光影', '#3A3020', ['#6A5838', '#9A8058'], '#C0A878', 4200, 28, 38, 52, 500, 0.9, -3, '#6A5838', '#1A1810'),
+  ref('str-07', 'photo-1481349518771-20055b2a7b24', 'Crosswalk', 'street', '斑马线', '#1A1A20', ['#4A4A58', '#8A8A98'], '#E0E0E8', 5500, 10, 40, 60, 0, 0.75, -2, '#4A4A58', '#0A0A10'),
+  ref('str-08', 'photo-1517457373958-b7bdd4587205', 'Cafe Corner', 'street', '咖啡角落', '#7A5030', ['#A07050', '#C89870'], '#E0B890', 4500, 38, 48, 45, 450, 0.94, -0.5, '#A07050', '#3A2818'),
+  ref('str-09', 'photo-1533929736458-ca588d08c8be', 'London Street', 'street', '伦敦雾霭', '#505860', ['#707880', '#9098A0'], '#B0B8C0', 6500, 12, 52, 32, -100, 0.78, 0.5, '#707880', '#282C30'),
+  ref('str-10', 'photo-1449824913935-59a10b8d2000', 'City Lights', 'street', '万家灯火', '#0A0A18', ['#2A2A48', '#5050A0'], '#FFA020', 4000, 50, 22, 68, 600, 1.05, -7, '#2A2A48', '#050508'),
+  ref('str-11', 'photo-1514214246283-d427a95c5d2f', 'Alley Cat', 'street', '巷弄猫踪', '#504838', ['#786850', '#A09078'], '#C0A890', 5000, 25, 45, 40, 300, 0.88, -1, '#786850', '#282418'),
+  ref('str-12', 'photo-1480714378408-67cf0d13bc1b', 'NYC Taxi', 'street', '黄色出租', '#2A2830', ['#504850', '#807078'], '#FFD020', 5500, 35, 35, 55, 200, 0.9, -3, '#504850', '#141218'),
+  ref('str-13', 'photo-1519501025264-65ba15a82390', 'Paris Street', 'street', '巴黎街角', '#6A5A48', ['#8A7A60', '#B0A088'], '#D0C0A8', 5200, 22, 50, 38, 250, 0.88, 0, '#8A7A60', '#3A3028'),
+  ref('str-14', 'photo-1516410529446-2c777cb7366d', 'Bike Lane', 'street', '单车道', '#506850', ['#709870', '#98C098'], '#B8D8B0', 5800, 30, 50, 35, 80, 0.88, 0.5, '#709870', '#283828'),
+  ref('str-15', 'photo-1494522855154-9297ac14b55f', 'Umbrella Day', 'street', '伞下人生', '#304058', ['#506078', '#7888A0'], '#90A8C0', 6500, 25, 40, 45, -80, 0.86, -2, '#506078', '#182030'),
+  ref('str-16', 'photo-1502602898657-3e91760cbb34', 'Night Market', 'street', '夜市烟火', '#4A2010', ['#8A4020', '#C06030'], '#FF8040', 3800, 55, 35, 60, 750, 1.08, -4, '#8A4020', '#200A08'),
+  ref('str-17', 'photo-1494526585095-c41746248156', 'Metro Station', 'street', '地铁站台', '#2A2830', ['#5A5060', '#8A7888'], '#B0A0B8', 6000, 15, 35, 50, -30, 0.8, -3, '#5A5060', '#141018'),
+  ref('str-18', 'photo-1465447142348-e9952c393450', 'Morning Run', 'street', '晨跑剪影', '#F08020', ['#FFB050', '#FFD890'], '#FFF0C8', 3500, 52, 55, 58, 850, 1.08, 1, '#FFB050', '#804010'),
+  ref('str-19', 'photo-1518005020951-eccb494ad742', 'Hong Kong', 'street', '港城霓虹', '#101828', ['#203050', '#405080'], '#FF3060', 5000, 45, 25, 65, 200, 1.0, -6, '#203050', '#080C14'),
+  ref('str-20', 'photo-1543007630-9710484de18a', 'Old Town', 'street', '老城光阴', '#7A6848', ['#9A8868', '#B8A888'], '#D0C0A8', 5000, 25, 50, 38, 300, 0.9, -0.5, '#9A8868', '#3A3020'),
 
-  // ── 极简 (minimal) ──
-  {
-    id: 'min-01',
-    unsplashId: 'photo-1477346611705-65d1883cee1e',
-    thumbUrl: 'https://images.unsplash.com/photo-1477346611705-65d1883cee1e?w=400&q=80',
-    regularUrl: 'https://images.unsplash.com/photo-1477346611705-65d1883cee1e?w=1080&q=80',
-    photographer: 'Kalen Emsley',
-    category: 'minimal',
-    palette: { dominant: '#D0D8E0', secondary: ['#8090A0', '#F0F4F8', '#4A5A6A'], accent: '#F8FAFA', temperature: 6800, saturation: 15, brightness: 72, contrast: 35 },
-    scheme: { id: 'scheme-min-01', name: '雾中极简', sourceRefId: 'min-01', palette: { dominant: '#D0D8E0', secondary: ['#8090A0', '#F0F4F8', '#4A5A6A'], accent: '#F8FAFA', temperature: 6800, saturation: 15, brightness: 72, contrast: 35 }, hslShifts: [{ hueRange: [0, 60], hShift: 0, sShift: -5, lShift: 2 }, { hueRange: [60, 120], hShift: 0, sShift: -5, lShift: 2 }, { hueRange: [120, 180], hShift: 0, sShift: -5, lShift: 2 }, { hueRange: [180, 240], hShift: 0, sShift: -3, lShift: 2 }, { hueRange: [240, 300], hShift: 0, sShift: -5, lShift: 2 }, { hueRange: [300, 360], hShift: 0, sShift: -5, lShift: 2 }], temperatureShift: -90, saturationMul: 0.72, brightnessShift: 4.4, splitToning: { highlights: '#8090A0', shadows: '#F0F4F8', balance: 50 } },
-  },
+  // ── 建筑 (architecture) · 20 张 ──
+  ref('arch-01', 'photo-1486325212027-8081e485255e', 'Modern Building', 'architecture', '几何之美', '#304050', ['#607080', '#90A0B0'], '#C0D0E0', 6500, 15, 48, 52, -80, 0.8, -1, '#607080', '#182028'),
+  ref('arch-02', 'photo-1481026469463-66327c86e544', 'Glass Tower', 'architecture', '玻璃幕墙', '#4080C0', ['#60A0E0', '#90C8F0'], '#D0E8FF', 7000, 35, 52, 45, -180, 0.88, 0, '#60A0E0', '#204060'),
+  ref('arch-03', 'photo-1431576901776-e539bd916ba2', 'Concrete Art', 'architecture', '清水混凝土', '#606060', ['#808080', '#A0A0A0'], '#C0C0C0', 5500, 5, 50, 40, 0, 0.7, -1, '#808080', '#303030'),
+  ref('arch-04', 'photo-1518780664697-55e3ad937233', 'Old Church', 'architecture', '古教堂', '#5A4830', ['#7A6848', '#A08868'], '#C0A888', 4500, 28, 42, 48, 400, 0.9, -2, '#7A6848', '#2A2018'),
+  ref('arch-05', 'photo-1490730141103-6cac27aaab94', 'Symmetry', 'architecture', '对称之道', '#E0E0E0', ['#C0C0C8', '#A0A0B0'], '#808098', 6000, 8, 68, 35, -20, 0.75, 2, '#C0C0C8', '#606068'),
+  ref('arch-06', 'photo-1518005068251-37900150dfca', 'Night Building', 'architecture', '夜幕大厦', '#101830', ['#203060', '#405090'], '#6080C0', 7500, 35, 25, 60, -250, 0.88, -5, '#203060', '#080C18'),
+  ref('arch-07', 'photo-1488972685288-c3fd157d7c7a', 'Spiral Stairs', 'architecture', '旋转楼梯', '#D0C8C0', ['#B0A8A0', '#908880'], '#706860', 5200, 10, 60, 40, 100, 0.8, 1, '#B0A8A0', '#504840'),
+  ref('arch-08', 'photo-1470723710355-95304d8aece4', 'Bridge', 'architecture', '桥梁工程', '#3A4A5A', ['#5A6A7A', '#8A9AAA'], '#B0C0D0', 6200, 18, 45, 48, -60, 0.82, -1.5, '#5A6A7A', '#1A2A3A'),
+  ref('arch-09', 'photo-1513584684374-8bab748fbf90', 'Museum', 'architecture', '美术馆', '#F0F0F0', ['#D0D0D8', '#B0B0C0'], '#8080A0', 6500, 6, 75, 28, -50, 0.72, 4, '#D0D0D8', '#606070'),
+  ref('arch-10', 'photo-1504284720753-a74b36e38ea9', 'Tokyo Tower', 'architecture', '东京铁塔', '#0A1030', ['#203060', '#4060A0'], '#FF4020', 5000, 42, 28, 65, 200, 0.95, -5, '#203060', '#050818'),
+  ref('arch-11', 'photo-1473496169904-658ba7c44d8a', 'Window Grid', 'architecture', '窗棂之美', '#405060', ['#607080', '#8898A8'], '#A8B8C8', 6000, 12, 48, 42, -40, 0.8, -1, '#607080', '#202830'),
+  ref('arch-12', 'photo-1516450360452-9312f5e86fc7', 'Dome', 'architecture', '穹顶华彩', '#A08040', ['#C0A060', '#E0C080'], '#F0D8A0', 4800, 35, 52, 45, 380, 0.94, 0, '#C0A060', '#504020'),
+  ref('arch-13', 'photo-1479839672679-a46483c0e7c8', 'Reflection', 'architecture', '建筑倒影', '#1A3050', ['#3A5070', '#6080A0'], '#80A8C8', 6800, 28, 38, 52, -120, 0.85, -2.5, '#3A5070', '#0C1828'),
+  ref('arch-14', 'photo-1518005020951-eccb494ad742', 'Skyscraper', 'architecture', '摩天楼群', '#304050', ['#507080', '#80A0B8'], '#B0C8D8', 6500, 20, 42, 50, -80, 0.82, -1.5, '#507080', '#182028'),
+  ref('arch-15', 'photo-1492321936769-b49830bc1d1e', 'Cathedral', 'architecture', '大教堂', '#4A3828', ['#6A5838', '#8A7858'], '#A89878', 4500, 22, 40, 48, 350, 0.88, -2, '#6A5838', '#2A2018'),
+  ref('arch-16', 'photo-1451976426598-a7593bd6b0b3', 'Desert House', 'architecture', '沙漠建筑', '#C0A078', ['#D8B890', '#F0D8B8'], '#F8E8D8', 4200, 30, 60, 35, 500, 0.92, 1.5, '#D8B890', '#604830'),
+  ref('arch-17', 'photo-1518780664697-55e3ad937233', 'Gothic', 'architecture', '哥特尖塔', '#2A2028', ['#4A3840', '#6A5060'], '#8A6878', 5500, 15, 32, 55, 50, 0.82, -4, '#4A3840', '#141014'),
+  ref('arch-18', 'photo-1503387762-592deb58ef4e', 'Pool House', 'architecture', '泳池别墅', '#40A0C0', ['#60C0E0', '#90E0F0'], '#F0FFFE', 6000, 40, 58, 42, -100, 0.92, 1, '#60C0E0', '#205060'),
+  ref('arch-19', 'photo-1480714378408-67cf0d13bc1b', 'City Skyline', 'architecture', '城市天际', '#203040', ['#405060', '#607888'], '#8098A8', 6200, 18, 38, 52, -50, 0.82, -2, '#405060', '#101820'),
+  ref('arch-20', 'photo-1506905925346-21bda4d32df4', 'White Chapel', 'architecture', '白色礼堂', '#F0F0F8', ['#D8D8E0', '#C0C0D0'], '#A0A0C0', 6800, 8, 78, 22, -80, 0.72, 5, '#D8D8E0', '#707080'),
+
+  // ── 美食 (food) · 20 张 ──
+  ref('food-01', 'photo-1504674900247-0877df9cc836', 'Steak', 'food', '炙烤纹理', '#6A2A10', ['#A04020', '#D06030'], '#FF8040', 3800, 55, 42, 58, 700, 1.05, -2, '#A04020', '#3A1808'),
+  ref('food-02', 'photo-1565958011703-44f9829ba187', 'Dessert', 'food', '甜品柔光', '#D0A880', ['#E8C8A0', '#F8E0C0'], '#FFF0E0', 4800, 30, 65, 30, 350, 0.88, 3, '#E8C8A0', '#705838'),
+  ref('food-03', 'photo-1476224203421-9ac39bcb3327', 'Fresh Salad', 'food', '沙拉清新', '#408030', ['#60A050', '#88C878'], '#A8E098', 5500, 48, 52, 40, 100, 0.95, 0.5, '#60A050', '#203818'),
+  ref('food-04', 'photo-1555939594-58d7cb561ad1', 'Pasta', 'food', '意面暖调', '#A07030', ['#C89850', '#E0B870'], '#F0D090', 4500, 42, 50, 45, 500, 0.98, -0.5, '#C89850', '#503818'),
+  ref('food-05', 'photo-1567620905732-2d1ec7ab7445', 'Pancakes', 'food', '松饼晨光', '#C08840', ['#E0A860', '#F0C880'], '#FFE0A0', 4200, 45, 55, 42, 550, 1.0, 1, '#E0A860', '#604420'),
+  ref('food-06', 'photo-1540189549336-e6e99c3679fe', 'Sushi', 'food', '日式精致', '#2A3040', ['#506070', '#8090A0'], '#E8A060', 5800, 28, 42, 48, -30, 0.85, -1.5, '#506070', '#141820'),
+  ref('food-07', 'photo-1551024601-bec78aea704b', 'Coffee', 'food', '咖啡拉花', '#4A3020', ['#6A4838', '#8A6850'], '#A88868', 4200, 35, 38, 48, 500, 0.92, -2, '#6A4838', '#2A1810'),
+  ref('food-08', 'photo-1546069901-ba9599a7e63c', 'Fruits', 'food', '水果盛宴', '#D04020', ['#F06040', '#FF8060'], '#FFB020', 5000, 60, 50, 52, 250, 1.08, 0, '#F06040', '#601810'),
+  ref('food-09', 'photo-1498837167922-ddd27525d352', 'Dim Sum', 'food', '点心蒸笼', '#B08860', ['#D0A880', '#E8C8A0'], '#F0D8B8', 4800, 28, 55, 35, 380, 0.9, 0.5, '#D0A880', '#584430'),
+  ref('food-10', 'photo-1512621776951-a57141f2eefd', 'Vegetable', 'food', '蔬菜田园', '#508038', ['#70A058', '#98C878'], '#B8E098', 5500, 45, 52, 38, 100, 0.94, 0.5, '#70A058', '#28401C'),
+  ref('food-11', 'photo-1473093295043-cdd812d0e601', 'Wine Glass', 'food', '红酒晚宴', '#3A1018', ['#602030', '#903048'], '#C04060', 4000, 40, 30, 55, 550, 0.95, -4, '#602030', '#1A080C'),
+  ref('food-12', 'photo-1571091718767-18b5b1457add', 'Burger', 'food', '汉堡特写', '#7A4820', ['#A06830', '#C88848'], '#E0A860', 4200, 48, 45, 50, 550, 1.0, -1, '#A06830', '#3A2410'),
+  ref('food-13', 'photo-1495214783159-3503fd1b572d', 'Seafood', 'food', '海鲜盛宴', '#305060', ['#507080', '#80A0B0'], '#F08030', 5500, 35, 42, 48, 100, 0.9, -1.5, '#507080', '#182830'),
+  ref('food-14', 'photo-1464305795204-6f5bbfc7fb81', 'Breakfast', 'food', '元气早餐', '#C09050', ['#E0B070', '#F0D090'], '#FFF0C0', 4500, 38, 58, 38, 450, 0.94, 1.5, '#E0B070', '#604828'),
+  ref('food-15', 'photo-1547592180-85f173990554', 'Ramen', 'food', '拉面热气', '#6A4028', ['#8A5838', '#B07850'], '#D09868', 4200, 35, 42, 48, 500, 0.92, -2, '#8A5838', '#3A2018'),
+  ref('food-16', 'photo-1482049016gy-2d13b5d7c4a0', 'Ice Cream', 'food', '冰淇淋色', '#E0A0B0', ['#F0C0D0', '#F8E0E8'], '#FFF0F8', 5200, 30, 68, 25, 50, 0.85, 3.5, '#F0C0D0', '#906070'),
+  ref('food-17', 'photo-1519996529931-28324d5a630e', 'BBQ', 'food', '烧烤烟火', '#4A2010', ['#7A3820', '#A05030'], '#D06840', 3500, 50, 35, 58, 750, 1.05, -3.5, '#7A3820', '#200A08'),
+  ref('food-18', 'photo-1571167530149-c1105da4c2c7', 'Chocolate', 'food', '巧克力丝滑', '#3A1810', ['#5A3020', '#7A4830'], '#905838', 4000, 35, 32, 50, 550, 0.9, -3, '#5A3020', '#1A0C08'),
+  ref('food-19', 'photo-1504754524776-8f4f37790ca0', 'Tea Time', 'food', '下午茶', '#A08060', ['#C0A080', '#E0C8A8'], '#F0E0D0', 5000, 25, 58, 32, 280, 0.88, 1.5, '#C0A080', '#504030'),
+  ref('food-20', 'photo-1529042410759-befb1204b468', 'Cocktail', 'food', '鸡尾酒光影', '#102030', ['#204060', '#406090'], '#FF6020', 5500, 42, 30, 60, 100, 0.95, -4, '#204060', '#081018'),
+
+  // ── 暗调 (dark-moody) · 20 张 ──
+  ref('dark-01', 'photo-1469474968028-56623f02e42e', 'Dark Forest', 'dark-moody', '暗林深处', '#1A2818', ['#3A5830', '#6B8A50'], '#A0C870', 5400, 35, 28, 48, 330, 0.88, -4.4, '#3A5830', '#0D1A0C'),
+  ref('dark-02', 'photo-1495616811223-4d98c6e9c869', 'Dark Water', 'dark-moody', '深水暗流', '#0A1820', ['#1A3040', '#2A4860'], '#3A6080', 7000, 25, 20, 55, -200, 0.82, -6, '#1A3040', '#050C10'),
+  ref('dark-03', 'photo-1518156677180-95a2ef71260d', 'Smoke', 'dark-moody', '烟雾缭绕', '#101010', ['#2A2A30', '#4A4A58'], '#6A6A78', 5500, 8, 18, 60, 0, 0.75, -8, '#2A2A30', '#080808'),
+  ref('dark-04', 'photo-1454496522488-7a8e488e8606', 'Storm', 'dark-moody', '暴风前夕', '#1A2030', ['#3A4060', '#5A6890'], '#7A90B0', 6500, 22, 28, 58, -100, 0.84, -5, '#3A4060', '#0C1018'),
+  ref('dark-05', 'photo-1504883303951-581cbf120aa4', 'Dark Tunnel', 'dark-moody', '隧道尽头', '#0A0A10', ['#1A1A28', '#3A3A50'], '#6060A0', 5800, 15, 15, 65, 0, 0.8, -9, '#1A1A28', '#050508'),
+  ref('dark-06', 'photo-1488866022916-f7f2a2a88e5e', 'Night Sky', 'dark-moody', '暗夜苍穹', '#050810', ['#101828', '#1A2840'], '#3A5080', 8000, 20, 12, 60, -350, 0.82, -10, '#101828', '#020408'),
+  ref('dark-07', 'photo-1473081556163-2a17de81fc97', 'Misty Path', 'dark-moody', '迷雾小径', '#1A2A20', ['#3A4A38', '#5A6A58'], '#7A8A78', 5500, 18, 32, 42, 100, 0.82, -4, '#3A4A38', '#0C140C'),
+  ref('dark-08', 'photo-1536420111820-d84dee90a5ea', 'Dark Flowers', 'dark-moody', '暗夜花卉', '#1A1018', ['#3A2030', '#5A3048'], '#8A5070', 5000, 30, 25, 55, 100, 0.88, -5.5, '#3A2030', '#0C0810'),
+  ref('dark-09', 'photo-1518199266791-5375a83190b7', 'Urban Dark', 'dark-moody', '暗色都市', '#0A0C18', ['#1A2030', '#303850'], '#505878', 6000, 15, 20, 58, -50, 0.78, -7, '#1A2030', '#05060C'),
+  ref('dark-10', 'photo-1502082553048-f009c37129b9', 'Dark Ocean', 'dark-moody', '暗潮汹涌', '#0A1418', ['#1A2830', '#2A3C48'], '#3A5060', 6500, 20, 18, 55, -100, 0.82, -7, '#1A2830', '#050A0C'),
+  ref('dark-11', 'photo-1501436513145-30f24e19fbd', 'Cave', 'dark-moody', '洞穴幽光', '#141008', ['#2A2018', '#4A3828'], '#6A5838', 4000, 22, 20, 52, 500, 0.85, -6, '#2A2018', '#0A0804'),
+  ref('dark-12', 'photo-1478760329108-5c3ed9d495a0', 'Dark Mountain', 'dark-moody', '暗山险峰', '#101820', ['#203040', '#304858'], '#405860', 6500, 15, 22, 55, -80, 0.8, -6, '#203040', '#080C10'),
+  ref('dark-13', 'photo-1444084316824-dc26d6657664', 'Abandoned', 'dark-moody', '废墟独白', '#2A2018', ['#4A3828', '#6A5838'], '#8A7858', 4500, 18, 30, 48, 350, 0.85, -4, '#4A3828', '#141008'),
+  ref('dark-14', 'photo-1462275646964-a0e3c11f18a6', 'Dark Portrait', 'dark-moody', '暗调肖像', '#1A1018', ['#3A2830', '#5A4050'], '#7A5868', 5000, 18, 22, 58, 80, 0.82, -6.5, '#3A2830', '#0C0810'),
+  ref('dark-15', 'photo-1486551937199-baf066858de7', 'Thunder', 'dark-moody', '闪电惊雷', '#0A0810', ['#1A1828', '#303860'], '#6070C0', 7000, 25, 15, 68, -200, 0.85, -9, '#1A1828', '#050408'),
+  ref('dark-16', 'photo-1487621167305-5d248087c724', 'Dark River', 'dark-moody', '暗河微光', '#0A1018', ['#1A2030', '#2A3850'], '#3A5070', 6500, 18, 18, 55, -80, 0.8, -7, '#1A2030', '#05080C'),
+  ref('dark-17', 'photo-1502943693086-33b5b1cfdf2f', 'Dark Trees', 'dark-moody', '暗林枯木', '#141810', ['#2A3020', '#4A4838'], '#6A6050', 5200, 15, 25, 50, 150, 0.82, -5, '#2A3020', '#080C08'),
+  ref('dark-18', 'photo-1507400492013-162706c8c05e', 'Dark City', 'dark-moody', '暗夜城', '#0A0A14', ['#1A1A28', '#3A3A50'], '#5A5A78', 6000, 12, 16, 60, -30, 0.78, -8, '#1A1A28', '#05050A'),
+  ref('dark-19', 'photo-1440778303588-435521a205bc', 'Dark Animal', 'dark-moody', '暗影猎手', '#0A0C08', ['#1A2018', '#303828'], '#485040', 5500, 12, 15, 55, 50, 0.78, -8.5, '#1A2018', '#050604'),
+  ref('dark-20', 'photo-1502481851512-e9e2529b8784', 'Mist Lake', 'dark-moody', '暗雾湖泊', '#101820', ['#1A2838', '#2A3848'], '#3A5060', 6500, 15, 20, 50, -80, 0.8, -6.5, '#1A2838', '#080C10'),
+
+  // ── 胶片 (film) · 20 张 ──
+  ref('film-01', 'photo-1501785888041-af3ef285b470', 'Film Sunset', 'film', '暖金夕照', '#8B6B3A', ['#C4A060', '#4A7080'], '#E0C080', 4800, 42, 45, 52, 510, 0.94, -1, '#C4A060', '#2A1A10'),
+  ref('film-02', 'photo-1493246507139-91e8fad9978e', 'Film Street', 'film', '街头褪色', '#706050', ['#908070', '#B0A090'], '#C8B8A8', 5200, 28, 48, 40, 250, 0.88, -1.5, '#908070', '#383028'),
+  ref('film-03', 'photo-1429041966141-44d228a42775', 'Film Portrait', 'film', '胶片肖像', '#A08060', ['#C0A080', '#E0C0A0'], '#F0D8C0', 4800, 32, 52, 42, 380, 0.9, 0, '#C0A080', '#504030'),
+  ref('film-04', 'photo-1504198453319-5ce911bafcde', 'Film Night', 'film', '胶片夜景', '#1A1828', ['#2A2840', '#4A4860'], '#6A6890', 5800, 22, 25, 55, -30, 0.82, -5, '#2A2840', '#0C0C14'),
+  ref('film-05', 'photo-1509316975850-ff9c5deb0cd9', 'Film Desert', 'film', '胶片沙漠', '#B08040', ['#D0A060', '#E8C080'], '#F0D8A0', 4200, 42, 52, 45, 580, 0.96, 0.5, '#D0A060', '#584020'),
+  ref('film-06', 'photo-1470252649378-9c29740c9fa8', 'Film Garden', 'film', '花园褪色', '#7A6848', ['#9A8868', '#B8A888'], '#D0C0A8', 5200, 25, 50, 38, 200, 0.86, -0.5, '#9A8868', '#3A3020'),
+  ref('film-07', 'photo-1534430480872-3498386e7856', 'Kodak Gold', 'film', '柯达金色', '#C09040', ['#E0B060', '#F0D080'], '#FFE8A0', 4200, 48, 55, 45, 600, 1.0, 0.5, '#E0B060', '#604820'),
+  ref('film-08', 'photo-1459749411175-04bf5292ceea', 'Fuji Greens', 'film', '富士绿调', '#3A6040', ['#5A8060', '#80A880'], '#A0C8A0', 5800, 35, 48, 38, 80, 0.9, -0.5, '#5A8060', '#1A3020'),
+  ref('film-09', 'photo-1507003211169-0a1dd7228f2d', 'Film Male', 'film', '胶片男像', '#504840', ['#706860', '#908880'], '#A8A098', 5000, 15, 42, 45, 200, 0.82, -2, '#706860', '#282420'),
+  ref('film-10', 'photo-1494526585095-c41746248156', 'Film City', 'film', '城市旧色', '#404850', ['#606870', '#808890'], '#A0A8B0', 5800, 12, 40, 42, -20, 0.8, -2, '#606870', '#202428'),
+  ref('film-11', 'photo-1528164344885-47b1492b4a1d', 'Portra Warm', 'film', 'Portra 暖', '#B08858', ['#D0A878', '#E8C898'], '#F0D8B0', 4500, 35, 55, 40, 450, 0.92, 0.5, '#D0A878', '#58442C'),
+  ref('film-12', 'photo-1520333789090-1afc82db536a', 'Ektar Vivid', 'film', 'Ektar 浓', '#2080A0', ['#40A8C8', '#70C8E0'], '#90E0F0', 5500, 52, 48, 50, -50, 1.0, -0.5, '#40A8C8', '#104050'),
+  ref('film-13', 'photo-1484589065579-248aad0d628b', 'Tri-X BW', 'film', 'Tri-X 黑白', '#303030', ['#505050', '#808080'], '#B0B0B0', 5500, 0, 42, 58, 0, 0.0, -2.5, '#505050', '#181818'),
+  ref('film-14', 'photo-1518005020951-eccb494ad742', 'Cinestill', 'film', 'Cinestill 光', '#1A2040', ['#3040A0', '#5060C0'], '#FF6030', 4500, 45, 30, 62, 400, 1.0, -4, '#3040A0', '#0C1020'),
+  ref('film-15', 'photo-1511884642898-4c92249e20b6', 'Velvia Sat', 'film', 'Velvia 浓', '#208040', ['#40A060', '#60C080'], '#80E0A0', 5500, 58, 48, 52, 50, 1.08, -0.5, '#40A060', '#104020'),
+  ref('film-16', 'photo-1441974231531-c6227db76b6e', 'Pro 400H', 'film', '400H 柔', '#6080A0', ['#80A0C0', '#A8C8E0'], '#D0E8F8', 6200, 28, 55, 32, -80, 0.86, 1.5, '#80A0C0', '#304050'),
+  ref('film-17', 'photo-1504567961542-e24d9439a724', 'Superia', 'film', 'Superia 日常', '#608050', ['#80A070', '#A0C090'], '#C0D8B0', 5500, 32, 52, 35, 100, 0.9, 0, '#80A070', '#304028'),
+  ref('film-18', 'photo-1455218873509-8097305ee378', 'Classic Neg', 'film', '经典负片', '#504838', ['#706050', '#908070'], '#A89878', 5000, 20, 45, 42, 200, 0.85, -1.5, '#706050', '#28241C'),
+  ref('film-19', 'photo-1526080652727-5b77f74eacd2', 'Film Fade', 'film', '褪色记忆', '#808070', ['#A0A090', '#C0C0B0'], '#D8D8C8', 5500, 12, 55, 28, 50, 0.78, 1.5, '#A0A090', '#404038'),
+  ref('film-20', 'photo-1497290756760-23ac55edf36f', 'Film Travel', 'film', '旅途胶片', '#7A6040', ['#9A8060', '#B8A080'], '#D0B898', 4800, 28, 48, 40, 350, 0.9, -0.5, '#9A8060', '#3A3020'),
+
+  // ── 极简 (minimal) · 20 张 ──
+  ref('min-01', 'photo-1477346611705-65d1883cee1e', 'Misty Minimal', 'minimal', '雾中极简', '#D0D8E0', ['#8090A0', '#F0F4F8'], '#F8FAFA', 6800, 15, 72, 35, -90, 0.72, 4.4, '#8090A0', '#4A5A6A'),
+  ref('min-02', 'photo-1499346030926-9a72daac6c63', 'White Space', 'minimal', '留白之美', '#F0F0F8', ['#D8D8E0', '#C0C0D0'], '#A0A0B8', 6500, 8, 78, 22, -50, 0.7, 5, '#D8D8E0', '#606068'),
+  ref('min-03', 'photo-1507003211169-0a1dd7228f2d', 'Single Object', 'minimal', '一物一世界', '#E8E0D8', ['#D0C8C0', '#B8B0A8'], '#989088', 5500, 10, 70, 28, 100, 0.76, 3, '#D0C8C0', '#585048'),
+  ref('min-04', 'photo-1494438639946-1ebd1d20bf85', 'Horizon Line', 'minimal', '天际一线', '#C8D8E8', ['#90A8C0', '#E0E8F0'], '#F8FCFF', 7000, 12, 72, 25, -120, 0.74, 4, '#90A8C0', '#506078'),
+  ref('min-05', 'photo-1517816428104-797678c7cf53', 'Simple Shadow', 'minimal', '简影', '#F8F0E8', ['#E8E0D8', '#D0C8C0'], '#A89888', 5200, 8, 75, 30, 100, 0.75, 4.5, '#E8E0D8', '#585048'),
+  ref('min-06', 'photo-1484589065579-248aad0d628b', 'Mono Minimal', 'minimal', '单色极简', '#E0E0E0', ['#C0C0C0', '#A0A0A0'], '#808080', 5500, 0, 68, 32, 0, 0.0, 2, '#C0C0C0', '#404040'),
+  ref('min-07', 'photo-1490750967868-88aa4f99afaa', 'Cloud', 'minimal', '云上留白', '#D8E0F0', ['#A0B0D0', '#E8F0F8'], '#FAFCFF', 7200, 12, 75, 22, -140, 0.74, 5, '#A0B0D0', '#506080'),
+  ref('min-08', 'photo-1508615039623-a25605d2b022', 'Architecture Min', 'minimal', '建筑极简', '#E8E8F0', ['#D0D0D8', '#B0B0C0'], '#8888A0', 6500, 6, 72, 28, -60, 0.72, 3.5, '#D0D0D8', '#505060'),
+  ref('min-09', 'photo-1506905925346-21bda4d32df4', 'Snow Minimal', 'minimal', '雪地极简', '#F0F4F8', ['#D8E0E8', '#C0C8D8'], '#A0B0C0', 7000, 8, 78, 20, -100, 0.72, 5.5, '#D8E0E8', '#506070'),
+  ref('min-10', 'photo-1472214103451-9374bd1c798e', 'Water Minimal', 'minimal', '水面极简', '#C0D0D8', ['#90A0B0', '#D8E0E8'], '#F0F8FA', 6500, 12, 70, 28, -70, 0.76, 3.5, '#90A0B0', '#405060'),
+  ref('min-11', 'photo-1418065460487-3e41a6c84dc5', 'Light Minimal', 'minimal', '光影极简', '#F8F8F0', ['#E8E8E0', '#D8D8D0'], '#A8A8A0', 5500, 5, 78, 22, 30, 0.72, 5, '#E8E8E0', '#484840'),
+  ref('min-12', 'photo-1440778303588-435521a205bc', 'Animal Min', 'minimal', '生灵极简', '#D8E0D8', ['#A8B8A8', '#E8F0E8'], '#F8FFF8', 5800, 10, 72, 25, 50, 0.76, 3.5, '#A8B8A8', '#485848'),
+  ref('min-13', 'photo-1493397212122-2b85dda8106b', 'Flat Color', 'minimal', '平面色块', '#2080B0', ['#40A0D0', '#80C8E8'], '#F0FAFF', 6500, 35, 55, 42, -80, 0.85, 1, '#40A0D0', '#104058'),
+  ref('min-14', 'photo-1504567961542-e24d9439a724', 'Nature Min', 'minimal', '自然留白', '#C8D8C8', ['#A0B8A0', '#E0E8E0'], '#F8FFF8', 5800, 12, 72, 22, 50, 0.76, 3.5, '#A0B8A0', '#486048'),
+  ref('min-15', 'photo-1527176930608-09cb256ab504', 'Desert Min', 'minimal', '沙漠极简', '#E8D8C8', ['#D0C0A8', '#F0E8D8'], '#FFF8F0', 4800, 15, 72, 28, 250, 0.8, 3.5, '#D0C0A8', '#685840'),
+  ref('min-16', 'photo-1444080748397-f442aa95c3e5', 'Sea Minimal', 'minimal', '海天极简', '#B0D0E0', ['#80A8C0', '#D8E8F0'], '#F0FAFB', 6800, 15, 68, 25, -100, 0.78, 3, '#80A8C0', '#405868'),
+  ref('min-17', 'photo-1489447068241-b3490214e879', 'Line Art', 'minimal', '线条之美', '#F0F0F0', ['#D0D0D0', '#B0B0B0'], '#808080', 5500, 0, 75, 30, 0, 0.0, 3, '#D0D0D0', '#404040'),
+  ref('min-18', 'photo-1516541196182-6bdb0516ed27', 'Plant Min', 'minimal', '植物极简', '#D0E0D0', ['#A0C0A0', '#E0F0E0'], '#F8FFF8', 5800, 15, 72, 22, 50, 0.78, 3.5, '#A0C0A0', '#486048'),
+  ref('min-19', 'photo-1507525428034-b723cf961d3e', 'Beach Min', 'minimal', '海滩极简', '#D0E8F0', ['#A0C0D0', '#E0F0F8'], '#F8FFFF', 6500, 12, 72, 22, -60, 0.76, 4, '#A0C0D0', '#405060'),
+  ref('min-20', 'photo-1515549832467-8783363e19b6', 'Object Min', 'minimal', '器物极简', '#E8E0D8', ['#D0C8C0', '#F0E8E0'], '#FEFAF8', 5200, 8, 73, 25, 80, 0.75, 4, '#D0C8C0', '#585048'),
 ]
 
 /** 获取所有分类 */

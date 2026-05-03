@@ -47,6 +47,21 @@
    3. **GC 策略**：任何写入缓存目录的路径必须同时设计 LRU 淘汰机制（上限 + 水位回退），禁止"只写不清"
    4. **磁盘写入**：异步 (`fs.promises`) 而非同步 (`fs.writeFileSync`)，避免阻塞 Electron 主进程事件循环
 
+10. **基于日志诊断问题（禁止猜测式排查）** — 所有异常分析必须基于 app 实际运行的日志，严禁靠猜测定位问题。
+    1. **日志完备性**：每个关键路径（IPC 调用 / 文件 IO / 网络请求 / GPU 渲染）必须有 logger 输出
+       - 成功路径：`logger.info('module.action.ok', { 关键指标 })`
+       - 失败路径：`logger.warn/error('module.action.failed', { 错误详情, 上下文 })`
+    2. **排查 SOP**：遇到用户报告的 bug 时强制执行：
+       1. 先读 `userData/logs/main.ndjson` 找到相关时间段日志
+       2. 定位具体的 error/warn 日志条目
+       3. 从日志的 context data 追溯代码路径
+       4. 确认根因后再修改代码
+    3. **日志不全时的处理**：如果日志无法定位问题（缺少关键信息），必须**先补充日志**再复现问题，不允许跳过日志直接改代码
+    4. **禁止**：
+       - 仅凭代码静态分析就断定根因（必须有运行时证据）
+       - 一次性添加 `console.log` 排查后不清理（用 `logger.*` 持久保留）
+       - 日志中包含敏感信息（apiKey/path 等走 sanitize）
+
 ---
 
 ## ✅ 每次代码提交前必做的 5 项检查
@@ -65,6 +80,16 @@
 - `npx tsc --noEmit` 要求 **0 错误**
 - `biome check .` 要求 **0 警告**
 - 不得把新引入的错误归为"历史遗留"
+
+### 3.5 构建验证（M5 新增 · 防低级错误）
+- **每次新增/移动文件、修改 import 路径、修改 Vite 配置后，必须执行 `npm run build`**
+- 构建必须 **0 错误** 通过。`tsc --noEmit` 只检查类型，不检查模块解析/CSS 导入/多入口构建等问题
+- 典型低级错误（构建才能发现，tsc 发现不了）：
+  * 错误的 CSS/资源 import 路径（如 `./global.css` vs `./styles/global.css`）
+  * 多入口 HTML（batch-gpu.html / frame-export.html）的 script src 不存在
+  * Vite alias 路径不匹配
+  * 生产构建的 CSP 策略与代码不兼容
+- **新建任何 `.html` / `.tsx` 入口文件时，必须同步验证 `npm run build` 通过**
 
 ### 4. 单元测试同步更新并全绿
 - `npm test` 全通过
