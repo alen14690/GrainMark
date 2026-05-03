@@ -5,7 +5,7 @@
  * 容器尺寸 = canvasW × canvasH，Layout 填满整个画面。
  * 渲染完成后通知主进程用 capturePage 截图。
  */
-import { createRoot } from 'react-dom/client'
+import { createRoot, type Root } from 'react-dom/client'
 import type { FrameStyle, FrameStyleOverrides, Photo } from '../shared/types'
 import { getFrameLayoutComponent } from './components/frame/FrameStyleRegistry'
 import './styles/global.css'
@@ -29,6 +29,9 @@ const grain = (
   }
 ).grain
 
+// ★ 复用同一个 React root — 避免重复 createRoot 导致 DOM 残留旧内容
+let reactRoot: Root | null = null
+
 grain?.invoke('frame:export:ready')
 
 grain?.on('frame:export:task', async (...args: unknown[]) => {
@@ -40,6 +43,14 @@ grain?.on('frame:export:task', async (...args: unknown[]) => {
   }
 
   try {
+    // 卸载旧内容，确保每次导出从干净状态开始
+    if (reactRoot) {
+      reactRoot.unmount()
+      reactRoot = null
+    }
+    // 清空 DOM（防止 unmount 后有残留）
+    root.innerHTML = ''
+
     root.style.width = `${task.width}px`
     root.style.height = `${task.height}px`
     document.body.style.width = `${task.width}px`
@@ -55,9 +66,8 @@ grain?.on('frame:export:task', async (...args: unknown[]) => {
       return
     }
 
-    // 直接渲染 Layout 组件（与编辑器预览完全相同的组件），跳过 FramePreviewHost 的 contain-fit
-    // containerWidth/Height = 完整 canvas 尺寸，Layout 填满整个画面
-    const reactRoot = createRoot(root)
+    // 创建新 root 并渲染最新的 Layout
+    reactRoot = createRoot(root)
     reactRoot.render(
       <div
         style={{
