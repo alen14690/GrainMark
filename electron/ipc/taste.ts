@@ -2,29 +2,27 @@
  * taste IPC — 口味参考集相关 IPC 通道
  *
  * 通道：
- *   - taste:presets       → 返回预置参考图列表
+ *   - taste:presets       → 返回今日轮换的参考图列表（每日不同）
  *   - taste:categories    → 返回分类列表
  *   - taste:extract       → 从指定图片提取色彩方案
- *   - taste:apply-scheme  → 将配色方案应用到照片（生成预览）
+ *   - taste:get-scheme    → 获取指定参考图的配色方案
  */
 import type { TasteCategory } from '../../shared/types.js'
 import { registerIpc } from './safeRegister.js'
 import { extractColorPalette } from '../services/taste/colorExtractor.js'
+import { getDailyTastePresets, fetchUnsplashUpdates } from '../services/taste/tasteDailyRotation.js'
 import { generateSchemeFromPalette } from '../services/taste/schemeGenerator.js'
 import {
   TASTE_CATEGORY_LABELS,
   TASTE_PRESETS,
   getTasteCategories,
-  getPresetsByCategory,
 } from '../services/taste/tastePresets.js'
 
 export function registerTasteIpc() {
-  // 获取所有预置参考图
+  // 获取今日轮换的参考图（每日自动换一批）
   registerIpc('taste:presets', async (category?: unknown) => {
-    if (category && typeof category === 'string') {
-      return getPresetsByCategory(category as TasteCategory)
-    }
-    return TASTE_PRESETS
+    const cat = category && typeof category === 'string' ? category as TasteCategory : undefined
+    return getDailyTastePresets(cat)
   })
 
   // 获取分类列表
@@ -36,8 +34,8 @@ export function registerTasteIpc() {
   registerIpc(
     'taste:extract',
     async (imagePath: unknown) => {
-      const path = imagePath as string
-      const palette = await extractColorPalette(path)
+      const p = imagePath as string
+      const palette = await extractColorPalette(p)
       const scheme = generateSchemeFromPalette(palette, `user-${Date.now()}`, '自定义方案')
       return { palette, scheme }
     },
@@ -51,4 +49,7 @@ export function registerTasteIpc() {
     if (!ref) throw new Error(`参考图 ${id} 不存在`)
     return ref.scheme
   })
+
+  // 启动时后台尝试拉取 Unsplash 新作品（不阻塞）
+  void fetchUnsplashUpdates().catch(() => {})
 }
