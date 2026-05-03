@@ -410,7 +410,7 @@ export default function Editor() {
   }, [photoPath])
 
   // ---- Viewport: 滚轮缩放 ----
-  const handleWheel = useCallback((e: React.WheelEvent) => {
+  const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault()
     const factor = e.ctrlKey ? 0.01 : 0.002 // trackpad 捏合用 ctrlKey
     setViewport((v) => {
@@ -420,6 +420,14 @@ export default function Editor() {
       return { ...v, zoom: newZoom }
     })
   }, [])
+
+  // 用 useEffect 注册 non-passive wheel listener（React onWheel 默认 passive，无法 preventDefault）
+  useEffect(() => {
+    const container = canvasContainerRef.current
+    if (!container || showFrameOverlay) return
+    container.addEventListener('wheel', handleWheel, { passive: false })
+    return () => container.removeEventListener('wheel', handleWheel)
+  }, [handleWheel, showFrameOverlay])
 
   // ---- Viewport: 拖拽平移 ----
   const handleCanvasMouseDown = useCallback(
@@ -686,7 +694,6 @@ export default function Editor() {
             cursor:
               !showFrameOverlay && viewport.zoom > 1 ? (isPanning.current ? 'grabbing' : 'grab') : 'default',
           }}
-          onWheel={showFrameOverlay ? undefined : handleWheel}
           onMouseDown={showFrameOverlay ? undefined : handleCanvasMouseDown}
           onMouseMove={showFrameOverlay ? undefined : handleCanvasMouseMove}
           onMouseUp={showFrameOverlay ? undefined : handleCanvasMouseUp}
