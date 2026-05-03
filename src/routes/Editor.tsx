@@ -57,7 +57,9 @@ interface DraftData {
 function saveDraft(photoId: string, data: DraftData): void {
   try {
     localStorage.setItem(DRAFT_PREFIX + photoId, JSON.stringify(data))
-  } catch { /* 存满了就算了 */ }
+  } catch {
+    /* 存满了就算了 */
+  }
 }
 
 function loadDraft(photoId: string): DraftData | null {
@@ -70,11 +72,9 @@ function loadDraft(photoId: string): DraftData | null {
       return null
     }
     return data
-  } catch { return null }
-}
-
-function clearDraft(photoId: string): void {
-  localStorage.removeItem(DRAFT_PREFIX + photoId)
+  } catch {
+    return null
+  }
 }
 
 export default function Editor() {
@@ -157,7 +157,7 @@ export default function Editor() {
   useEffect(() => {
     if (!photoId || draftRestoredRef.current) return
     const draft = loadDraft(photoId)
-    if (draft && draft.pipeline) {
+    if (draft?.pipeline) {
       // 恢复草稿 pipeline（覆盖 loadFromPreset 的结果）
       useEditStore.setState((s) => {
         s.currentPipeline = draft.pipeline
@@ -180,7 +180,9 @@ export default function Editor() {
         timestamp: Date.now(),
       })
     }, 2000) // 2 秒 debounce
-    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current) }
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    }
   }, [photoId, currentPipeline, frameConfig, activeFilterId])
 
   // 离开 Editor 时不清空编辑态（草稿已保存），只清理内存中的 history/future 释放内存
@@ -337,7 +339,7 @@ export default function Editor() {
     }
   }
 
-  /** 导出当前编辑结果为全分辨率图片 */
+  /** 导出当前编辑结果（全分辨率，后端 pipeline + 边框渲染） */
   const [exportSize, setExportSize] = useState<'original' | '4000' | '2400' | '1600'>('original')
   const [exportToast, setExportToast] = useState<string | null>(null)
   const handleExport = async () => {
@@ -356,8 +358,6 @@ export default function Editor() {
       if (result) {
         setExportToast(result)
         setTimeout(() => setExportToast(null), 6000)
-        // 导出成功后清除草稿（避免下次进入恢复已导出的旧状态）
-        if (photoId) clearDraft(photoId)
       }
     } catch (err) {
       console.error('[export]', err)

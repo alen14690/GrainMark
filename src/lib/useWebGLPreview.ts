@@ -316,17 +316,17 @@ export function useWebGLPreview(
 
       setStatus('ready')
 
-      // 2.5) 帧快照：仅在 captureSnapshot=true 时执行（toDataURL 极其昂贵：10-50ms）
-      //      边框预览需要时才开启，拖滑块调参时不执行
-      if (captureSnapshotRef.current) {
-        try {
-          const canvas = canvasRef.current
-          if (canvas) {
-            snapshotRef.current = canvas.toDataURL('image/jpeg', 0.8)
-          }
-        } catch {
-          // 静默失败
+      // 2.5) 帧快照：始终捕获，确保切到边框时第一帧就有编辑后的图像。
+      //      边框模式（captureSnapshot=true）用 0.8 质量；
+      //      普通模式用 0.3 极低质量（编码耗时 ~3ms，可接受）。
+      try {
+        const canvas = canvasRef.current
+        if (canvas) {
+          const quality = captureSnapshotRef.current ? 0.8 : 0.3
+          snapshotRef.current = canvas.toDataURL('image/jpeg', quality)
         }
+      } catch {
+        // 静默失败
       }
 
       // 3) 直方图：同 tick readPixels + 复用 buffer + 跳帧
@@ -532,7 +532,7 @@ export function useWebGLPreview(
     }
   }, [])
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: pipeline/lut.texture are intentional triggers, values consumed via refs + renderNow closure
+  // biome-ignore lint/correctness/useExhaustiveDependencies: pipeline/lut.texture/captureSnapshot are intentional triggers, values consumed via refs + renderNow closure
   useEffect(() => {
     if (!gl || !sourceTexRef.current || !pipelineRef.current) return
     // rAF 合并：同一帧内 pipeline 多次变化只调 renderNow 一次
@@ -546,7 +546,7 @@ export function useWebGLPreview(
         console.error('[useWebGLPreview] renderNow failed:', e)
       }
     })
-  }, [pipeline, lut.texture, renderNow])
+  }, [pipeline, lut.texture, captureSnapshot, renderNow])
 
   return { canvasRef, status, error, snapshotRef }
 }

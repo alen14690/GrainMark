@@ -8,7 +8,7 @@
          connect-src 必须允许 data: blob: grain: —— Editor 的 useWebGLPreview 会用
          fetch('data:...') 或 fetch('grain://...') 读 previewUrl 转 ImageBitmap；
          CSP 拒绝会报 `Failed to fetch`（与 preview:render 无关）。生产 CSP 已允许。 -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: grain:; connect-src 'self' data: blob: grain: ws://localhost:* http://localhost:*; object-src 'none'; base-uri 'self'; form-action 'none';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: grain: https://images.unsplash.com; connect-src 'self' data: blob: grain: ws://localhost:* http://localhost:*; object-src 'none'; base-uri 'self'; form-action 'none';">
     <title>GrainMark · Film Post-Production</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
