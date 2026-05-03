@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "npm run build && electron dist-electron/main.js",
+    "preview": "npm run build && test -f dist-electron/main.js && test -f dist/index.html && electron dist-electron/main.js",
     "pack:dir": "npm run build && electron-builder --dir",
     "pack": "npm run build && electron-builder",
     "pack:mac": "npm run build && electron-builder --mac",
@@ -36,17 +36,17 @@
     "snapshot:bless": "GRAINMARK_BLESS_BASELINES=1 vitest run"
   },
   "dependencies": {
+    "clsx": "^2.1.1",
     "exiftool-vendored": "^29.1.0",
-    "sharp": "^0.33.5",
-    "lucide-react": "^0.460.0",
-    "zustand": "^5.0.1",
     "immer": "^10.1.1",
+    "lucide-react": "^0.460.0",
+    "nanoid": "^5.0.8",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0",
-    "clsx": "^2.1.1",
-    "nanoid": "^5.0.8",
-    "zod": "^3.23.8"
+    "sharp": "^0.33.5",
+    "zod": "^3.23.8",
+    "zustand": "^5.0.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
@@ -80,19 +80,30 @@
     "directories": {
       "output": "release"
     },
-    "files": ["dist", "dist-electron"],
+    "files": [
+      "dist",
+      "dist-electron"
+    ],
     "asar": true,
     "mac": {
       "category": "public.app-category.photography",
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "hardenedRuntime": false,
       "gatekeeperAssess": false
     },
     "win": {
-      "target": ["nsis"]
+      "target": [
+        "nsis"
+      ]
     },
     "linux": {
-      "target": ["AppImage", "deb"]
+      "target": [
+        "AppImage",
+        "deb"
+      ]
     }
   }
 }

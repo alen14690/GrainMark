@@ -9,12 +9,16 @@ import { buildAppMenu } from './menu.js'
 import { registerGrainPrivileges, registerGrainProtocol, setPhotoPathResolver } from './protocol/grain.js'
 import { shutdownGpuRenderer } from './services/batch/gpuRenderer.js'
 import { shutdownExiftool } from './services/exif/reader.js'
+import { shutdownFrameExporter } from './services/frame/frameExporter.js'
 import { setLLMVault } from './services/llm/configStore.js'
 import { logger } from './services/logger/logger.js'
 import { PathGuard } from './services/security/pathGuard.js'
 import { setPathGuard } from './services/security/pathGuardRegistry.js'
 import { SecureVault } from './services/security/secureVault.js'
 import { flushStorage, getLogsDir, getPhotosTable, initStorage } from './services/storage/init.js'
+
+// ★ 最早期诊断：所有 import 解析成功后输出（如果看不到此行说明模块加载阶段就崩了）
+console.error('[GrainMark] main.ts loaded — all imports resolved successfully')
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -37,9 +41,11 @@ let secureVault: SecureVault | null = null
 
 // 协议特权必须在 app.ready 之前注册
 registerGrainPrivileges()
+console.error('[GrainMark] Privileges registered, requesting single instance lock...')
 
 // 只允许单例运行
 if (!app.requestSingleInstanceLock()) {
+  console.error('[GrainMark] Single instance lock FAILED — another instance is running. Quitting.')
   app.quit()
 }
 
@@ -91,6 +97,13 @@ async function createWindow() {
   // 加载失败诊断（不要静默失败）
   win.webContents.on('did-fail-load', (_e, errCode, errDesc, url) => {
     logger.error('window.load-failed', { errCode, errDesc, url })
+  })
+
+  // 渲染端错误日志转发（仅 ERROR 级别）
+  win.webContents.on('console-message', (_e, level, message, line, sourceId) => {
+    if (level >= 3) {
+      logger.error('renderer.error', { message: message.slice(0, 300), line, sourceId: sourceId?.split('/').pop() })
+    }
   })
 
   // 渲染进程崩溃诊断
@@ -145,7 +158,7 @@ function setupSessionCSP() {
     "script-src 'self'",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: blob: grain:",
+    "img-src 'self' data: blob: grain: https://images.unsplash.com",
     // connect-src：允许 data:/blob:/grain: 是为了批处理隐藏窗口从 data URL fetch 源图
     "connect-src 'self' data: blob: grain: ws://localhost:* http://localhost:*",
     "object-src 'none'",
@@ -222,93 +235,101 @@ function registerDialogHandlers() {
 }
 
 app.whenReady().then(async () => {
-  setupSessionCSP()
-
-  // 初始化存储（内部末尾会异步触发 cacheSweeper.runStartupSweep 进行 preview + thumb GC）
-  await initStorage()
-
-  // 初始化日志磁盘沉淀（必须在 initStorage 之后，因为用 userData/logs）
-  logger.initFileSink(getLogsDir())
-  logger.info('app.started', {
-    platform: process.platform,
-    arch: process.arch,
-    pid: process.pid,
-    electronVersion: process.versions.electron,
-  })
-
-  // 初始化安全组件
-  const home = app.getPath('home')
-  pathGuard = new PathGuard([
-    path.join(home, 'Pictures'),
-    path.join(home, 'Downloads'),
-    path.join(home, 'Desktop'),
-    app.getPath('userData'),
-    app.getPath('temp'),
-  ])
-  await pathGuard.init()
-
-  // Hotfix：从已导入的 photos.json 恢复"用户此前明示授权过的目录"白名单
-  //
-  // 背景：F1（IPC PathGuard 切面）生效后，preview:render / photo:thumb 等
-  //   handler 会对传入路径强制 validate()。但启动时 PathGuard 只含 5 个系统
-  //   默认目录；若用户历史导入的照片在这些目录之外（例如外置硬盘 /Volumes/*
-  //   或自定义素材库），下次启动打开 Editor 会 validate 失败 → UI 卡 rendering。
-  //
-  // 修复契约：每张已存在于 photos.json 的照片，其父目录视为"已授权"——因为
-  //   当初导入时一定走过 dialog:selectFiles / selectDir，获得过用户明示同意。
-  //   重启不应撤销该授权。
-  //
-  // 回归保护：tests/unit/mainStartupContract.test.ts 会对本段代码做静态扫描。
+  console.error('[GrainMark] app.ready — starting initialization...')
   try {
-    const photos = getPhotosTable().all()
-    const seenDirs = new Set<string>()
-    for (const p of photos) {
-      if (!p.path) continue
-      const parent = path.dirname(p.path)
-      if (parent && !seenDirs.has(parent)) {
-        seenDirs.add(parent)
-        pathGuard.addAllowed(parent)
+    setupSessionCSP()
+
+    // 初始化存储（内部末尾会异步触发 cacheSweeper.runStartupSweep 进行 preview + thumb GC）
+    await initStorage()
+
+    // 初始化日志磁盘沉淀（必须在 initStorage 之后，因为用 userData/logs）
+    logger.initFileSink(getLogsDir())
+    logger.info('app.started', {
+      platform: process.platform,
+      arch: process.arch,
+      pid: process.pid,
+      electronVersion: process.versions.electron,
+    })
+
+    // 初始化安全组件
+    const home = app.getPath('home')
+    pathGuard = new PathGuard([
+      path.join(home, 'Pictures'),
+      path.join(home, 'Downloads'),
+      path.join(home, 'Desktop'),
+      app.getPath('userData'),
+      app.getPath('temp'),
+    ])
+    await pathGuard.init()
+
+    // Hotfix：从已导入的 photos.json 恢复"用户此前明示授权过的目录"白名单
+    //
+    // 背景：F1（IPC PathGuard 切面）生效后，preview:render / photo:thumb 等
+    //   handler 会对传入路径强制 validate()。但启动时 PathGuard 只含 5 个系统
+    //   默认目录；若用户历史导入的照片在这些目录之外（例如外置硬盘 /Volumes/*
+    //   或自定义素材库），下次启动打开 Editor 会 validate 失败 → UI 卡 rendering。
+    //
+    // 修复契约：每张已存在于 photos.json 的照片，其父目录视为"已授权"——因为
+    //   当初导入时一定走过 dialog:selectFiles / selectDir，获得过用户明示同意。
+    //   重启不应撤销该授权。
+    //
+    // 回归保护：tests/unit/mainStartupContract.test.ts 会对本段代码做静态扫描。
+    try {
+      const photos = getPhotosTable().all()
+      const seenDirs = new Set<string>()
+      for (const p of photos) {
+        if (!p.path) continue
+        const parent = path.dirname(p.path)
+        if (parent && !seenDirs.has(parent)) {
+          seenDirs.add(parent)
+          pathGuard.addAllowed(parent)
+        }
       }
+      logger.info('pathGuard.rehydrated', { dirs: seenDirs.size })
+    } catch (err) {
+      logger.warn('pathGuard.rehydrate.failed', { err: (err as Error).message })
     }
-    logger.info('pathGuard.rehydrated', { dirs: seenDirs.size })
+
+    try {
+      secureVault = new SecureVault(app.getPath('userData'))
+    } catch (e) {
+      logger.warn('vault.unavailable', { reason: (e as Error).message })
+    }
+
+    // 注入到 LLM 配置层（SecureVault 可能 null，configStore 内部会做降级处理）
+    setLLMVault(secureVault)
+
+    // 注册 grain:// 协议
+    const table = getPhotosTable()
+    setPhotoPathResolver((id) => {
+      const photo = table.get(id)
+      return photo ? photo.path : null
+    })
+    registerGrainProtocol(pathGuard)
+
+    // F1 修复：把 PathGuard 注入到 IPC 层，所有声明了 pathFields 的 handler 都会强制校验
+    setIpcPathGuard(pathGuard)
+    // F6/F7 修复：把 PathGuard 注入 service 层 registry，让 cubeIO 等做防御深度校验
+    setPathGuard(pathGuard)
+
+    // 注册 IPC
+    registerDialogHandlers()
+    registerAllIpcHandlers()
+
+    await createWindow()
+    console.error('[GrainMark] Window created successfully')
+
+    // 应用菜单：必须在窗口创建后挂，确保点击时能拿到窗口引用
+    buildAppMenu({ getMainWindow: () => win })
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    })
   } catch (err) {
-    logger.warn('pathGuard.rehydrate.failed', { err: (err as Error).message })
+    // ★ 关键：把启动错误输出到 stderr，确保在终端可见
+    console.error('[GrainMark:FATAL] Initialization failed:', err)
+    app.quit()
   }
-
-  try {
-    secureVault = new SecureVault(app.getPath('userData'))
-  } catch (e) {
-    logger.warn('vault.unavailable', { reason: (e as Error).message })
-  }
-
-  // 注入到 LLM 配置层（SecureVault 可能 null，configStore 内部会做降级处理）
-  setLLMVault(secureVault)
-
-  // 注册 grain:// 协议
-  const table = getPhotosTable()
-  setPhotoPathResolver((id) => {
-    const photo = table.get(id)
-    return photo ? photo.path : null
-  })
-  registerGrainProtocol(pathGuard)
-
-  // F1 修复：把 PathGuard 注入到 IPC 层，所有声明了 pathFields 的 handler 都会强制校验
-  setIpcPathGuard(pathGuard)
-  // F6/F7 修复：把 PathGuard 注入 service 层 registry，让 cubeIO 等做防御深度校验
-  setPathGuard(pathGuard)
-
-  // 注册 IPC
-  registerDialogHandlers()
-  registerAllIpcHandlers()
-
-  await createWindow()
-
-  // 应用菜单：必须在窗口创建后挂，确保点击时能拿到窗口引用
-  buildAppMenu({ getMainWindow: () => win })
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
-  })
 })
 
 // 二次实例被激活时唤醒主窗口
@@ -331,6 +352,7 @@ app.on('browser-window-created', (_e, bw) => {
   bw.once('closed', () => {
     if (win === bw) {
       shutdownGpuRenderer()
+      shutdownFrameExporter()
     }
   })
 })
@@ -345,6 +367,7 @@ app.on('before-quit', (event) => {
   ;(async () => {
     try {
       shutdownGpuRenderer()
+      shutdownFrameExporter()
     } catch {
       // ignore
     }
@@ -367,12 +390,16 @@ app.on('before-quit', (event) => {
   })()
 })
 
-// 未捕获异常 — 本地记录（不上传）
+// 未捕获异常 — 本地记录 + stderr 输出（不上传）
+// ★ 必须同时输出到 stderr：logger 可能尚未初始化（app.ready 之前崩溃时）
 process.on('uncaughtException', (err) => {
-  logger.error('uncaught', { message: err.message })
+  console.error('[GrainMark:FATAL] uncaughtException:', err.message, err.stack)
+  logger.error('uncaught', { message: err.message, stack: err.stack })
 })
 process.on('unhandledRejection', (reason) => {
-  logger.error('unhandled-rejection', { reason: String(reason) })
+  const msg = reason instanceof Error ? `${reason.message}\n${reason.stack}` : String(reason)
+  console.error('[GrainMark:FATAL] unhandledRejection:', msg)
+  logger.error('unhandled-rejection', { reason: msg })
 })
 
 // 导出给测试/IPC 使用

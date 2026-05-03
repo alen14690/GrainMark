@@ -62,6 +62,7 @@ async function loadRemoteCache(): Promise<TasteReference[]> {
     remoteCache = JSON.parse(raw) as TasteReference[]
     remoteCacheLoaded = true
   } catch {
+    // 文件不存在 或 getDataDir 尚未就绪 → 使用空缓存
     remoteCache = []
     remoteCacheLoaded = true
   }
