@@ -12,7 +12,7 @@ import { thumbSrc } from '../../../lib/grainUrl'
  */
 import type { FrameLayoutProps } from '../FrameStyleRegistry'
 
-export function PlaceholderFrameLayout({ photo, style }: FrameLayoutProps) {
+export function PlaceholderFrameLayout({ photo, style, photoSrcOverride }: FrameLayoutProps) {
   return (
     <div
       className="relative w-full h-full flex flex-col"
@@ -20,8 +20,12 @@ export function PlaceholderFrameLayout({ photo, style }: FrameLayoutProps) {
       data-frame-status="placeholder"
     >
       {/* 照片本体 · 保持 aspect */}
-      {photo.thumbPath && (
-        <img src={thumbSrc(photo)} alt="" className="flex-1 min-h-0 w-full object-contain bg-bg-0" />
+      {(photoSrcOverride || photo.thumbPath) && (
+        <img
+          src={photoSrcOverride ?? thumbSrc(photo)}
+          alt=""
+          className="flex-1 min-h-0 w-full object-contain bg-bg-0"
+        />
       )}
       {/* 占位边框 · 用 brand-violet 描边 + 等宽字说明"尚未实装" */}
       <div className="border-t border-brand-violet/40 bg-bg-1/60 px-4 py-3">

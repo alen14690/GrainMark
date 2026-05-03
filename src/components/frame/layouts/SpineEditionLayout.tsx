@@ -17,6 +17,7 @@ export function SpineEditionLayout({
   overrides: _overrides,
   containerWidth,
   containerHeight,
+  photoSrcOverride,
 }: FrameLayoutProps) {
   const orientation = classifyOrientation(photo.width, photo.height)
   const layout = orientation === 'portrait' ? style.portrait : style.landscape
@@ -43,9 +44,9 @@ export function SpineEditionLayout({
       data-frame-style-id={style.id}
       data-frame-orientation={orientation}
     >
-      {photo.thumbPath && (
+      {(photoSrcOverride || photo.thumbPath) && (
         <img
-          src={thumbSrc(photo)}
+          src={photoSrcOverride ?? thumbSrc(photo)}
           alt=""
           className="w-full h-full object-contain"
           style={{ backgroundColor: '#000' }}

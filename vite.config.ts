@@ -56,6 +56,7 @@ export default defineConfig({
       input: {
         main: path.resolve(__dirname, 'index.html'),
         'batch-gpu': path.resolve(__dirname, 'batch-gpu.html'),
+        'frame-export': path.resolve(__dirname, 'frame-export.html'),
       },
     },
   },

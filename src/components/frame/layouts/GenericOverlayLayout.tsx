@@ -350,6 +350,42 @@ function scale(ratio: number, ctx: StageFiveContext): number {
 }
 
 /**
+ * 预览基准 minEdge（CSS 像素）。
+ * 在预览场景下 containerWidth/Height 通常为 400-800px 级别，
+ * blur(60px) 在此尺度下视觉效果良好。
+ * 导出时容器可达 3000-6000px 像素，blur 必须等比放大，
+ * 否则模糊效果几乎看不见。
+ */
+const BLUR_PREVIEW_BASE = 600
+
+/**
+ * 按容器 minEdge 等比缩放 blur 半径 —— 保证预览和导出视觉一致。
+ *
+ * 原理：`blur(60px)` 在 600px 容器中占 10%，在 4000px 容器中只占 1.5%。
+ * 等比缩放后，4000px 容器会使用 `blur(400px)`，视觉效果与预览一致。
+ */
+function scaleBlur(basePx: number, ctx: StageFiveContext): number {
+  const minEdge = Math.min(ctx.containerWidth, ctx.containerHeight)
+  return Math.round(basePx * (minEdge / BLUR_PREVIEW_BASE))
+}
+
+/**
+ * 按容器尺寸等比缩放 inset 溢出值（防模糊边缘白边）。
+ */
+function scaleInset(basePx: number, ctx: StageFiveContext): number {
+  const minEdge = Math.min(ctx.containerWidth, ctx.containerHeight)
+  return Math.round(basePx * (minEdge / BLUR_PREVIEW_BASE))
+}
+
+/**
+ * 构造动态 filter 字符串：将 `blur(Npx)` 中的 N 按容器尺寸等比缩放，
+ * 其余 saturate/brightness 等保持原样。
+ */
+function scaleFilterBlur(filterStr: string, ctx: StageFiveContext): string {
+  return filterStr.replace(/blur\((\d+)px\)/g, (_m, px) => `blur(${scaleBlur(Number(px), ctx)}px)`)
+}
+
+/**
  * Logo + 机型文字的统一渲染组件
  *
  * 两种布局模式（由调用方根据可用空间决定）：
@@ -498,8 +534,8 @@ function renderFrostedGlass(ctx: StageFiveContext) {
           right: 0,
           bottom: 0,
           height: glassH,
-          backdropFilter: 'blur(30px) saturate(150%)',
-          WebkitBackdropFilter: 'blur(30px) saturate(150%)',
+          backdropFilter: `blur(${scaleBlur(30, ctx)}px) saturate(150%)`,
+          WebkitBackdropFilter: `blur(${scaleBlur(30, ctx)}px) saturate(150%)`,
           background: 'rgba(20, 20, 30, 0.75)',
           borderTop: '1px solid rgba(255,255,255,0.1)',
           display: 'flex',
@@ -589,8 +625,8 @@ function renderGlassChip(ctx: StageFiveContext) {
           right: 0,
           bottom: 0,
           height: glassH,
-          backdropFilter: 'blur(24px) saturate(150%)',
-          WebkitBackdropFilter: 'blur(24px) saturate(150%)',
+          backdropFilter: `blur(${scaleBlur(24, ctx)}px) saturate(150%)`,
+          WebkitBackdropFilter: `blur(${scaleBlur(24, ctx)}px) saturate(150%)`,
           background: 'rgba(15, 15, 20, 0.8)',
           borderTop: '1px solid rgba(255,255,255,0.08)',
           display: 'flex',
@@ -798,7 +834,7 @@ function renderAmbientGlow(ctx: StageFiveContext) {
             backgroundImage: `url(${imageSrc})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            filter: 'blur(40px) saturate(140%)',
+            filter: scaleFilterBlur('blur(40px) saturate(140%)', ctx),
             transform: 'scale(1.3)',
             zIndex: 0,
           }}
@@ -870,7 +906,7 @@ function renderBokehPillar(ctx: StageFiveContext) {
             backgroundImage: `url(${imageSrc})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            filter: 'blur(60px)',
+            filter: scaleFilterBlur('blur(60px)', ctx),
             transform: 'scale(1.5)',
             zIndex: 0,
           }}
@@ -1230,8 +1266,8 @@ function renderGlassGradient(ctx: StageFiveContext) {
           height: glassH,
           background:
             'linear-gradient(90deg, rgba(120,80,220,0.2), rgba(80,180,220,0.15), rgba(220,120,80,0.2))',
-          backdropFilter: 'blur(24px) saturate(150%)',
-          WebkitBackdropFilter: 'blur(24px) saturate(150%)',
+          backdropFilter: `blur(${scaleBlur(24, ctx)}px) saturate(150%)`,
+          WebkitBackdropFilter: `blur(${scaleBlur(24, ctx)}px) saturate(150%)`,
           borderTop: '1px solid rgba(255,255,255,0.1)',
           display: 'flex',
           alignItems: 'center',
@@ -1286,8 +1322,8 @@ function renderGlassMinimal(ctx: StageFiveContext) {
           bottom: 0,
           height: glassH,
           background: 'rgba(10, 10, 15, 0.85)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
+          backdropFilter: `blur(${scaleBlur(20, ctx)}px)`,
+          WebkitBackdropFilter: `blur(${scaleBlur(20, ctx)}px)`,
           borderTop: '1px solid rgba(255,255,255,0.06)',
           display: 'flex',
           alignItems: 'center',
@@ -1392,7 +1428,7 @@ function renderAmbientVinyl(ctx: StageFiveContext) {
             backgroundImage: `url(${imageSrc})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            filter: 'blur(50px) saturate(120%)',
+            filter: scaleFilterBlur('blur(50px) saturate(120%)', ctx),
             transform: 'scale(1.4)',
             zIndex: 0,
           }}
@@ -1461,7 +1497,7 @@ function renderAmbientAura(ctx: StageFiveContext) {
             backgroundImage: `url(${imageSrc})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            filter: 'blur(80px) saturate(180%) brightness(0.8)',
+            filter: scaleFilterBlur('blur(80px) saturate(180%) brightness(0.8)', ctx),
             transform: 'scale(1.6)',
             zIndex: 0,
           }}
@@ -1523,7 +1559,7 @@ function renderAmbientSoft(ctx: StageFiveContext) {
             backgroundImage: `url(${imageSrc})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            filter: 'blur(60px) saturate(80%) brightness(1.3)',
+            filter: scaleFilterBlur('blur(60px) saturate(80%) brightness(1.3)', ctx),
             transform: 'scale(1.4)',
             opacity: 0.3,
             zIndex: 1,
@@ -1583,7 +1619,7 @@ function renderAmbientDark(ctx: StageFiveContext) {
             backgroundImage: `url(${imageSrc})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            filter: 'blur(80px) brightness(0.3) saturate(60%)',
+            filter: scaleFilterBlur('blur(80px) brightness(0.3) saturate(60%)', ctx),
             transform: 'scale(1.5)',
             zIndex: 0,
           }}
@@ -1652,7 +1688,7 @@ function renderAmbientGradient(ctx: StageFiveContext) {
             backgroundImage: `url(${imageSrc})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            filter: 'blur(70px) saturate(150%) brightness(0.6)',
+            filter: scaleFilterBlur('blur(70px) saturate(150%) brightness(0.6)', ctx),
             transform: 'scale(1.5)',
             opacity: 0.5,
             zIndex: 1,
@@ -1787,7 +1823,7 @@ function renderAmbientColored(ctx: StageFiveContext) {
             backgroundImage: `url(${imageSrc})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            filter: colors.filter,
+            filter: scaleFilterBlur(colors.filter, ctx),
             transform: 'scale(1.5)',
             zIndex: 1,
           }}
@@ -1853,11 +1889,11 @@ function renderAmbientRounded(ctx: StageFiveContext) {
         <div
           style={{
             position: 'absolute',
-            inset: '-40px',
+            inset: `-${scaleInset(40, ctx)}px`,
             backgroundImage: `url(${imageSrc})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            filter: 'blur(50px) saturate(140%) brightness(0.7)',
+            filter: scaleFilterBlur('blur(50px) saturate(140%) brightness(0.7)', ctx),
             zIndex: 0,
           }}
         />
@@ -1913,11 +1949,11 @@ function renderAmbientIsland(ctx: StageFiveContext) {
         <div
           style={{
             position: 'absolute',
-            inset: '-40px',
+            inset: `-${scaleInset(40, ctx)}px`,
             backgroundImage: `url(${imageSrc})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            filter: 'blur(60px) saturate(120%) brightness(0.4)',
+            filter: scaleFilterBlur('blur(60px) saturate(120%) brightness(0.4)', ctx),
             zIndex: 0,
           }}
         />
@@ -1973,11 +2009,11 @@ function renderAmbientGlass(ctx: StageFiveContext) {
         <div
           style={{
             position: 'absolute',
-            inset: '-40px',
+            inset: `-${scaleInset(40, ctx)}px`,
             backgroundImage: `url(${imageSrc})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            filter: 'blur(40px) saturate(160%) brightness(0.6)',
+            filter: scaleFilterBlur('blur(40px) saturate(160%) brightness(0.6)', ctx),
             zIndex: 0,
           }}
         />
@@ -2000,8 +2036,8 @@ function renderAmbientGlass(ctx: StageFiveContext) {
           bottom: containerHeight * 0.025,
           height: glassH - containerHeight * 0.01,
           background: 'rgba(255,255,255,0.06)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
+          backdropFilter: `blur(${scaleBlur(24, ctx)}px)`,
+          WebkitBackdropFilter: `blur(${scaleBlur(24, ctx)}px)`,
           borderRadius: 16,
           border: '1px solid rgba(255,255,255,0.08)',
           display: 'flex',
@@ -2037,11 +2073,11 @@ function renderAmbientAurora(ctx: StageFiveContext) {
         <div
           style={{
             position: 'absolute',
-            inset: '-40px',
+            inset: `-${scaleInset(40, ctx)}px`,
             backgroundImage: `url(${imageSrc})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            filter: 'blur(50px) saturate(150%) brightness(0.5)',
+            filter: scaleFilterBlur('blur(50px) saturate(150%) brightness(0.5)', ctx),
             zIndex: 0,
           }}
         />
@@ -2049,10 +2085,10 @@ function renderAmbientAurora(ctx: StageFiveContext) {
       <div
         style={{
           position: 'absolute',
-          inset: '-30px',
+          inset: `-${scaleInset(30, ctx)}px`,
           background:
             'conic-gradient(from 45deg, rgba(120,80,220,0.2), rgba(80,200,220,0.15), rgba(255,120,80,0.15), rgba(120,80,220,0.2))',
-          filter: 'blur(40px)',
+          filter: scaleFilterBlur('blur(40px)', ctx),
           zIndex: 1,
         }}
       />
@@ -2111,11 +2147,11 @@ function renderAmbientFrost(ctx: StageFiveContext) {
         <div
           style={{
             position: 'absolute',
-            inset: '-40px',
+            inset: `-${scaleInset(40, ctx)}px`,
             backgroundImage: `url(${imageSrc})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            filter: 'blur(70px) saturate(80%) brightness(0.5)',
+            filter: scaleFilterBlur('blur(70px) saturate(80%) brightness(0.5)', ctx),
             zIndex: 0,
           }}
         />
@@ -2125,7 +2161,7 @@ function renderAmbientFrost(ctx: StageFiveContext) {
           position: 'absolute',
           inset: 0,
           background: 'rgba(180,200,230,0.03)',
-          backdropFilter: 'blur(1px)',
+          backdropFilter: `blur(${scaleBlur(1, ctx)}px)`,
           zIndex: 1,
         }}
       />
@@ -2187,11 +2223,11 @@ function renderAmbientBreathe(ctx: StageFiveContext) {
         <div
           style={{
             position: 'absolute',
-            inset: '-40px',
+            inset: `-${scaleInset(40, ctx)}px`,
             backgroundImage: `url(${imageSrc})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            filter: 'blur(50px) saturate(140%) brightness(0.5)',
+            filter: scaleFilterBlur('blur(50px) saturate(140%) brightness(0.5)', ctx),
             zIndex: 0,
           }}
         />
@@ -2266,11 +2302,11 @@ function renderAmbientMirror(ctx: StageFiveContext) {
         <div
           style={{
             position: 'absolute',
-            inset: '-40px',
+            inset: `-${scaleInset(40, ctx)}px`,
             backgroundImage: `url(${imageSrc})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            filter: 'blur(50px) saturate(140%) brightness(0.4)',
+            filter: scaleFilterBlur('blur(50px) saturate(140%) brightness(0.4)', ctx),
             zIndex: 0,
           }}
         />
@@ -2304,7 +2340,7 @@ function renderAmbientMirror(ctx: StageFiveContext) {
           overflow: 'hidden',
           transform: 'scaleY(-1)',
           opacity: 0.15,
-          filter: 'blur(3px)',
+          filter: scaleFilterBlur('blur(3px)', ctx),
           zIndex: 2,
           maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.5), transparent)',
           WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.5), transparent)',
@@ -2347,11 +2383,11 @@ function renderAmbientVignette(ctx: StageFiveContext) {
         <div
           style={{
             position: 'absolute',
-            inset: '-40px',
+            inset: `-${scaleInset(40, ctx)}px`,
             backgroundImage: `url(${imageSrc})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            filter: 'blur(60px) saturate(100%) brightness(0.35)',
+            filter: scaleFilterBlur('blur(60px) saturate(100%) brightness(0.35)', ctx),
             zIndex: 0,
           }}
         />
@@ -3029,8 +3065,8 @@ function renderTransparentOverlay(ctx: StageFiveContext) {
           right: containerWidth * 0.03,
           bottom: containerHeight * 0.03,
           background: 'rgba(0,0,0,0.35)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
+          backdropFilter: `blur(${scaleBlur(12, ctx)}px)`,
+          WebkitBackdropFilter: `blur(${scaleBlur(12, ctx)}px)`,
           borderRadius: 8,
           padding: `${scale(0.008, ctx)}px ${scale(0.012, ctx)}px`,
           border: '1px solid rgba(255,255,255,0.1)',

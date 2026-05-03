@@ -100,11 +100,13 @@ export function registerPhotoIpc() {
           if (cropW > 0 && cropH > 0) {
             outBuffer = await sharp(outBuffer)
               .extract({ left: cropX, top: cropY, width: cropW, height: cropH })
+              .jpeg({ quality: opts.quality })
               .toBuffer()
           }
         }
 
         // 应用旋转和翻转（在裁切之后）
+        // 注意：手动旋转后必须清除 EXIF orientation，否则后续 Sharp 读取会双重旋转
         const needsTransform = (opts.rotation && opts.rotation !== 0) || opts.flipH || opts.flipV
         if (needsTransform) {
           let img = sharp(outBuffer)
@@ -112,18 +114,18 @@ export function registerPhotoIpc() {
             img = img.rotate(opts.rotation)
           }
           if (opts.flipH) {
-            img = img.flop() // 水平翻转
+            img = img.flop()
           }
           if (opts.flipV) {
-            img = img.flip() // 垂直翻转
+            img = img.flip()
           }
-          outBuffer = await img.toBuffer()
+          // withMetadata({ orientation: 1 }) = "Top-left"（正常方向），清除旋转标记
+          outBuffer = await img.withMetadata({ orientation: 1 }).jpeg({ quality: opts.quality }).toBuffer()
         }
 
         // 应用水印（在所有变换之后）
         if (opts.watermark) {
           const { renderWatermark } = await import('../services/watermark/renderer.js')
-          // renderWatermark 需要文件路径，先写临时文件
           const tmpPath = path.join(os.tmpdir(), `grainmark-export-${Date.now()}.jpg`)
           await fsp.writeFile(tmpPath, outBuffer)
           try {
@@ -135,19 +137,57 @@ export function registerPhotoIpc() {
           }
         }
 
-        // 应用边框（在水印之后、写文件之前 —— 边框包裹整个画面含水印）
+        // 应用边框（离屏 BrowserWindow 渲染，与前端预览 100% 一致）
         if (opts.frame?.styleId) {
-          const { renderFrame } = await import('../services/frame/renderer.js')
-          // renderFrame 需要文件路径，写临时文件
-          const tmpFramePath = path.join(os.tmpdir(), `grainmark-frame-${Date.now()}.jpg`)
-          await fsp.writeFile(tmpFramePath, outBuffer)
-          try {
-            const frameDataUrl = await renderFrame(tmpFramePath, opts.frame.styleId, opts.frame.overrides)
-            const frameBase64 = frameDataUrl.replace(/^data:image\/\w+;base64,/, '')
-            outBuffer = Buffer.from(frameBase64, 'base64')
-          } finally {
-            await fsp.unlink(tmpFramePath).catch(() => {})
-          }
+          const { getFrameExporter } = await import('../services/frame/frameExporter.js')
+          const { listPublicFrameStyles } = await import('../services/frame/registry.js')
+          const { computeFrameGeometry } = await import('../services/frame/layoutEngine.js')
+          const { nanoid } = await import('nanoid')
+
+          const frameStyle = listPublicFrameStyles().find((s) => s.id === opts.frame!.styleId)
+          if (!frameStyle) throw new Error(`未知边框风格: ${opts.frame.styleId}`)
+
+          // 读取编辑后照片的实际尺寸
+          const editedMeta = await sharp(outBuffer).metadata()
+          const editedW = editedMeta.width ?? 1920
+          const editedH = editedMeta.height ?? 1080
+
+          // 计算带边框的 canvas 尺寸
+          const geometry = computeFrameGeometry(editedW, editedH, frameStyle)
+
+          // 将编辑后照片转为 dataURL
+          const photoJpeg = await sharp(outBuffer).jpeg({ quality: 92 }).toBuffer()
+          const photoDataUrl = `data:image/jpeg;base64,${photoJpeg.toString('base64')}`
+
+          // 构建最小 Photo 对象（EXIF 从原图读）
+          const exifData = await readExif(srcPath)
+          const photoObj = {
+            id: 'export-temp',
+            name: path.basename(srcPath),
+            path: srcPath,
+            thumbPath: null,
+            format: 'jpg' as const,
+            width: editedW,
+            height: editedH,
+            size: outBuffer.length,
+            sizeBytes: outBuffer.length,
+            exif: exifData,
+            importedAt: Date.now(),
+            starred: false,
+            rating: 0,
+            tags: [] as string[],
+          } as unknown as import('../../shared/types.js').Photo
+
+          const exporter = getFrameExporter()
+          outBuffer = await exporter.exportFrame({
+            taskId: nanoid(),
+            photoDataUrl,
+            photo: photoObj,
+            style: frameStyle,
+            overrides: opts.frame.overrides,
+            width: geometry.canvasW,
+            height: geometry.canvasH,
+          })
         }
 
         await fsp.writeFile(result.filePath, outBuffer)

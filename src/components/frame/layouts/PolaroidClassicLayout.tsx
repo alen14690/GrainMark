@@ -18,6 +18,7 @@ export function PolaroidClassicLayout({
   overrides,
   containerWidth,
   containerHeight,
+  photoSrcOverride,
 }: FrameLayoutProps) {
   const orientation = classifyOrientation(photo.width, photo.height)
   const layout = orientation === 'portrait' ? style.portrait : style.landscape
@@ -52,9 +53,9 @@ export function PolaroidClassicLayout({
       data-frame-orientation={orientation}
     >
       {/* 照片本体 · 在白边之内 */}
-      {photo.thumbPath && (
+      {(photoSrcOverride || photo.thumbPath) && (
         <img
-          src={thumbSrc(photo)}
+          src={photoSrcOverride ?? thumbSrc(photo)}
           alt=""
           className="w-full h-full object-contain"
           style={{ backgroundColor: '#000' }}

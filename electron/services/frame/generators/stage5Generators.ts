@@ -584,25 +584,37 @@ const generateOilClassic: FrameSvgGenerator = (ctx: FrameGeneratorContext) => {
 
 const generateAmbientVinyl: FrameSvgGenerator = (ctx: FrameGeneratorContext) => {
   const { geometry, modelLine, paramLine, style } = ctx
-  const { canvasW, canvasH, borderBottomPx, imgOffsetY, imgH } = geometry
+  const { canvasW, canvasH, imgOffsetX, imgOffsetY, imgW, imgH } = geometry
   const me = minEdge(geometry)
-  const fontModel = me * 0.02
+  const fontModel = me * 0.024
   const fontParam = me * 0.014
-  const plateTop = imgOffsetY + imgH
-  const centerY = plateTop + borderBottomPx / 2
+
+  // 圆形照片：居中偏上，直径 = min(imgW, imgH) * 0.7
+  const circleDiam = Math.round(Math.min(imgW, imgH) * 0.7)
+  const circleR = circleDiam / 2
+  const circleCx = imgOffsetX + imgW / 2
+  const circleCy = imgOffsetY + imgH * 0.45
+  const captionY = canvasH * 0.88
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}" height="${canvasH}" viewBox="0 0 ${canvasW} ${canvasH}">
-  <!-- style=${ESC(style.id)} -->
+  <!-- style=${ESC(style.id)} · vinyl circle crop -->
   <rect x="0" y="0" width="${canvasW}" height="${canvasH}" fill="#0A0A0A"/>
   <defs>
     <radialGradient id="vinyl-glow" cx="50%" cy="40%" r="60%">
       <stop offset="0" stop-color="rgba(120,80,180,0.2)"/>
       <stop offset="1" stop-color="rgba(0,0,0,0.6)"/>
     </radialGradient>
+    <clipPath id="vinyl-circle">
+      <circle cx="${circleCx}" cy="${circleCy}" r="${circleR}"/>
+    </clipPath>
   </defs>
   <rect x="0" y="0" width="${canvasW}" height="${canvasH}" fill="url(#vinyl-glow)"/>
-  ${drawText({ x: canvasW / 2, y: centerY - fontModel * 0.8, text: truncateByWidth(modelLine, canvasW * 0.8, fontModel), fontSizePx: fontModel, fontFamily: 'inter', color: 'rgba(255,255,255,0.95)', weight: 500, align: 'center' })}
-  ${drawText({ x: canvasW / 2, y: centerY + fontParam * 0.5, text: truncateByWidth(paramLine, canvasW * 0.8, fontParam), fontSizePx: fontParam, fontFamily: 'mono', color: 'rgba(255,255,255,0.7)', align: 'center' })}
+  <!-- 圆形阴影 -->
+  <circle cx="${circleCx}" cy="${circleCy + 8}" r="${circleR + 2}" fill="rgba(0,0,0,0.4)"/>
+  <circle cx="${circleCx}" cy="${circleCy}" r="${circleR}" fill="#000" stroke="rgba(255,255,255,0.08)" stroke-width="2"/>
+  <!-- __PHOTO_CIRCLE_CLIP__ 标记：composite 层用此 clipPath 裁切照片 -->
+  ${drawText({ x: canvasW / 2, y: captionY - fontModel, text: truncateByWidth(modelLine, canvasW * 0.8, fontModel), fontSizePx: fontModel, fontFamily: 'inter', color: 'rgba(255,255,255,0.95)', weight: 500, align: 'center' })}
+  ${drawText({ x: canvasW / 2, y: captionY + fontParam * 0.5, text: truncateByWidth(paramLine, canvasW * 0.8, fontParam), fontSizePx: fontParam, fontFamily: 'mono', color: 'rgba(255,255,255,0.7)', align: 'center' })}
 </svg>`
 }
 

@@ -23,6 +23,7 @@ export function MinimalBarLayout({
   overrides,
   containerWidth,
   containerHeight,
+  photoSrcOverride,
 }: FrameLayoutProps) {
   const orientation = classifyOrientation(photo.width, photo.height)
   const layout = orientation === 'portrait' ? style.portrait : style.landscape
@@ -51,8 +52,12 @@ export function MinimalBarLayout({
       data-frame-orientation={orientation}
     >
       {/* 照片本体 · 占据上部 · flex-1 让底栏贴底 */}
-      {photo.thumbPath && (
-        <img src={thumbSrc(photo)} alt="" className="flex-1 min-h-0 w-full object-contain bg-bg-0" />
+      {(photoSrcOverride || photo.thumbPath) && (
+        <img
+          src={photoSrcOverride ?? thumbSrc(photo)}
+          alt=""
+          className="flex-1 min-h-0 w-full object-contain bg-bg-0"
+        />
       )}
       {/* 底栏容器 */}
       <div

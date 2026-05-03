@@ -19,6 +19,7 @@ export function FilmFullBorderLayout({
   overrides,
   containerWidth,
   containerHeight,
+  photoSrcOverride,
 }: FrameLayoutProps) {
   const orientation = classifyOrientation(photo.width, photo.height)
   const layout = orientation === 'portrait' ? style.portrait : style.landscape
@@ -64,7 +65,9 @@ export function FilmFullBorderLayout({
       data-frame-orientation={orientation}
     >
       {/* 照片 */}
-      {photo.thumbPath && <img src={thumbSrc(photo)} alt="" className="w-full h-full object-contain" />}
+      {(photoSrcOverride || photo.thumbPath) && (
+        <img src={photoSrcOverride ?? thumbSrc(photo)} alt="" className="w-full h-full object-contain" />
+      )}
 
       {/* 齿孔 · 横图上下;竖图左右 */}
       {borderTop > 0 && (
