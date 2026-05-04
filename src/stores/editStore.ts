@@ -65,6 +65,36 @@ export interface HistoryEntry {
 /** 历史栈上限（AGENTS: 50 步，约等于 Lightroom 默认） */
 export const HISTORY_LIMIT = 50
 
+/** 单张照片的完整编辑状态快照（多图切换时保存/恢复） */
+export interface PhotoEditState {
+  pipeline: FilterPipeline | null
+  baselinePipeline: FilterPipeline | null
+  baselineFilterId: string | null
+  frameConfig: FrameConfig | null
+  watermarkConfig: WatermarkConfig | null
+  history: HistoryEntry[]
+  future: HistoryEntry[]
+  dirty: boolean
+}
+
+/** 参数同步选项 */
+export interface SyncOptions {
+  whiteBalance: boolean
+  tone: boolean
+  colorGrading: boolean
+  saturation: boolean
+  vibrance: boolean
+  clarity: boolean
+  hsl: boolean
+  curves: boolean
+  grain: boolean
+  halation: boolean
+  vignette: boolean
+  crop: boolean
+  frame: boolean
+  watermark: boolean
+}
+
 interface EditState {
   /** 当前编辑 pipeline；null 表示"显示原图" */
   currentPipeline: FilterPipeline | null
@@ -117,6 +147,29 @@ interface EditState {
   // 工作流级 setter（watermark / frame）
   setFrameConfig: (config: FrameConfig | null) => void
   setWatermarkConfig: (config: WatermarkConfig | null) => void
+
+  // ---- 多图编辑会话（Lightroom 风格胶片条）----
+  /** 当前会话中的照片 ID 列表（胶片条内容）；单图模式 = [photoId] */
+  sessionPhotoIds: string[]
+  /** 当前正在编辑的照片 ID */
+  activePhotoId: string | null
+  /** 胶片条中被选中的照片 ID（用于同步/批量导出）；不含 activePhotoId */
+  selectedPhotoIds: string[]
+  /** 每张照片的独立编辑状态缓存（切换照片时保存/恢复） */
+  photoStates: Record<string, PhotoEditState>
+
+  // ---- 多图 actions ----
+  /** 初始化编辑会话（从 Library 进入时调用） */
+  initSession: (photoIds: string[], activeId?: string) => void
+  /** 切换当前编辑照片（自动保存旧照片状态、恢复新照片状态） */
+  switchPhoto: (photoId: string) => void
+  /** 切换胶片条选中状态（Cmd+Click） */
+  toggleSelected: (photoId: string) => void
+  /** 全选/全不选 */
+  selectAll: () => void
+  deselectAll: () => void
+  /** 同步当前照片的参数到选中照片（按字段） */
+  syncToSelected: (options: SyncOptions) => void
 
   // ---- 历史栈 actions（M4.2）----
   /**
@@ -210,6 +263,11 @@ export const useEditStore = create<EditState>()(
     _dirty: false,
     history: [],
     future: [],
+    // 多图会话
+    sessionPhotoIds: [],
+    activePhotoId: null,
+    selectedPhotoIds: [],
+    photoStates: {},
 
     loadFromPreset(preset) {
       set((s) => {
@@ -529,6 +587,159 @@ export const useEditStore = create<EditState>()(
         // 守住上限
         if (s.history.length > HISTORY_LIMIT) {
           s.history = s.history.slice(s.history.length - HISTORY_LIMIT)
+        }
+      })
+    },
+
+    // ---- 多图会话 actions ----
+
+    initSession(photoIds, activeId) {
+      set((s) => {
+        s.sessionPhotoIds = [...photoIds]
+        s.activePhotoId = activeId ?? photoIds[0] ?? null
+        s.selectedPhotoIds = []
+        // 不清空 photoStates（草稿可以跨会话保留）
+      })
+    },
+
+    switchPhoto(photoId) {
+      set((s) => {
+        if (s.activePhotoId === photoId) return
+        // 保存当前照片的状态到 photoStates
+        if (s.activePhotoId) {
+          s.photoStates[s.activePhotoId] = {
+            pipeline: deepClonePipeline(s.currentPipeline),
+            baselinePipeline: deepClonePipeline(s.baselinePipeline),
+            baselineFilterId: s.baselineFilterId,
+            frameConfig: deepClone(s.frameConfig),
+            watermarkConfig: deepClone(s.watermarkConfig),
+            history: JSON.parse(JSON.stringify(s.history)),
+            future: JSON.parse(JSON.stringify(s.future)),
+            dirty: s._dirty,
+          }
+        }
+        // 恢复目标照片的状态
+        const saved = s.photoStates[photoId]
+        if (saved) {
+          s.currentPipeline = deepClonePipeline(saved.pipeline)
+          s.baselinePipeline = deepClonePipeline(saved.baselinePipeline)
+          s.baselineFilterId = saved.baselineFilterId
+          s.frameConfig = deepClone(saved.frameConfig)
+          s.watermarkConfig = deepClone(saved.watermarkConfig)
+          s.history = JSON.parse(JSON.stringify(saved.history))
+          s.future = JSON.parse(JSON.stringify(saved.future))
+          s._dirty = saved.dirty
+        } else {
+          // 新照片：初始化为空状态
+          s.currentPipeline = null
+          s.baselinePipeline = null
+          s.baselineFilterId = null
+          s.frameConfig = null
+          s.watermarkConfig = null
+          s.history = []
+          s.future = []
+          s._dirty = false
+        }
+        s.activePhotoId = photoId
+      })
+    },
+
+    toggleSelected(photoId) {
+      set((s) => {
+        const idx = s.selectedPhotoIds.indexOf(photoId)
+        if (idx >= 0) {
+          s.selectedPhotoIds.splice(idx, 1)
+        } else {
+          s.selectedPhotoIds.push(photoId)
+        }
+      })
+    },
+
+    selectAll() {
+      set((s) => {
+        // 选中所有（排除当前正在编辑的）
+        s.selectedPhotoIds = s.sessionPhotoIds.filter((id) => id !== s.activePhotoId)
+      })
+    },
+
+    deselectAll() {
+      set((s) => {
+        s.selectedPhotoIds = []
+      })
+    },
+
+    syncToSelected(options) {
+      set((s) => {
+        if (!s.activePhotoId || s.selectedPhotoIds.length === 0) return
+        // 先保存当前照片状态
+        s.photoStates[s.activePhotoId] = {
+          pipeline: deepClonePipeline(s.currentPipeline),
+          baselinePipeline: deepClonePipeline(s.baselinePipeline),
+          baselineFilterId: s.baselineFilterId,
+          frameConfig: deepClone(s.frameConfig),
+          watermarkConfig: deepClone(s.watermarkConfig),
+          history: JSON.parse(JSON.stringify(s.history)),
+          future: JSON.parse(JSON.stringify(s.future)),
+          dirty: s._dirty,
+        }
+
+        const srcPipe = s.currentPipeline
+        for (const targetId of s.selectedPhotoIds) {
+          const target = s.photoStates[targetId] ?? {
+            pipeline: null, baselinePipeline: null, baselineFilterId: null,
+            frameConfig: null, watermarkConfig: null,
+            history: [], future: [], dirty: false,
+          }
+          // 确保目标有 pipeline 对象
+          if (!target.pipeline) target.pipeline = {}
+          const tp = target.pipeline
+
+          // 按字段合并
+          if (options.whiteBalance && srcPipe?.whiteBalance) {
+            tp.whiteBalance = JSON.parse(JSON.stringify(srcPipe.whiteBalance))
+          }
+          if (options.tone && srcPipe?.tone) {
+            tp.tone = JSON.parse(JSON.stringify(srcPipe.tone))
+          }
+          if (options.colorGrading && srcPipe?.colorGrading) {
+            tp.colorGrading = JSON.parse(JSON.stringify(srcPipe.colorGrading))
+          }
+          if (options.saturation && srcPipe?.saturation !== undefined) {
+            tp.saturation = srcPipe.saturation
+          }
+          if (options.vibrance && srcPipe?.vibrance !== undefined) {
+            tp.vibrance = srcPipe.vibrance
+          }
+          if (options.clarity && srcPipe?.clarity !== undefined) {
+            tp.clarity = srcPipe.clarity
+          }
+          if (options.hsl && srcPipe?.hsl) {
+            tp.hsl = JSON.parse(JSON.stringify(srcPipe.hsl))
+          }
+          if (options.curves && srcPipe?.curves) {
+            tp.curves = JSON.parse(JSON.stringify(srcPipe.curves))
+          }
+          if (options.grain && srcPipe?.grain) {
+            tp.grain = JSON.parse(JSON.stringify(srcPipe.grain))
+          }
+          if (options.halation && srcPipe?.halation) {
+            tp.halation = JSON.parse(JSON.stringify(srcPipe.halation))
+          }
+          if (options.vignette && srcPipe?.vignette) {
+            tp.vignette = JSON.parse(JSON.stringify(srcPipe.vignette))
+          }
+          if (options.crop && srcPipe?.crop) {
+            tp.crop = JSON.parse(JSON.stringify(srcPipe.crop))
+          }
+          if (options.frame) {
+            target.frameConfig = deepClone(s.frameConfig)
+          }
+          if (options.watermark) {
+            target.watermarkConfig = deepClone(s.watermarkConfig)
+          }
+
+          target.dirty = true
+          s.photoStates[targetId] = target
         }
       })
     },

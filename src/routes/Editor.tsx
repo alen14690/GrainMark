@@ -27,10 +27,11 @@ import {
   ZoomIn,
 } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useLocation, useParams } from 'react-router-dom'
 import AIAdvisorDialog from '../components/AIAdvisorDialog'
 import { AdjustmentsPanel } from '../components/AdjustmentsPanel'
 import CropOverlay from '../components/CropOverlay'
+import { FilmStrip } from '../components/FilmStrip'
 import { EditorFramePanel } from '../components/frame/EditorFramePanel'
 import { FramePreviewHost } from '../components/frame/FramePreviewHost'
 import { Histogram, ScoreBar, ValueBadge, cn } from '../design'
@@ -79,12 +80,32 @@ function loadDraft(photoId: string): DraftData | null {
 
 export default function Editor() {
   const { photoId } = useParams()
+  const location = useLocation()
+  // 多图模式：从 Library 传入的 photoIds（通过 navigate state）
+  const locationPhotoIds = (location.state as { photoIds?: string[] } | null)?.photoIds
+
   // P0-6：精准 selector —— 只在"当前这张照片"或"第一张照片"真变时才重渲
   //   旧实现 useAppStore((s) => s.photos) 会让 Editor 订阅整个数组，
   //   Library 导入/删除别的照片都会导致 Editor 重渲染
-  const photo = useAppStore((s) => s.photos.find((p) => p.id === photoId) ?? s.photos[0])
+  const allPhotos = useAppStore((s) => s.photos)
+  const activePhotoId = useEditStore((s) => s.activePhotoId)
+  const sessionPhotoIds = useEditStore((s) => s.sessionPhotoIds)
+  // 当前编辑的照片：优先从 session 中取 activePhotoId，否则 fallback 到路由 photoId
+  const effectivePhotoId = activePhotoId ?? photoId
+  const photo = allPhotos.find((p) => p.id === effectivePhotoId) ?? allPhotos[0]
   const filters = useAppStore((s) => s.filters)
   const activeFilterId = useAppStore((s) => s.activeFilterId)
+
+  // 初始化多图编辑会话（仅在 Editor mount 时执行一次）
+  const sessionInitRef = useRef(false)
+  useEffect(() => {
+    if (sessionInitRef.current) return
+    sessionInitRef.current = true
+    const ids = locationPhotoIds ?? (photoId ? [photoId] : allPhotos.length > 0 ? [allPhotos[0].id] : [])
+    if (ids.length > 0) {
+      useEditStore.getState().initSession(ids, photoId ?? ids[0])
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewError, setPreviewError] = useState<string | null>(null)
@@ -839,6 +860,22 @@ export default function Editor() {
             {photo.width}×{photo.height}
           </span>
         </div>
+
+        {/* 胶片条（多图模式） */}
+        <FilmStrip
+          photos={allPhotos}
+          onAddPhotos={async () => {
+            const paths = await ipc('dialog:selectFiles', { multi: true })
+            if (paths && paths.length > 0) {
+              const imported = await ipc('photo:import', paths)
+              if (imported && imported.length > 0) {
+                const newIds = imported.map((p: { id: string }) => p.id)
+                const { sessionPhotoIds, initSession, activePhotoId } = useEditStore.getState()
+                initSession([...sessionPhotoIds, ...newIds], activePhotoId ?? sessionPhotoIds[0])
+              }
+            }
+          }}
+        />
       </section>
 
       {/* Right Panel */}

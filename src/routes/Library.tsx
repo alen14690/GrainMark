@@ -3,7 +3,7 @@
  *
  * 卤化银风格：EXIF 徽章统计 + PhotoCard（含胶片齿孔装饰）
  */
-import { Download, ImageIcon, Trash2, Upload } from 'lucide-react'
+import { Download, ImageIcon, Pencil, Trash2, Upload } from 'lucide-react'
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { EmptyState, PhotoCard, ValueBadge } from '../design'
@@ -89,13 +89,27 @@ export default function Library() {
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
-              onClick={() => navigate('/batch', { state: { selectedPhotoIds: selected } })}
-              title="将选中照片批量导出"
+              onClick={() => navigate(`/editor/${selected[0]}`, { state: { photoIds: selected } })}
+              title="进入编辑器（多图模式）"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md
                 text-xs font-medium
                 bg-brand-amber/10 hover:bg-brand-amber/20
                 border border-brand-amber/30 hover:border-brand-amber/50
                 text-brand-amber
+                transition-all duration-fast ease-liquid"
+            >
+              <Pencil className="w-3.5 h-3.5" strokeWidth={2} />
+              <span>编辑 {selected.length} 张</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/batch', { state: { selectedPhotoIds: selected } })}
+              title="将选中照片批量导出"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md
+                text-xs font-medium
+                bg-white/[0.04] hover:bg-white/[0.08]
+                border border-white/10 hover:border-white/20
+                text-fg-2 hover:text-fg-1
                 transition-all duration-fast ease-liquid"
             >
               <Download className="w-3.5 h-3.5" strokeWidth={2} />
