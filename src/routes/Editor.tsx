@@ -31,6 +31,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useParams } from 'react-router-dom'
 import AIAdvisorDialog from '../components/AIAdvisorDialog'
 import { AdjustmentsPanel } from '../components/AdjustmentsPanel'
+import { BatchExportBar } from '../components/BatchExportBar'
 import CropOverlay from '../components/CropOverlay'
 import { FilmStrip } from '../components/FilmStrip'
 import { SyncPanel } from '../components/SyncPanel'
@@ -722,6 +723,8 @@ export default function Editor() {
               <Download className="w-3.5 h-3.5" />
               导出
             </button>
+            {/* 多图批量导出 */}
+            <BatchExportBar exportSize={exportSize} />
           </div>
         </div>
 
