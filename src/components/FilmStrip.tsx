@@ -14,7 +14,7 @@
  *   - 高度 80px，可横向滚动
  */
 import { Check, Plus } from 'lucide-react'
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useRef } from 'react'
 import type { Photo } from '../../shared/types'
 import { ipc } from '../lib/ipc'
 import { previewCache } from '../routes/Editor'
