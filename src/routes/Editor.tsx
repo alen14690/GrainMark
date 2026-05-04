@@ -448,14 +448,6 @@ export default function Editor() {
     })
   }, [])
 
-  // 用 useEffect 注册 non-passive wheel listener（React onWheel 默认 passive，无法 preventDefault）
-  useEffect(() => {
-    const container = canvasContainerRef.current
-    if (!container || showFrameOverlay) return
-    container.addEventListener('wheel', handleWheel, { passive: false })
-    return () => container.removeEventListener('wheel', handleWheel)
-  }, [handleWheel, showFrameOverlay])
-
   // ---- Viewport: 拖拽平移 ----
   const handleCanvasMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -494,6 +486,14 @@ export default function Editor() {
   const canvasStyle = { maxWidth: '100%', maxHeight: 'calc(100vh - 260px)' } as const
   /** 是否显示边框覆盖层 — 选中了边框且风格数据已加载 */
   const showFrameOverlay = !!frameConfig?.styleId && !!selectedFrameStyle
+
+  // 用 useEffect 注册 non-passive wheel listener（React onWheel 默认 passive，无法 preventDefault）
+  useEffect(() => {
+    const container = canvasContainerRef.current
+    if (!container || showFrameOverlay) return
+    container.addEventListener('wheel', handleWheel, { passive: false })
+    return () => container.removeEventListener('wheel', handleWheel)
+  }, [handleWheel, showFrameOverlay])
 
   return (
     <div className="h-full flex animate-fade-in bg-bg-0" data-testid="editor-root">

@@ -89,9 +89,11 @@ export function SyncPanel({ onClose }: SyncPanelProps) {
       {/* 字段勾选 */}
       <div className="grid grid-cols-2 gap-1.5 mb-4">
         {SYNC_FIELDS.map(({ key, label }) => (
-          <label
+          <button
+            type="button"
             key={key}
-            className={`flex items-center gap-1.5 px-2 py-1 rounded-md cursor-pointer transition-colors
+            onClick={() => toggle(key)}
+            className={`flex items-center gap-1.5 px-2 py-1 rounded-md cursor-pointer transition-colors text-left
               ${options[key] ? 'bg-brand-amber/10 text-fg-1' : 'bg-white/[0.03] text-fg-3 hover:bg-white/[0.06]'}`}
           >
             <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors
@@ -100,7 +102,7 @@ export function SyncPanel({ onClose }: SyncPanelProps) {
               {options[key] && <Check className="w-2.5 h-2.5 text-black" strokeWidth={3} />}
             </div>
             <span className="text-[11px]">{label}</span>
-          </label>
+          </button>
         ))}
       </div>
 

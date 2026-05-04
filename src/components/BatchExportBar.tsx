@@ -6,7 +6,6 @@
  */
 import { Download, FolderOpen, Loader2 } from 'lucide-react'
 import { useState } from 'react'
-import type { Photo } from '../../shared/types'
 import { ipc } from '../lib/ipc'
 import { useEditStore } from '../stores/editStore'
 import { useAppStore } from '../stores/appStore'
