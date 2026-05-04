@@ -271,6 +271,59 @@ Commit body 模板（中文）：
 
 ---
 
+## 🛡️ 代码变更保障机制（第 11 条全局规则）
+
+**背景**：多次出现提交后 TypeScript 编译失败、React Hooks 顺序违规、未使用导入等问题。以下规则**强制执行**，每次代码变更必须遵守。
+
+### 11.1 提交前自检清单（Pre-commit Checklist）
+
+每次 `git commit` 之前，AI Agent 必须在脑中或实际执行以下检查：
+
+| # | 检查项 | 常见错误 | 验证方式 |
+|---|--------|---------|---------|
+| 1 | **未使用的 import** | 添加了导入但最终没用到 | 逐行确认每个 import 在文件中被引用 |
+| 2 | **未使用的变量/函数** | `const x = ...` 定义了但没调用 | `noUnusedLocals: true` 规则 |
+| 3 | **Hooks 调用顺序** | `if (...) return` 之后还有 useEffect/useCallback | 所有 hooks 必须在任何条件返回之前 |
+| 4 | **变量声明顺序** | useEffect deps 引用了后面才声明的变量 | 依赖项必须在 useEffect 之前声明 |
+| 5 | **render 阶段 setState** | 组件函数体内直接调 `store.set()` / `setState()` | 所有状态修改只在 useEffect/事件handler 中 |
+| 6 | **类型兼容性** | 新增字段但没更新所有引用处 | 确认 interface 变更的所有消费方 |
+
+### 11.2 影响面评估规则
+
+每次修改文件时，必须分析以下影响面：
+
+1. **谁导入了我修改的文件？** — 改 editStore 的类型/API → 所有引用方可能需要同步更新
+2. **我修改的函数被谁调用？** — 改 `switchPhoto` → 所有调用方的行为可能受影响
+3. **我添加/删除的导出被谁消费？** — 删除一个 export → 消费方编译报错
+4. **我修改了 React 组件的 hooks 结构吗？** — 增删 hook → 必须确认无条件分支在其之前 return
+
+### 11.3 React 组件修改铁律
+
+1. **所有 hooks（useState/useEffect/useCallback/useRef/useMemo）必须在组件函数体最顶部连续声明**，中间不能有任何条件 return
+2. **条件 early return（如 `if (!data) return <Loading />`）只能放在所有 hooks 之后**
+3. **禁止在组件函数体内（非 useEffect/非事件 handler）调用任何会触发 re-render 的操作**：
+   - ❌ `useEditStore.getState().someAction()` 在函数体内
+   - ❌ `setState(...)` 在函数体内
+   - ✅ 在 `useEffect(() => { ... }, [])` 中调用
+   - ✅ 在 `onClick={() => { ... }}` 中调用
+4. **新增 useEffect 时必须检查 deps 中所有变量的声明位置**，确保在 useEffect 之前
+
+### 11.4 Zustand Store 修改规则
+
+1. **新增 action 后必须确认所有 selector 的引用稳定性** — `useEditStore((s) => s.someNewField)` 是否在每次 set 时都返回新引用？
+2. **在 `set()` 回调中修改的字段 = 会触发订阅该字段的组件 re-render** — 修改越多字段，连锁 re-render 越广
+3. **禁止在 `set()` 中做重量级操作**（JSON 深拷贝、网络请求）— 只做轻量的数据赋值
+4. **数组/对象类型的字段**：immer 的 `set` 会对修改过的路径创建新引用，未修改的路径引用不变
+
+### 11.5 提交后验证
+
+如果有条件执行，每次提交后应验证：
+- `tsc --noEmit` 无错误
+- `npm run build` 三阶段（main/preload/renderer）全部成功
+- 不引入新的 `console.warn`/`console.error`
+
+---
+
 ## 🔄 复盘机制
 
 每个 Pass / 里程碑结束必须输出：
