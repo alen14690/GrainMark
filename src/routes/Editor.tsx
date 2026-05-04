@@ -475,12 +475,6 @@ export default function Editor() {
     setViewport((v) => (v.zoom > 1 ? { zoom: 1, panX: 0, panY: 0 } : { zoom: 3, panX: 0, panY: 0 }))
   }, [])
 
-  if (!photo) {
-    return (
-      <div className="h-full flex items-center justify-center text-fg-3 text-sm">请先到「图库」导入照片</div>
-    )
-  }
-
   const useWebglCanvas = !webglFatal && (webgl.status === 'ready' || webgl.status === 'loading')
   const showImgFallback = !useWebglCanvas && previewUrl
   const canvasStyle = { maxWidth: '100%', maxHeight: 'calc(100vh - 260px)' } as const
@@ -495,7 +489,7 @@ export default function Editor() {
     return () => container.removeEventListener('wheel', handleWheel)
   }, [handleWheel, showFrameOverlay])
 
-  // 安全守卫：photo 未就绪时显示 loading（避免访问 undefined 属性导致白屏崩溃）
+  // ★ 安全守卫必须放在所有 hooks 之后（React 要求 hooks 调用顺序恒定）
   if (!photo) {
     return (
       <div className="h-full flex items-center justify-center bg-bg-0 text-fg-3 text-sm">
