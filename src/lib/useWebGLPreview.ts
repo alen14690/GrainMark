@@ -487,8 +487,8 @@ export function useWebGLPreview(
         tmpCanvas.height = 0
         tmpCanvas = null
 
-        // 换图必然重采一次直方图（重置计数器让第一帧强制采样）
-        histogramFrameCounterRef.current = 0
+        // 换图后延迟 2 帧再采直方图（P1-6 优化：先让画面出来，减少首帧卡顿）
+        histogramFrameCounterRef.current = -2
         await renderNow()
       } catch (e) {
         if (cancelled) return

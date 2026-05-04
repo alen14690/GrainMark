@@ -47,6 +47,10 @@ import { usePerfStore } from '../stores/perfStore'
 
 type RightPanelTab = 'filters' | 'adjust' | 'frame'
 
+// ---- 性能优化：previewUrl 模块级缓存（跨切换保持，页面刷新丢失）----
+// Key = photoPath, Value = 渲染后的 data URL 或 grain:// URL
+export const previewCache = new Map<string, string>()
+
 // ---- 草稿持久化（P0：编辑状态不丢失）----
 const DRAFT_PREFIX = 'grainmark:draft:'
 const DRAFT_EXPIRE_MS = 7 * 24 * 60 * 60 * 1000 // 7 天过期
@@ -411,20 +415,28 @@ export default function Editor() {
   const webglFatal = webgl.status === 'error' || webgl.status === 'unsupported'
   const photoPath = photo?.path
 
-  // 拉取 previewUrl：只依赖 photoPath。filterId / pipelineOverride 永远传 null/undefined，
-  // preview:render 主进程只做 "取原图 + resize + encode"，所有滤镜/滑块实时 GPU 渲染
-  //
-  // 关键：schema 是 z.tuple([path, filterId, pipelineOverride?]) —— 必须传 3 个参数
-  //   即使第 3 个是 undefined 也要显式传，否则 args.length=2 会被 Zod 拒绝
-  //   （Array must contain at least 3 element(s)）
+  // 拉取 previewUrl：只依赖 photoPath
+  // ★ 性能优化：缓存命中时 0ms 切换；未命中时保留旧画面不闪白
   useEffect(() => {
     if (!photoPath) return
+
+    // 命中缓存 → 同步更新，无 IPC 延迟
+    const cached = previewCache.get(photoPath)
+    if (cached) {
+      setPreviewUrl(cached)
+      setPreviewError(null)
+      setLoading(false)
+      return
+    }
+
+    // 未命中 → IPC 拉取，但 ★ 不清空旧 previewUrl（保留旧画面避免闪白）
     let alive = true
     setLoading(true)
-    setPreviewError(null)
+    // 注意：不 setPreviewUrl(null)，让 WebGL 继续显示旧图直到新图就绪
     ipc('preview:render', photoPath, null, undefined)
       .then((url) => {
         if (alive) {
+          previewCache.set(photoPath, url) // 缓存
           setPreviewUrl(url)
           setPreviewError(null)
         }

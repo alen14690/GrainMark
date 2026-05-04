@@ -605,29 +605,31 @@ export const useEditStore = create<EditState>()(
     switchPhoto(photoId) {
       set((s) => {
         if (s.activePhotoId === photoId) return
-        // 保存当前照片的状态到 photoStates
+        // ★ P0-4 性能优化：引用转移替代深拷贝
+        // 切走后旧照片的 history/future 不会被修改（只有 active 照片才会 push/pop）
+        // 所以保存时直接引用转移，恢复时也直接赋值，避免 JSON.stringify 开销
         if (s.activePhotoId) {
           s.photoStates[s.activePhotoId] = {
-            pipeline: deepClonePipeline(s.currentPipeline),
-            baselinePipeline: deepClonePipeline(s.baselinePipeline),
+            pipeline: s.currentPipeline, // 直接引用转移（immer draft 会自动处理）
+            baselinePipeline: s.baselinePipeline,
             baselineFilterId: s.baselineFilterId,
-            frameConfig: deepClone(s.frameConfig),
-            watermarkConfig: deepClone(s.watermarkConfig),
-            history: JSON.parse(JSON.stringify(s.history)),
-            future: JSON.parse(JSON.stringify(s.future)),
+            frameConfig: s.frameConfig,
+            watermarkConfig: s.watermarkConfig,
+            history: s.history,   // 直接引用转移，无拷贝
+            future: s.future,     // 直接引用转移，无拷贝
             dirty: s._dirty,
           }
         }
         // 恢复目标照片的状态
         const saved = s.photoStates[photoId]
         if (saved) {
-          s.currentPipeline = deepClonePipeline(saved.pipeline)
-          s.baselinePipeline = deepClonePipeline(saved.baselinePipeline)
+          s.currentPipeline = saved.pipeline
+          s.baselinePipeline = saved.baselinePipeline
           s.baselineFilterId = saved.baselineFilterId
-          s.frameConfig = deepClone(saved.frameConfig)
-          s.watermarkConfig = deepClone(saved.watermarkConfig)
-          s.history = JSON.parse(JSON.stringify(saved.history))
-          s.future = JSON.parse(JSON.stringify(saved.future))
+          s.frameConfig = saved.frameConfig
+          s.watermarkConfig = saved.watermarkConfig
+          s.history = saved.history ?? []
+          s.future = saved.future ?? []
           s._dirty = saved.dirty
         } else {
           // 新照片：初始化为空状态

@@ -14,8 +14,10 @@
  *   - 高度 80px，可横向滚动
  */
 import { Check, Plus } from 'lucide-react'
-import { useCallback, useRef } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import type { Photo } from '../../shared/types'
+import { ipc } from '../lib/ipc'
+import { previewCache } from '../routes/Editor'
 import { useEditStore } from '../stores/editStore'
 
 interface FilmStripProps {
@@ -27,7 +29,8 @@ export function FilmStrip({ photos, onAddPhotos }: FilmStripProps) {
   const sessionPhotoIds = useEditStore((s) => s.sessionPhotoIds)
   const activePhotoId = useEditStore((s) => s.activePhotoId)
   const selectedPhotoIds = useEditStore((s) => s.selectedPhotoIds)
-  const photoStates = useEditStore((s) => s.photoStates)
+  // P1-8 优化：只订阅有编辑的 photoId 列表（避免整个 Record 引用变化触发 re-render）
+  const editedPhotoIds = useEditStore((s) => Object.keys(s.photoStates).filter((k) => s.photoStates[k]?.dirty))
   const switchPhoto = useEditStore((s) => s.switchPhoto)
   const toggleSelected = useEditStore((s) => s.toggleSelected)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -41,6 +44,19 @@ export function FilmStrip({ photos, onAddPhotos }: FilmStripProps) {
       }
     },
     [switchPhoto, toggleSelected],
+  )
+
+  // P0-3：hover 预加载 — 鼠标悬停时提前请求 preview
+  const handleMouseEnter = useCallback(
+    (photoId: string) => {
+      const photo = photos.find((p) => p.id === photoId)
+      if (photo?.path && !previewCache.has(photo.path)) {
+        ipc('preview:render', photo.path, null, undefined)
+          .then((url) => { previewCache.set(photo.path, url) })
+          .catch(() => {})
+      }
+    },
+    [photos],
   )
 
   // 只在多图模式下显示（必须放在所有 hooks 之后）
@@ -61,13 +77,14 @@ export function FilmStrip({ photos, onAddPhotos }: FilmStripProps) {
         {orderedPhotos.map((photo) => {
           const isActive = photo.id === activePhotoId
           const isSelected = selectedPhotoIds.includes(photo.id)
-          const hasEdits = !!photoStates[photo.id]?.dirty
+          const hasEdits = editedPhotoIds.includes(photo.id)
 
           return (
             <button
               key={photo.id}
               type="button"
               onClick={(e) => handleClick(photo.id, e)}
+              onMouseEnter={() => handleMouseEnter(photo.id)}
               className={`
                 relative flex-shrink-0 rounded-lg overflow-hidden transition-all duration-150
                 ${isActive
