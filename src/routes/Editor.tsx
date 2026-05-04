@@ -109,7 +109,8 @@ export default function Editor() {
     if (ids.length > 0) {
       useEditStore.getState().initSession(ids, photoId ?? ids[0])
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewError, setPreviewError] = useState<string | null>(null)
@@ -175,9 +176,14 @@ export default function Editor() {
   const redo = useEditStore((s) => s.redo)
 
   // 切换 filter → 重置编辑态
+  // biome-ignore lint/correctness/useExhaustiveDependencies: loadFromPreset 是稳定引用
   useEffect(() => {
-    loadFromPreset(activeFilter ?? null)
-  }, [activeFilter, loadFromPreset])
+    // 只在用户主动切换滤镜时执行（activeFilter 为具体对象时），
+    // 避免 mount 阶段 activeFilter=undefined 时把 pipeline 清空导致死循环
+    if (activeFilter) {
+      loadFromPreset(activeFilter)
+    }
+  }, [activeFilter])
 
   // 草稿恢复：进入 Editor 时检查 localStorage 是否有该照片的未完成编辑
   const draftRestoredRef = useRef(false)
