@@ -95,8 +95,8 @@ export default function Editor() {
   const sessionPhotoIds = useEditStore((s) => s.sessionPhotoIds)
   const selectedPhotoIds = useEditStore((s) => s.selectedPhotoIds)
   // 当前编辑的照片：优先从 session 中取 activePhotoId，否则 fallback 到路由 photoId
-  const effectivePhotoId = activePhotoId ?? photoId
-  const photo = allPhotos.find((p) => p.id === effectivePhotoId) ?? allPhotos[0]
+  const effectivePhotoId = activePhotoId ?? photoId ?? allPhotos[0]?.id
+  const photo = allPhotos.find((p) => p.id === effectivePhotoId)
   const filters = useAppStore((s) => s.filters)
   const activeFilterId = useAppStore((s) => s.activeFilterId)
 
@@ -494,6 +494,15 @@ export default function Editor() {
     container.addEventListener('wheel', handleWheel, { passive: false })
     return () => container.removeEventListener('wheel', handleWheel)
   }, [handleWheel, showFrameOverlay])
+
+  // 安全守卫：photo 未就绪时显示 loading（避免访问 undefined 属性导致白屏崩溃）
+  if (!photo) {
+    return (
+      <div className="h-full flex items-center justify-center bg-bg-0 text-fg-3 text-sm">
+        加载中...
+      </div>
+    )
+  }
 
   return (
     <div className="h-full flex animate-fade-in bg-bg-0" data-testid="editor-root">
