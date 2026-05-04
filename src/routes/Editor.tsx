@@ -8,6 +8,7 @@
  *   - 右栏 Tab   : 滤镜列表 | 参数调整（滑块）
  */
 import {
+  Copy,
   Crop,
   Download,
   Eye,
@@ -32,6 +33,7 @@ import AIAdvisorDialog from '../components/AIAdvisorDialog'
 import { AdjustmentsPanel } from '../components/AdjustmentsPanel'
 import CropOverlay from '../components/CropOverlay'
 import { FilmStrip } from '../components/FilmStrip'
+import { SyncPanel } from '../components/SyncPanel'
 import { EditorFramePanel } from '../components/frame/EditorFramePanel'
 import { FramePreviewHost } from '../components/frame/FramePreviewHost'
 import { Histogram, ScoreBar, ValueBadge, cn } from '../design'
@@ -90,6 +92,7 @@ export default function Editor() {
   const allPhotos = useAppStore((s) => s.photos)
   const activePhotoId = useEditStore((s) => s.activePhotoId)
   const sessionPhotoIds = useEditStore((s) => s.sessionPhotoIds)
+  const selectedPhotoIds = useEditStore((s) => s.selectedPhotoIds)
   // 当前编辑的照片：优先从 session 中取 activePhotoId，否则 fallback 到路由 photoId
   const effectivePhotoId = activePhotoId ?? photoId
   const photo = allPhotos.find((p) => p.id === effectivePhotoId) ?? allPhotos[0]
@@ -122,6 +125,8 @@ export default function Editor() {
   const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 })
   /** 裁切模式 */
   const [cropMode, setCropMode] = useState(false)
+  /** 同步参数面板 */
+  const [syncPanelOpen, setSyncPanelOpen] = useState(false)
   const canvasContainerRef = useRef<HTMLDivElement>(null)
 
   // 边框/水印从 editStore 统一读取（Single Source of Truth）
@@ -635,6 +640,24 @@ export default function Editor() {
               <Save className="w-3.5 h-3.5" />
               保存预设
             </button>
+            {/* 多图同步按钮 */}
+            {sessionPhotoIds.length > 1 && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setSyncPanelOpen((v) => !v)}
+                  className={cn(
+                    'btn-ghost btn-xs gap-1',
+                    selectedPhotoIds.length > 0 && 'text-brand-amber',
+                  )}
+                  title="同步参数到选中照片"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span className="text-xxs">同步{selectedPhotoIds.length > 0 ? ` (${selectedPhotoIds.length})` : ''}</span>
+                </button>
+                {syncPanelOpen && <SyncPanel onClose={() => setSyncPanelOpen(false)} />}
+              </div>
+            )}
             <div className="divider-metal-v mx-0.5 h-4" />
             <select
               value={exportSize}
