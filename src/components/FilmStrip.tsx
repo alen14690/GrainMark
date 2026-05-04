@@ -32,21 +32,19 @@ export function FilmStrip({ photos, onAddPhotos }: FilmStripProps) {
   const toggleSelected = useEditStore((s) => s.toggleSelected)
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  // 只在多图模式下显示
-  if (sessionPhotoIds.length <= 1) return null
-
   const handleClick = useCallback(
     (photoId: string, e: React.MouseEvent) => {
       if (e.metaKey || e.ctrlKey) {
-        // Cmd/Ctrl+Click → 切换选中
         toggleSelected(photoId)
       } else {
-        // 普通点击 → 切换编辑
         switchPhoto(photoId)
       }
     },
     [switchPhoto, toggleSelected],
   )
+
+  // 只在多图模式下显示（必须放在所有 hooks 之后）
+  if (sessionPhotoIds.length <= 1) return null
 
   // 按 sessionPhotoIds 顺序排列照片
   const orderedPhotos = sessionPhotoIds

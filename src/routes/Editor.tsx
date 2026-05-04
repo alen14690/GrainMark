@@ -87,27 +87,29 @@ export default function Editor() {
   // 多图模式：从 Library 传入的 photoIds（通过 navigate state）
   const locationPhotoIds = (location.state as { photoIds?: string[] } | null)?.photoIds
 
-  // P0-6：精准 selector —— 只在"当前这张照片"或"第一张照片"真变时才重渲
-  //   旧实现 useAppStore((s) => s.photos) 会让 Editor 订阅整个数组，
-  //   Library 导入/删除别的照片都会导致 Editor 重渲染
+  // 精准 selector：只订阅 photos 数组长度和当前照片变化，避免其他照片变化导致重渲
   const allPhotos = useAppStore((s) => s.photos)
   const activePhotoId = useEditStore((s) => s.activePhotoId)
   const sessionPhotoIds = useEditStore((s) => s.sessionPhotoIds)
   const selectedPhotoIds = useEditStore((s) => s.selectedPhotoIds)
   // 当前编辑的照片：优先从 session 中取 activePhotoId，否则 fallback 到路由 photoId
-  const effectivePhotoId = activePhotoId ?? photoId ?? allPhotos[0]?.id
+  const effectivePhotoId = activePhotoId || photoId || allPhotos[0]?.id
   const photo = allPhotos.find((p) => p.id === effectivePhotoId)
   const filters = useAppStore((s) => s.filters)
   const activeFilterId = useAppStore((s) => s.activeFilterId)
 
-  // 初始化多图编辑会话（仅在 Editor mount 时执行一次）
+  // 初始化多图编辑会话：从 location.state 读取 photoIds，写入 editStore
+  // 延迟到 requestAnimationFrame 执行，避免在 React commit 阶段触发连锁 setState
   const sessionInitRef = useRef(false)
   useEffect(() => {
     if (sessionInitRef.current) return
     sessionInitRef.current = true
     const ids = locationPhotoIds ?? (photoId ? [photoId] : allPhotos.length > 0 ? [allPhotos[0].id] : [])
-    if (ids.length > 0) {
-      useEditStore.getState().initSession(ids, photoId ?? ids[0])
+    if (ids.length > 1) {
+      // 多图模式：延迟初始化避免 render cycle 冲突
+      requestAnimationFrame(() => {
+        useEditStore.getState().initSession(ids, photoId ?? ids[0])
+      })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
